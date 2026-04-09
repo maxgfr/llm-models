@@ -21,6 +21,10 @@
   "bin": {
     "llm-models": "./build/index.js"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "keywords": [
     "llm",
     "models",

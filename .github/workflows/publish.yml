@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NPM_CONFIG_PROVENANCE: true
     outputs:
       new_release_published: ${{ steps.check_release.outputs.new_release }}
       new_release_version: ${{ steps.version_after.outputs.version }}
-      new_release_tag: ${{ steps.version_after.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,10 +65,6 @@ jobs:
             echo "new_release=false" >> $GITHUB_OUTPUT
             echo "ℹ️ No new version released"
           fi
-
-      - name: Publish to npm with OIDC
-        if: steps.check_release.outputs.new_release == 'true'
-        run: npm publish --provenance --access public
 
   build-binaries:
     needs: release
