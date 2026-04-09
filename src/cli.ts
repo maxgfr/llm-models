@@ -157,7 +157,7 @@ export function runCommand(): void {
       "Sort by: cost_input, cost_output, context_length, release_date, name, knowledge_cutoff, value",
     )
     .option("--desc", "Sort descending")
-    .option("-n, --limit <n>", "Max results (default: 20)", Number.parseInt, 20)
+    .option("-n, --limit <n>", "Max results (default: 20)", (v: string) => Number.parseInt(v, 10), 20)
     .option("-c, --count", "Show model count only")
     .option("--ids-only", "Output model IDs only, one per line")
     .option("--json", "Output raw JSON")
@@ -493,7 +493,7 @@ export function runCommand(): void {
       "Filter by capability: reasoning, tool_call, structured_output, open_weights, attachment",
     )
     .option("--min-context <n>", "Min context window size", Number.parseInt)
-    .option("-n, --limit <n>", "Max results (default: 10)", Number.parseInt, 10)
+    .option("-n, --limit <n>", "Max results (default: 10)", (v: string) => Number.parseInt(v, 10), 10)
     .option("--json", "Output raw JSON")
     .option("--format <fmt>", "Output format: table, json, csv, markdown")
     .action(
@@ -654,7 +654,7 @@ export function runCommand(): void {
     )
     .option("--max-cost <n>", "Max input cost budget ($/M tokens)", Number.parseFloat)
     .option("--min-context <n>", "Min context window", Number.parseInt)
-    .option("-n, --limit <n>", "Max results (default: 10)", Number.parseInt, 10)
+    .option("-n, --limit <n>", "Max results (default: 10)", (v: string) => Number.parseInt(v, 10), 10)
     .option("--list", "List available use cases")
     .option("--json", "Output raw JSON")
     .option("--format <fmt>", "Output format: table, json, csv, markdown")
