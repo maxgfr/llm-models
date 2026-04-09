@@ -50,13 +50,16 @@ export const ModelsDevModelSchema = z.object({
   structured_output: z.boolean().optional(),
   cost: ModelsDevCostSchema,
   status: z.string().optional(),
-  interleaved: z.union([z.boolean(), z.object({ field: z.string() })]).optional(),
+  interleaved: z
+    .boolean()
+    .or(z.object({ field: z.string() }))
+    .optional(),
   provider: z
     .object({
       npm: z.string().optional(),
       api: z.string().optional(),
       shape: z.string().optional(),
-      body: z.record(z.unknown()).optional(),
+      body: z.record(z.string(), z.unknown()).optional(),
     })
     .optional(),
   experimental: z.unknown().optional(),

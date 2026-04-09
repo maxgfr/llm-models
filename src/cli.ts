@@ -10,14 +10,13 @@ import {
 } from "./completions";
 import { getConfigPath, getProfile, initConfig, listProfiles, loadConfig } from "./config";
 import {
-  type OutputFormat,
   formatCapabilities,
   formatContext,
   formatCost,
   formatCostRaw,
+  type OutputFormat,
   outputFormatted,
   parseTokenCount,
-  printTable,
 } from "./format";
 import { compareModels } from "./functions/compare";
 import { cheapestModels, estimateCost } from "./functions/cost";
@@ -48,7 +47,7 @@ export function runCommand(): void {
     .option("--no-cache", "Disable cache for this request")
     .option("--quiet", "Suppress informational messages")
     .option("--verbose", "Show debug info (timing, cache status)")
-    .hook("preAction", (_thisCommand, actionCommand) => {
+    .hook("preAction", (_thisCommand, _actionCommand) => {
       const opts = program.opts();
       if (opts.cache === false) {
         setCacheEnabled(false);

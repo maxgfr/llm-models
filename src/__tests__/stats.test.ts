@@ -1,6 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, mock } from "bun:test";
 import { setCacheEnabled } from "../cache";
-import type { UnifiedModel } from "../types";
 
 beforeAll(() => {
   setCacheEnabled(false);

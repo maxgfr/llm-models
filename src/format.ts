@@ -66,7 +66,7 @@ export function printTable(headers: string[], rows: string[][]): void {
   const rightAlign = headers.map((_, i) => {
     if (rows.length === 0) return false;
     const raw = (rows[0][i] || "").replace(ANSI_RE, "");
-    return /^[\d$.\-]+$/.test(raw);
+    return /^[\d$.-]+$/.test(raw);
   });
 
   const headerLine = headers

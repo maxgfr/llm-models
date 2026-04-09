@@ -1,67 +1,67 @@
 #!/usr/bin/env node
 
-export { fetchOpenRouterModels } from "./clients/openrouter";
+export { clearCache, setCacheEnabled } from "./cache";
 export { fetchModelsDevModels } from "./clients/models-dev";
+export { fetchOpenRouterModels } from "./clients/openrouter";
+export { getProfile, listProfiles, loadConfig } from "./config";
 export {
-  OpenRouterModelSchema,
-  OpenRouterResponseSchema,
-  OpenRouterArchitectureSchema,
-  OpenRouterPricingSchema,
-  OpenRouterTopProviderSchema,
-  OpenRouterDefaultParametersSchema,
-  OpenRouterLinksSchema,
-} from "./schemas/openrouter";
+  cheapestModels,
+  compareModels,
+  diffModels,
+  estimateCost,
+  fetchUnifiedModels,
+  filterModels,
+  findModels,
+  getProvider,
+  getStats,
+  listProviders,
+  listUseCases,
+  QueryBuilder,
+  query,
+  recommendModels,
+  sortModels,
+} from "./functions/index";
 export {
-  ModelsDevModelSchema,
-  ModelsDevProviderSchema,
-  ModelsDevResponseSchema,
-  ModelsDevCostSchema,
-  ModelsDevLimitSchema,
-  ModelsDevModalitiesSchema,
-} from "./schemas/models-dev";
-export {
-  UnifiedModelSchema,
-  ProviderInfoSchema,
+  CapabilitiesSchema,
+  CostEstimateSchema,
+  ModelComparisonSchema,
   ModelFilterSchema,
   ModelSortFieldSchema,
   NormalizedCostSchema,
-  CostEstimateSchema,
-  ModelComparisonSchema,
-  CapabilitiesSchema,
+  ProviderInfoSchema,
+  UnifiedModelSchema,
 } from "./schemas/functions";
 export {
-  fetchUnifiedModels,
-  findModels,
-  filterModels,
-  sortModels,
-  compareModels,
-  getProvider,
-  listProviders,
-  estimateCost,
-  cheapestModels,
-  getStats,
-  recommendModels,
-  listUseCases,
-  diffModels,
-  query,
-  QueryBuilder,
-} from "./functions/index";
-export { setCacheEnabled, clearCache } from "./cache";
-export { loadConfig, getProfile, listProfiles } from "./config";
+  ModelsDevCostSchema,
+  ModelsDevLimitSchema,
+  ModelsDevModalitiesSchema,
+  ModelsDevModelSchema,
+  ModelsDevProviderSchema,
+  ModelsDevResponseSchema,
+} from "./schemas/models-dev";
+export {
+  OpenRouterArchitectureSchema,
+  OpenRouterDefaultParametersSchema,
+  OpenRouterLinksSchema,
+  OpenRouterModelSchema,
+  OpenRouterPricingSchema,
+  OpenRouterResponseSchema,
+  OpenRouterTopProviderSchema,
+} from "./schemas/openrouter";
 export type {
-  OpenRouterModel,
-  OpenRouterResponse,
+  Capabilities,
+  CostEstimate,
+  ModelComparison,
+  ModelFilter,
+  ModelSortField,
   ModelsDevModel,
   ModelsDevProvider,
   ModelsDevResponse,
-  UnifiedModel,
   NormalizedCost,
-  Capabilities,
+  OpenRouterModel,
+  OpenRouterResponse,
   ProviderInfo,
-  ModelFilter,
-  ModelSortField,
-  CostEstimate,
-  ModelComparison,
+  UnifiedModel,
 } from "./types";
 
 import { runCommand } from "./cli";
