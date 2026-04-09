@@ -20,6 +20,7 @@ jobs:
     outputs:
       new_release_published: ${{ steps.check_release.outputs.new_release }}
       new_release_version: ${{ steps.version_after.outputs.version }}
+      new_release_tag: ${{ steps.version_after.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,21 +44,25 @@ jobs:
       - name: Build
         run: bun run build:all
 
-      - name: Get version before release
+      - name: Get latest tag before release
         id: version_before
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: echo "tag=$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')" >> $GITHUB_OUTPUT
 
       - name: Semantic Release
         run: bunx semantic-release
 
-      - name: Get version after release
+      - name: Get latest tag after release
         id: version_after
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: |
+          git fetch --tags
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
 
       - name: Check if new version was released
         id: check_release
         run: |
-          if [ "${{ steps.version_before.outputs.version }}" != "${{ steps.version_after.outputs.version }}" ]; then
+          if [ "${{ steps.version_before.outputs.tag }}" != "${{ steps.version_after.outputs.tag }}" ]; then
             echo "new_release=true" >> $GITHUB_OUTPUT
           else
             echo "new_release=false" >> $GITHUB_OUTPUT

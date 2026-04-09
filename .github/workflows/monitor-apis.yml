@@ -1,0 +1,96 @@
+name: Monitor API schemas
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-schemas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Run schema validation tests
+        id: schema_test
+        continue-on-error: true
+        run: |
+          bun test src/__tests__/openrouter-schema.test.ts src/__tests__/models-dev-schema.test.ts 2>&1 | tee test-output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      - name: Create or update issue on failure
+        if: steps.schema_test.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('test-output.txt', 'utf8');
+            const title = `API Schema Change Detected - ${new Date().toISOString().split('T')[0]}`;
+            const label = 'api-schema-change';
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: label,
+              state: 'open',
+            });
+
+            const body = `## API Schema Validation Failed\n\nThe daily schema check detected changes in one or more upstream APIs.\n\n### Test Output\n\`\`\`\n${output.slice(-3000)}\n\`\`\`\n\n### Next Steps\n1. Review the API changes\n2. Update Zod schemas in \`src/schemas/\` to match\n3. Run \`bun test\` to verify\n4. Close this issue when fixed\n\n_Detected by automated monitoring on ${new Date().toISOString()}_`;
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body: `### Update - ${new Date().toISOString().split('T')[0]}\n\nSchema validation still failing.\n\n\`\`\`\n${output.slice(-2000)}\n\`\`\``,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              });
+            }
+
+      - name: Close issue on success
+        if: steps.schema_test.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = 'api-schema-change';
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: label,
+              state: 'open',
+            });
+            for (const issue of existing.data) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `Schemas are valid again as of ${new Date().toISOString().split('T')[0]}. Closing automatically.`,
+              });
+            }
