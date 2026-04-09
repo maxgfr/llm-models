@@ -1,8 +1,19 @@
+import { bold, colorizeCost, stripAnsi } from "./colors";
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape codes require control characters
+const ANSI_RE = /\x1b\[\d+m/g;
+
 export function formatNumber(n: number): string {
   return n.toLocaleString("en-US");
 }
 
 export function formatCost(cost: number | undefined | null): string {
+  if (cost == null) return "-";
+  const formatted = `$${cost.toFixed(2)}`;
+  return colorizeCost(cost, formatted);
+}
+
+export function formatCostRaw(cost: number | undefined | null): string {
   if (cost == null) return "-";
   return `$${cost.toFixed(2)}`;
 }
@@ -40,19 +51,89 @@ export function formatCapabilities(caps: Record<string, boolean | undefined>): s
 }
 
 export function printTable(headers: string[], rows: string[][]): void {
-  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] || "").length)));
+  const widths = headers.map((h, i) =>
+    Math.max(h.length, ...rows.map((r) => stripAnsi(r[i] || ""))),
+  );
 
-  const pad = (s: string, w: number, right = false) => (right ? s.padStart(w) : s.padEnd(w));
+  const pad = (s: string, w: number, right = false) => {
+    const visible = stripAnsi(s);
+    const diff = w - visible;
+    if (diff <= 0) return s;
+    return right ? " ".repeat(diff) + s : s + " ".repeat(diff);
+  };
 
-  // Detect numeric columns (right-align)
-  const rightAlign = headers.map((_, i) => rows.length > 0 && /^[\d$.\-]+$/.test(rows[0][i] || ""));
+  // Detect numeric columns (right-align) — strip ANSI for detection
+  const rightAlign = headers.map((_, i) => {
+    if (rows.length === 0) return false;
+    const raw = (rows[0][i] || "").replace(ANSI_RE, "");
+    return /^[\d$.\-]+$/.test(raw);
+  });
 
-  const headerLine = headers.map((h, i) => pad(h, widths[i], rightAlign[i])).join("  ");
+  const headerLine = headers
+    .map((h, i) => pad(bold(h), widths[i] + (bold(h).length - h.length), rightAlign[i]))
+    .join("  ");
   const separator = widths.map((w) => "-".repeat(w)).join("  ");
 
   console.log(headerLine);
   console.log(separator);
   for (const row of rows) {
     console.log(row.map((cell, i) => pad(cell || "", widths[i], rightAlign[i])).join("  "));
+  }
+}
+
+// --- Multiple output formats ---
+
+export type OutputFormat = "table" | "json" | "csv" | "markdown";
+
+export function formatAsCSV(headers: string[], rows: string[][]): string {
+  const csvEscape = (s: string) => {
+    const clean = s.replace(ANSI_RE, ""); // strip ANSI
+    if (clean.includes(",") || clean.includes('"') || clean.includes("\n")) {
+      return `"${clean.replace(/"/g, '""')}"`;
+    }
+    return clean;
+  };
+  const lines = [headers.map(csvEscape).join(",")];
+  for (const row of rows) {
+    lines.push(row.map(csvEscape).join(","));
+  }
+  return lines.join("\n");
+}
+
+export function formatAsMarkdown(headers: string[], rows: string[][]): string {
+  const clean = (s: string) => s.replace(ANSI_RE, "");
+  const widths = headers.map((h, i) =>
+    Math.max(h.length, ...rows.map((r) => clean(r[i] || "").length)),
+  );
+
+  const pad = (s: string, w: number) => clean(s).padEnd(w);
+  const headerLine = `| ${headers.map((h, i) => pad(h, widths[i])).join(" | ")} |`;
+  const separator = `| ${widths.map((w) => "-".repeat(w)).join(" | ")} |`;
+  const dataLines = rows.map(
+    (row) => `| ${row.map((cell, i) => pad(cell || "", widths[i])).join(" | ")} |`,
+  );
+
+  return [headerLine, separator, ...dataLines].join("\n");
+}
+
+export function outputFormatted(
+  format: OutputFormat,
+  headers: string[],
+  rows: string[][],
+  jsonData?: unknown,
+): void {
+  switch (format) {
+    case "json":
+      console.log(JSON.stringify(jsonData ?? rows, null, 2));
+      break;
+    case "csv":
+      console.log(formatAsCSV(headers, rows));
+      break;
+    case "markdown":
+      console.log(formatAsMarkdown(headers, rows));
+      break;
+    default:
+      printTable(headers, rows);
+      break;
   }
 }

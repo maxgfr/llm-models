@@ -59,6 +59,7 @@ export async function compareModels(modelIds: string[]): Promise<ModelComparison
   const models = modelIds.map((id) => findModelById(allModels, id) as UnifiedModel);
 
   const contextValues: Record<string, number | null> = {};
+  const outputLimitValues: Record<string, number | null> = {};
   const costInputValues: Record<string, number | null> = {};
   const costOutputValues: Record<string, number | null> = {};
   const capabilities: Record<string, Record<string, boolean | undefined>> = {};
@@ -66,6 +67,7 @@ export async function compareModels(modelIds: string[]): Promise<ModelComparison
 
   for (const model of models) {
     contextValues[model.id] = model.context_length;
+    outputLimitValues[model.id] = model.output_limit ?? null;
     costInputValues[model.id] = model.cost?.input ?? null;
     costOutputValues[model.id] = model.cost?.output ?? null;
     capabilities[model.id] = { ...model.capabilities };
@@ -78,6 +80,10 @@ export async function compareModels(modelIds: string[]): Promise<ModelComparison
       context_length: {
         values: contextValues,
         best: findBest(contextValues, "highest"),
+      },
+      output_limit: {
+        values: outputLimitValues,
+        best: findBest(outputLimitValues, "highest"),
       },
       cost_input: {
         values: costInputValues,

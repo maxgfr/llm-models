@@ -71,6 +71,47 @@ describe("normalizeOpenRouterModel", () => {
     const result = normalizeOpenRouterModel(mockModel);
     expect(result.output_limit).toBe(16384);
   });
+
+  it("carries description", () => {
+    const result = normalizeOpenRouterModel(mockModel);
+    expect(result.description).toBe("Test model");
+  });
+
+  it("carries supported_parameters", () => {
+    const result = normalizeOpenRouterModel(mockModel);
+    expect(result.supported_parameters).toEqual(["temperature"]);
+  });
+
+  it("carries tokenizer from architecture", () => {
+    const result = normalizeOpenRouterModel(mockModel);
+    expect(result.tokenizer).toBe("GPT");
+  });
+
+  it("carries reasoning cost when present", () => {
+    const modelWithReasoning: OpenRouterModel = {
+      ...mockModel,
+      pricing: {
+        ...mockModel.pricing,
+        internal_reasoning: "0.000003",
+      },
+    };
+    const result = normalizeOpenRouterModel(modelWithReasoning);
+    expect(result.cost?.reasoning).toBeCloseTo(3);
+  });
+
+  it("carries cache costs when present", () => {
+    const modelWithCache: OpenRouterModel = {
+      ...mockModel,
+      pricing: {
+        ...mockModel.pricing,
+        input_cache_read: "0.00000125",
+        input_cache_write: "0.0000025",
+      },
+    };
+    const result = normalizeOpenRouterModel(modelWithCache);
+    expect(result.cost?.cache_read).toBeCloseTo(1.25);
+    expect(result.cost?.cache_write).toBeCloseTo(2.5);
+  });
 });
 
 describe("normalizeModelsDevModel", () => {
@@ -118,5 +159,35 @@ describe("normalizeModelsDevModel", () => {
     const result = normalizeModelsDevModel(mockModel, "openai");
     expect(result.release_date).toBe("2024-05-13");
     expect(result.family).toBe("gpt");
+  });
+
+  it("carries extended costs when present", () => {
+    const modelWithExtendedCosts: ModelsDevModel = {
+      ...mockModel,
+      cost: {
+        input: 2.5,
+        output: 10,
+        cache_read: 1.25,
+        cache_write: 2.5,
+        reasoning: 7.5,
+        input_audio: 40,
+        output_audio: 80,
+      },
+    };
+    const result = normalizeModelsDevModel(modelWithExtendedCosts, "openai");
+    expect(result.cost?.cache_read).toBe(1.25);
+    expect(result.cost?.cache_write).toBe(2.5);
+    expect(result.cost?.reasoning).toBe(7.5);
+    expect(result.cost?.input_audio).toBe(40);
+    expect(result.cost?.output_audio).toBe(80);
+  });
+
+  it("handles model without cost", () => {
+    const modelNoCost: ModelsDevModel = {
+      ...mockModel,
+      cost: undefined,
+    };
+    const result = normalizeModelsDevModel(modelNoCost, "openai");
+    expect(result.cost).toBeUndefined();
   });
 });

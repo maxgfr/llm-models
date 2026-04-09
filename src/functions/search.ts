@@ -49,6 +49,11 @@ export function filterModels(models: UnifiedModel[], filter: ModelFilter): Unifi
     }
   }
 
+  if (filter.family) {
+    const f = filter.family.toLowerCase();
+    result = result.filter((m) => m.family?.toLowerCase() === f);
+  }
+
   return result;
 }
 
@@ -82,6 +87,17 @@ export function sortModels(
         valA = a.name.toLowerCase();
         valB = b.name.toLowerCase();
         break;
+      case "knowledge_cutoff":
+        valA = a.knowledge_cutoff ?? null;
+        valB = b.knowledge_cutoff ?? null;
+        break;
+      case "value": {
+        const costA = a.cost ? a.cost.input + a.cost.output : null;
+        const costB = b.cost ? b.cost.input + b.cost.output : null;
+        valA = costA != null && costA > 0 ? a.context_length / costA : null;
+        valB = costB != null && costB > 0 ? b.context_length / costB : null;
+        break;
+      }
     }
 
     // Nulls sort last regardless of direction

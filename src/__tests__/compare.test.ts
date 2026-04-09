@@ -1,4 +1,9 @@
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it, mock } from "bun:test";
+import { setCacheEnabled } from "../cache";
+
+beforeAll(() => {
+  setCacheEnabled(false);
+});
 
 const originalFetch = globalThis.fetch;
 
@@ -105,5 +110,39 @@ describe("compareModels", () => {
   it("throws when less than 2 models", async () => {
     const { compareModels } = await import("../functions/compare");
     expect(compareModels(["openai/gpt-4o"])).rejects.toThrow("At least 2 models");
+  });
+
+  it("includes output_limit dimension", async () => {
+    mockFetchForBothAPIs();
+    const { compareModels } = await import("../functions/compare");
+
+    const result = await compareModels(["openai/gpt-4o", "anthropic/claude-sonnet-4"]);
+
+    expect(result.dimensions.output_limit).toBeDefined();
+    expect(result.dimensions.output_limit.values).toBeDefined();
+    expect(typeof result.dimensions.output_limit.values["openai/gpt-4o"]).toBe("number");
+    // GPT-4o has 16384 output limit, Claude has 8192 → GPT-4o is best (highest)
+    expect(result.dimensions.output_limit.best).toBe("openai/gpt-4o");
+  });
+
+  it("includes capabilities for each model", async () => {
+    mockFetchForBothAPIs();
+    const { compareModels } = await import("../functions/compare");
+
+    const result = await compareModels(["openai/gpt-4o", "anthropic/claude-sonnet-4"]);
+
+    expect(result.dimensions.capabilities["openai/gpt-4o"]).toBeDefined();
+    expect(result.dimensions.capabilities["anthropic/claude-sonnet-4"]).toBeDefined();
+  });
+
+  it("includes modalities for each model", async () => {
+    mockFetchForBothAPIs();
+    const { compareModels } = await import("../functions/compare");
+
+    const result = await compareModels(["openai/gpt-4o", "anthropic/claude-sonnet-4"]);
+
+    expect(result.dimensions.modalities["openai/gpt-4o"]).toBeDefined();
+    expect(result.dimensions.modalities["openai/gpt-4o"].input).toBeDefined();
+    expect(result.dimensions.modalities["openai/gpt-4o"].output).toBeDefined();
   });
 });

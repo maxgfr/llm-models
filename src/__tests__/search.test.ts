@@ -11,6 +11,9 @@ const mockModels: UnifiedModel[] = [
     cost: { input: 2.5, output: 10 },
     modalities: { input: ["text", "image"], output: ["text"] },
     capabilities: { reasoning: false, tool_call: true, structured_output: true },
+    family: "gpt",
+    status: "active",
+    knowledge_cutoff: "2024-06",
     sources: { openrouter: true, models_dev: true },
   },
   {
@@ -21,6 +24,8 @@ const mockModels: UnifiedModel[] = [
     cost: { input: 3, output: 15 },
     modalities: { input: ["text", "image"], output: ["text"] },
     capabilities: { reasoning: true, tool_call: true },
+    family: "claude",
+    knowledge_cutoff: "2025-03",
     sources: { openrouter: true, models_dev: true },
   },
   {
@@ -32,6 +37,8 @@ const mockModels: UnifiedModel[] = [
     modalities: { input: ["text", "image", "audio"], output: ["text"] },
     capabilities: { reasoning: true, tool_call: true, open_weights: false },
     release_date: "2025-01-15",
+    family: "gemini",
+    knowledge_cutoff: "2025-01",
     sources: { openrouter: true, models_dev: true },
   },
   {
@@ -41,6 +48,7 @@ const mockModels: UnifiedModel[] = [
     context_length: 8192,
     modalities: { input: ["text"], output: ["text"] },
     capabilities: { open_weights: true },
+    status: "deprecated",
     sources: { openrouter: true, models_dev: false },
   },
 ];
@@ -86,6 +94,43 @@ describe("filterModels", () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("google/gemini-2.0-flash");
   });
+
+  it("filters by maxCostOutput", () => {
+    const result = filterModels(mockModels, { maxCostOutput: 1 });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("google/gemini-2.0-flash");
+  });
+
+  it("filters by status active (includes undefined)", () => {
+    const result = filterModels(mockModels, { status: "active" });
+    // active + undefined status models (excludes deprecated meta/llama)
+    expect(result.every((m) => m.status !== "deprecated")).toBe(true);
+    expect(result.length).toBe(3);
+  });
+
+  it("filters by status deprecated", () => {
+    const result = filterModels(mockModels, { status: "deprecated" });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("meta/llama-3-70b");
+  });
+
+  it("filters by family", () => {
+    const result = filterModels(mockModels, { family: "gpt" });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("openai/gpt-4o");
+  });
+
+  it("filters by family case-insensitive", () => {
+    const result = filterModels(mockModels, { family: "GPT" });
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("openai/gpt-4o");
+  });
+
+  it("excludes models without cost when maxCostOutput set", () => {
+    const result = filterModels(mockModels, { maxCostOutput: 100 });
+    // meta/llama has no cost, should be excluded
+    expect(result.every((m) => m.cost != null)).toBe(true);
+  });
 });
 
 describe("sortModels", () => {
@@ -111,5 +156,41 @@ describe("sortModels", () => {
     const result = sortModels(mockModels, "cost_input");
     const lastModel = result[result.length - 1];
     expect(lastModel.cost).toBeUndefined();
+  });
+
+  it("sorts by release_date", () => {
+    const result = sortModels(mockModels, "release_date");
+    // Only gemini has release_date, others should be last
+    const withDates = result.filter((m) => m.release_date);
+    expect(withDates[0].id).toBe("google/gemini-2.0-flash");
+  });
+
+  it("sorts by knowledge_cutoff", () => {
+    const result = sortModels(mockModels, "knowledge_cutoff");
+    // Should sort alphabetically: 2024-06, 2025-01, 2025-03, null last
+    const withKC = result.filter((m) => m.knowledge_cutoff);
+    expect(withKC[0].knowledge_cutoff).toBe("2024-06");
+    expect(withKC[withKC.length - 1].knowledge_cutoff).toBe("2025-03");
+  });
+
+  it("sorts by value (cost-effectiveness)", () => {
+    const result = sortModels(mockModels, "value");
+    // value = context_length / (input_cost + output_cost)
+    // gemini: 1048576 / 0.5 = 2097152
+    // openai: 128000 / 12.5 = 10240
+    // anthropic: 200000 / 18 = 11111
+    // meta: no cost → null → last
+    // Ascending: openai (10240) < anthropic (11111) < gemini (2097152) < meta (null)
+    expect(result[0].id).toBe("openai/gpt-4o");
+    expect(result[result.length - 1].id).toBe("meta/llama-3-70b");
+  });
+
+  it("sorts by value descending", () => {
+    const result = sortModels(mockModels, "value", true);
+    // Descending reverses entire array: null first, then highest value
+    // Non-null models should be in descending value order
+    const withValue = result.filter((m) => m.cost != null);
+    expect(withValue[0].id).toBe("google/gemini-2.0-flash");
+    expect(withValue[withValue.length - 1].id).toBe("openai/gpt-4o");
   });
 });

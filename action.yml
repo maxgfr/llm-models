@@ -1,0 +1,94 @@
+name: "LLM Models Check"
+description: "Check LLM model costs, status, and availability in CI/CD"
+author: "maxgfr"
+
+branding:
+  icon: "cpu"
+  color: "blue"
+
+inputs:
+  command:
+    description: "Command to run (find, cost, cheapest, compare, recommend, stats)"
+    required: true
+  args:
+    description: "Arguments for the command"
+    required: false
+    default: ""
+  max-budget:
+    description: "Maximum total cost budget (USD). Fails the step if any model exceeds this."
+    required: false
+  fail-on-deprecated:
+    description: "Fail if any matched model is deprecated (true/false)"
+    required: false
+    default: "false"
+  node-version:
+    description: "Node.js version to use"
+    required: false
+    default: "20"
+
+outputs:
+  result:
+    description: "JSON output of the command"
+    value: ${{ steps.run.outputs.result }}
+  model-count:
+    description: "Number of models matched"
+    value: ${{ steps.run.outputs.count }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Run llm-models
+      id: run
+      shell: bash
+      run: |
+        RESULT=$(npx -y llm-models@latest ${{ inputs.command }} ${{ inputs.args }} --json 2>&1)
+        echo "result<<EOF" >> $GITHUB_OUTPUT
+        echo "$RESULT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+        COUNT=$(echo "$RESULT" | node -e "
+          const input = require('fs').readFileSync('/dev/stdin', 'utf-8');
+          try {
+            const data = JSON.parse(input);
+            console.log(Array.isArray(data) ? data.length : 1);
+          } catch { console.log(0); }
+        ")
+        echo "count=$COUNT" >> $GITHUB_OUTPUT
+
+    - name: Check budget
+      if: inputs.max-budget != ''
+      shell: bash
+      run: |
+        echo '${{ steps.run.outputs.result }}' | node -e "
+          const input = require('fs').readFileSync('/dev/stdin', 'utf-8');
+          const data = JSON.parse(input);
+          const budget = ${{ inputs.max-budget }};
+          const items = Array.isArray(data) ? data : [data];
+          for (const item of items) {
+            if (item.total_cost_usd && item.total_cost_usd > budget) {
+              console.error('Budget exceeded: ' + item.model + ' costs \$' + item.total_cost_usd.toFixed(4) + ' (budget: \$' + budget + ')');
+              process.exit(1);
+            }
+          }
+          console.log('All models within budget (\$' + budget + ')');
+        "
+
+    - name: Check deprecated
+      if: inputs.fail-on-deprecated == 'true'
+      shell: bash
+      run: |
+        echo '${{ steps.run.outputs.result }}' | node -e "
+          const input = require('fs').readFileSync('/dev/stdin', 'utf-8');
+          const data = JSON.parse(input);
+          const items = Array.isArray(data) ? data : [data];
+          const deprecated = items.filter(m => m.status === 'deprecated');
+          if (deprecated.length > 0) {
+            console.error('Deprecated models found: ' + deprecated.map(m => m.id).join(', '));
+            process.exit(1);
+          }
+          console.log('No deprecated models found');
+        "

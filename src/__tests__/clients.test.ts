@@ -1,6 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it, mock } from "bun:test";
+import { setCacheEnabled } from "../cache";
 import { fetchModelsDevModels } from "../clients/models-dev";
 import { fetchOpenRouterModels } from "../clients/openrouter";
+
+beforeAll(() => {
+  setCacheEnabled(false);
+});
 
 const originalFetch = globalThis.fetch;
 

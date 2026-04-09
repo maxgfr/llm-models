@@ -1,3 +1,4 @@
+import { writeCache } from "../cache";
 import { fetchModelsDevModels } from "../clients/models-dev";
 import { fetchOpenRouterModels } from "../clients/openrouter";
 import type { ModelsDevModel, OpenRouterModel, UnifiedModel } from "../types";
@@ -30,6 +31,9 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
           cache_write: model.pricing.input_cache_write
             ? openRouterPriceToPerMillion(model.pricing.input_cache_write)
             : undefined,
+          reasoning: model.pricing.internal_reasoning
+            ? openRouterPriceToPerMillion(model.pricing.internal_reasoning)
+            : undefined,
         }
       : undefined,
     modalities: {
@@ -41,6 +45,10 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
     release_date: undefined,
     status: undefined,
     family: undefined,
+    description: model.description,
+    supported_parameters: model.supported_parameters,
+    tokenizer: model.architecture.tokenizer,
+    hugging_face_id: model.hugging_face_id ?? undefined,
     sources: { openrouter: true, models_dev: false },
   };
 }
@@ -58,6 +66,9 @@ export function normalizeModelsDevModel(model: ModelsDevModel, providerId: strin
           output: model.cost.output,
           cache_read: model.cost.cache_read,
           cache_write: model.cost.cache_write,
+          reasoning: model.cost.reasoning,
+          input_audio: model.cost.input_audio,
+          output_audio: model.cost.output_audio,
         }
       : undefined,
     modalities: {
@@ -80,6 +91,15 @@ export function normalizeModelsDevModel(model: ModelsDevModel, providerId: strin
 }
 
 function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): UnifiedModel {
+  // Merge costs: prefer models.dev base costs but carry OpenRouter extras
+  let cost = modelsDev.cost ?? openrouter.cost;
+  if (cost && openrouter.cost && modelsDev.cost) {
+    cost = {
+      ...modelsDev.cost,
+      reasoning: modelsDev.cost.reasoning ?? openrouter.cost.reasoning,
+    };
+  }
+
   return {
     ...openrouter,
     capabilities: {
@@ -90,8 +110,7 @@ function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): Unified
     status: modelsDev.status ?? openrouter.status,
     family: modelsDev.family ?? openrouter.family,
     knowledge_cutoff: modelsDev.knowledge_cutoff ?? openrouter.knowledge_cutoff,
-    // Prefer models.dev cost (numbers, more precise) over OpenRouter (converted from strings)
-    cost: modelsDev.cost ?? openrouter.cost,
+    cost,
     output_limit: modelsDev.output_limit ?? openrouter.output_limit,
     sources: { openrouter: true, models_dev: true },
   };
@@ -132,5 +151,7 @@ export async function fetchUnifiedModels(): Promise<UnifiedModel[]> {
     result.set(id, model);
   }
 
-  return Array.from(result.values());
+  const unified = Array.from(result.values());
+  writeCache("unified", unified);
+  return unified;
 }

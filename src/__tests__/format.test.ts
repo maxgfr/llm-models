@@ -1,5 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { formatCapabilities, formatContext, formatCost, parseTokenCount } from "../format";
+import {
+  formatAsCSV,
+  formatAsMarkdown,
+  formatCapabilities,
+  formatContext,
+  formatCost,
+  formatCostRaw,
+  parseTokenCount,
+} from "../format";
 
 describe("formatCost", () => {
   it("formats numbers as dollars", () => {
@@ -65,5 +73,84 @@ describe("formatCapabilities", () => {
   it("returns empty string when no capabilities", () => {
     expect(formatCapabilities({ reasoning: false })).toBe("");
     expect(formatCapabilities({})).toBe("");
+  });
+});
+
+describe("formatCostRaw", () => {
+  it("formats numbers as dollars without color", () => {
+    expect(formatCostRaw(2.5)).toBe("$2.50");
+    expect(formatCostRaw(0)).toBe("$0.00");
+    expect(formatCostRaw(100.1)).toBe("$100.10");
+  });
+
+  it("returns dash for null/undefined", () => {
+    expect(formatCostRaw(null)).toBe("-");
+    expect(formatCostRaw(undefined)).toBe("-");
+  });
+});
+
+describe("formatAsCSV", () => {
+  it("generates CSV with headers", () => {
+    const csv = formatAsCSV(["Name", "Value"], [["foo", "bar"]]);
+    expect(csv).toBe("Name,Value\nfoo,bar");
+  });
+
+  it("escapes commas in values", () => {
+    const csv = formatAsCSV(["Col"], [["hello, world"]]);
+    expect(csv).toContain('"hello, world"');
+  });
+
+  it("escapes quotes in values", () => {
+    const csv = formatAsCSV(["Col"], [['say "hi"']]);
+    expect(csv).toContain('"say ""hi"""');
+  });
+
+  it("handles multiple rows", () => {
+    const csv = formatAsCSV(
+      ["A", "B"],
+      [
+        ["1", "2"],
+        ["3", "4"],
+      ],
+    );
+    const lines = csv.split("\n");
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toBe("A,B");
+    expect(lines[1]).toBe("1,2");
+    expect(lines[2]).toBe("3,4");
+  });
+
+  it("strips ANSI codes from values", () => {
+    const csv = formatAsCSV(["Col"], [["\x1b[32m$2.50\x1b[39m"]]);
+    expect(csv).not.toContain("\x1b");
+    expect(csv).toContain("$2.50");
+  });
+});
+
+describe("formatAsMarkdown", () => {
+  it("generates markdown table", () => {
+    const md = formatAsMarkdown(["Name", "Value"], [["foo", "bar"]]);
+    expect(md).toContain("| Name");
+    expect(md).toContain("| foo");
+    expect(md).toContain("---");
+  });
+
+  it("includes separator row", () => {
+    const md = formatAsMarkdown(["A", "B"], [["1", "2"]]);
+    const lines = md.split("\n");
+    expect(lines).toHaveLength(3); // header, separator, data
+    expect(lines[1]).toMatch(/^\|[\s-|]+\|$/);
+  });
+
+  it("handles multiple rows", () => {
+    const md = formatAsMarkdown(["A"], [["1"], ["2"], ["3"]]);
+    const lines = md.split("\n");
+    expect(lines).toHaveLength(5); // header + separator + 3 data
+  });
+
+  it("strips ANSI codes", () => {
+    const md = formatAsMarkdown(["Col"], [["\x1b[31mred\x1b[39m"]]);
+    expect(md).not.toContain("\x1b");
+    expect(md).toContain("red");
   });
 });

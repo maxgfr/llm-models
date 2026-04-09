@@ -39,7 +39,15 @@ export {
   listProviders,
   estimateCost,
   cheapestModels,
+  getStats,
+  recommendModels,
+  listUseCases,
+  diffModels,
+  query,
+  QueryBuilder,
 } from "./functions/index";
+export { setCacheEnabled, clearCache } from "./cache";
+export { loadConfig, getProfile, listProfiles } from "./config";
 export type {
   OpenRouterModel,
   OpenRouterResponse,

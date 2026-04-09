@@ -5,6 +5,9 @@ export const NormalizedCostSchema = z.object({
   output: z.number(),
   cache_read: z.number().optional(),
   cache_write: z.number().optional(),
+  reasoning: z.number().optional(),
+  input_audio: z.number().optional(),
+  output_audio: z.number().optional(),
 });
 
 export const CapabilitiesSchema = z.object({
@@ -31,6 +34,10 @@ export const UnifiedModelSchema = z.object({
   release_date: z.string().optional(),
   status: z.string().optional(),
   family: z.string().optional(),
+  description: z.string().optional(),
+  supported_parameters: z.array(z.string()).optional(),
+  tokenizer: z.string().optional(),
+  hugging_face_id: z.string().nullable().optional(),
   sources: z.object({
     openrouter: z.boolean(),
     models_dev: z.boolean(),
@@ -65,6 +72,7 @@ export const ModelFilterSchema = z.object({
   minContext: z.number().optional(),
   search: z.string().optional(),
   status: z.enum(["active", "deprecated", "beta"]).optional(),
+  family: z.string().optional(),
 });
 
 export const ModelSortFieldSchema = z.enum([
@@ -73,6 +81,8 @@ export const ModelSortFieldSchema = z.enum([
   "context_length",
   "release_date",
   "name",
+  "knowledge_cutoff",
+  "value",
 ]);
 
 export const CostEstimateSchema = z.object({
@@ -93,6 +103,7 @@ export const ModelComparisonSchema = z.object({
   models: z.array(UnifiedModelSchema),
   dimensions: z.object({
     context_length: ModelComparisonDimensionSchema,
+    output_limit: ModelComparisonDimensionSchema,
     cost_input: ModelComparisonDimensionSchema,
     cost_output: ModelComparisonDimensionSchema,
     capabilities: z.record(z.string(), z.record(z.string(), z.boolean().optional())),

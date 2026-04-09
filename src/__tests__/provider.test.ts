@@ -1,4 +1,9 @@
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it, mock } from "bun:test";
+import { setCacheEnabled } from "../cache";
+
+beforeAll(() => {
+  setCacheEnabled(false);
+});
 
 const originalFetch = globalThis.fetch;
 
