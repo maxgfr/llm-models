@@ -44,35 +44,31 @@ jobs:
       - name: Build
         run: bun run build:all
 
-      - name: Get latest tag before release
+      - name: Get version before release
         id: version_before
-        run: echo "tag=$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')" >> $GITHUB_OUTPUT
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Semantic Release
-        run: bunx semantic-release
+        run: bun run release
 
-      - name: Get latest tag after release
+      - name: Get version after release
         id: version_after
-        run: |
-          git fetch --tags
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'none')
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       - name: Check if new version was released
         id: check_release
         run: |
-          if [ "${{ steps.version_before.outputs.tag }}" != "${{ steps.version_after.outputs.tag }}" ]; then
+          if [ "${{ steps.version_before.outputs.version }}" != "${{ steps.version_after.outputs.version }}" ]; then
             echo "new_release=true" >> $GITHUB_OUTPUT
+            echo "✅ New version released: ${{ steps.version_after.outputs.version }}"
           else
             echo "new_release=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No new version released"
           fi
 
       - name: Publish to npm with OIDC
         if: steps.check_release.outputs.new_release == 'true'
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   build-binaries:
     needs: release
