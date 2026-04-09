@@ -87,6 +87,43 @@ describe("normalizeOpenRouterModel", () => {
     expect(result.tokenizer).toBe("GPT");
   });
 
+  it("infers tool_call capability from supported_parameters", () => {
+    const modelWithTools: OpenRouterModel = {
+      ...mockModel,
+      supported_parameters: ["temperature", "tools", "tool_choice"],
+    };
+    const result = normalizeOpenRouterModel(modelWithTools);
+    expect(result.capabilities.tool_call).toBe(true);
+  });
+
+  it("infers structured_output capability from supported_parameters", () => {
+    const modelWithFormat: OpenRouterModel = {
+      ...mockModel,
+      supported_parameters: ["temperature", "response_format"],
+    };
+    const result = normalizeOpenRouterModel(modelWithFormat);
+    expect(result.capabilities.structured_output).toBe(true);
+  });
+
+  it("infers reasoning capability from pricing", () => {
+    const modelWithReasoning: OpenRouterModel = {
+      ...mockModel,
+      pricing: {
+        ...mockModel.pricing,
+        internal_reasoning: "0.000003",
+      },
+    };
+    const result = normalizeOpenRouterModel(modelWithReasoning);
+    expect(result.capabilities.reasoning).toBe(true);
+  });
+
+  it("does not infer capabilities without evidence", () => {
+    const result = normalizeOpenRouterModel(mockModel);
+    expect(result.capabilities.tool_call).toBeUndefined();
+    expect(result.capabilities.structured_output).toBeUndefined();
+    expect(result.capabilities.reasoning).toBeUndefined();
+  });
+
   it("carries reasoning cost when present", () => {
     const modelWithReasoning: OpenRouterModel = {
       ...mockModel,

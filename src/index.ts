@@ -9,6 +9,7 @@ export {
   compareModels,
   diffModels,
   estimateCost,
+  fetchUnifiedData,
   fetchUnifiedModels,
   filterModels,
   findModels,

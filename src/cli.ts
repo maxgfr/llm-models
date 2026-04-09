@@ -1,5 +1,6 @@
 import { Command } from "commander";
-import { clearCache, setCacheEnabled } from "./cache";
+import pkg from "../package.json";
+import { clearCache, getCacheInfo, setCacheEnabled } from "./cache";
 import { fetchModelsDevModels } from "./clients/models-dev";
 import { fetchOpenRouterModels } from "./clients/openrouter";
 import { bold, cyan, dim, green, red, yellow } from "./colors";
@@ -27,8 +28,6 @@ import { listUseCases, recommendModels } from "./functions/recommend";
 import { findModels } from "./functions/search";
 import { getStats } from "./functions/stats";
 import type { Capabilities, ModelFilter, ModelSortField } from "./types";
-
-const pkg = require("../package.json");
 
 function resolveFormat(options: { json?: boolean; format?: string }): OutputFormat {
   if (options.json) return "json";
@@ -844,7 +843,7 @@ export function runCommand(): void {
       if (action === "clear") {
         clearCache();
       } else {
-        const info = require("./cache").getCacheInfo();
+        const info = getCacheInfo();
         console.log("Cache directory: ~/.cache/llm-models/");
         console.log(`Files: ${info.files}`);
         console.log(`Size: ${(info.sizeBytes / 1024).toFixed(1)} KB`);

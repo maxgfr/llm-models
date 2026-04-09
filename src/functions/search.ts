@@ -16,7 +16,11 @@ export function filterModels(models: UnifiedModel[], filter: ModelFilter): Unifi
 
   if (filter.modality) {
     const mod = filter.modality.toLowerCase();
-    result = result.filter((m) => m.modalities.input.some((i) => i.toLowerCase() === mod));
+    result = result.filter(
+      (m) =>
+        m.modalities.input.some((i) => i.toLowerCase() === mod) ||
+        m.modalities.output.some((o) => o.toLowerCase() === mod),
+    );
   }
 
   if (filter.maxCostInput != null) {

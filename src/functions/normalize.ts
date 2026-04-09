@@ -1,7 +1,13 @@
-import { writeCache } from "../cache";
+import { readFallbackCache, writeCache } from "../cache";
 import { fetchModelsDevModels } from "../clients/models-dev";
 import { fetchOpenRouterModels } from "../clients/openrouter";
-import type { ModelsDevModel, OpenRouterModel, UnifiedModel } from "../types";
+import type {
+  ModelsDevModel,
+  ModelsDevResponse,
+  OpenRouterModel,
+  OpenRouterResponse,
+  UnifiedModel,
+} from "../types";
 
 export function openRouterPriceToPerMillion(perToken: string): number {
   return Number.parseFloat(perToken) * 1_000_000;
@@ -40,7 +46,14 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
       input: model.architecture.input_modalities,
       output: model.architecture.output_modalities,
     },
-    capabilities: {},
+    capabilities: {
+      tool_call: model.supported_parameters.includes("tools") ? true : undefined,
+      structured_output: model.supported_parameters.includes("response_format") ? true : undefined,
+      reasoning:
+        model.pricing.internal_reasoning && Number.parseFloat(model.pricing.internal_reasoning) > 0
+          ? true
+          : undefined,
+    },
     knowledge_cutoff: model.knowledge_cutoff ?? null,
     release_date: undefined,
     status: undefined,
@@ -97,6 +110,8 @@ function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): Unified
     cost = {
       ...modelsDev.cost,
       reasoning: modelsDev.cost.reasoning ?? openrouter.cost.reasoning,
+      cache_read: modelsDev.cost.cache_read ?? openrouter.cost.cache_read,
+      cache_write: modelsDev.cost.cache_write ?? openrouter.cost.cache_write,
     };
   }
 
@@ -116,33 +131,60 @@ function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): Unified
   };
 }
 
-export async function fetchUnifiedModels(): Promise<UnifiedModel[]> {
-  const [openRouterData, modelsDevData] = await Promise.all([
-    fetchOpenRouterModels(),
-    fetchModelsDevModels(),
-  ]);
+export async function fetchUnifiedData(): Promise<{
+  models: UnifiedModel[];
+  modelsDevData: ModelsDevResponse;
+}> {
+  const results = await Promise.allSettled([fetchOpenRouterModels(), fetchModelsDevModels()]);
+
+  let openRouterData: OpenRouterResponse | null =
+    results[0].status === "fulfilled" ? results[0].value : null;
+  let modelsDevData: ModelsDevResponse | null =
+    results[1].status === "fulfilled" ? results[1].value : null;
+
+  // Fallback to expired cache if an API failed
+  if (!openRouterData) {
+    openRouterData = readFallbackCache<OpenRouterResponse>("openrouter");
+    if (openRouterData) {
+      console.error("Warning: OpenRouter API unavailable, using expired cache");
+    }
+  }
+  if (!modelsDevData) {
+    modelsDevData = readFallbackCache<ModelsDevResponse>("models-dev");
+    if (modelsDevData) {
+      console.error("Warning: models.dev API unavailable, using expired cache");
+    }
+  }
+
+  if (!openRouterData && !modelsDevData) {
+    throw new Error("Both APIs are unavailable and no cached data exists");
+  }
 
   // Index models.dev models by "provider/modelId"
   const modelsDevMap = new Map<string, UnifiedModel>();
-  for (const [providerId, provider] of Object.entries(modelsDevData)) {
-    for (const model of Object.values(provider.models)) {
-      const unified = normalizeModelsDevModel(model, providerId);
-      modelsDevMap.set(unified.id, unified);
+  if (modelsDevData) {
+    for (const [providerId, provider] of Object.entries(modelsDevData)) {
+      for (const model of Object.values(provider.models)) {
+        const unified = normalizeModelsDevModel(model, providerId);
+        modelsDevMap.set(unified.id, unified);
+      }
     }
   }
 
   // Normalize OpenRouter models and merge with models.dev when matched
   const result = new Map<string, UnifiedModel>();
 
-  for (const orModel of openRouterData.data) {
-    const normalized = normalizeOpenRouterModel(orModel);
-    const modelsDevMatch = modelsDevMap.get(normalized.id);
+  if (openRouterData) {
+    for (const orModel of openRouterData.data) {
+      const normalized = normalizeOpenRouterModel(orModel);
+      const modelsDevMatch = modelsDevMap.get(normalized.id);
 
-    if (modelsDevMatch) {
-      result.set(normalized.id, mergeModels(normalized, modelsDevMatch));
-      modelsDevMap.delete(normalized.id);
-    } else {
-      result.set(normalized.id, normalized);
+      if (modelsDevMatch) {
+        result.set(normalized.id, mergeModels(normalized, modelsDevMatch));
+        modelsDevMap.delete(normalized.id);
+      } else {
+        result.set(normalized.id, normalized);
+      }
     }
   }
 
@@ -153,5 +195,9 @@ export async function fetchUnifiedModels(): Promise<UnifiedModel[]> {
 
   const unified = Array.from(result.values());
   writeCache("unified", unified);
-  return unified;
+  return { models: unified, modelsDevData: modelsDevData ?? ({} as ModelsDevResponse) };
+}
+
+export async function fetchUnifiedModels(): Promise<UnifiedModel[]> {
+  return (await fetchUnifiedData()).models;
 }

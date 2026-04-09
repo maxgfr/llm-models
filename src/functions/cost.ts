@@ -57,9 +57,7 @@ export async function cheapestModels(options?: {
 
   models = filterModels(models, {
     minContext: options?.minContext,
-    capability: options?.capability as Capabilities[keyof Capabilities] extends boolean
-      ? keyof Capabilities
-      : undefined,
+    capability: options?.capability,
   });
 
   models = sortModels(models, "cost_input");

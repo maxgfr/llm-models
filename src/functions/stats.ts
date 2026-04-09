@@ -85,6 +85,10 @@ export async function getStats(): Promise<ModelStats> {
 
   // Context length distribution
   const contexts = models.map((m) => m.context_length).sort((a, b) => a - b);
+  const contextStats =
+    contexts.length > 0
+      ? { min: contexts[0], max: contexts[contexts.length - 1], median: percentile(contexts, 50) }
+      : { min: 0, max: 0, median: 0 };
 
   return {
     total_models: models.length,
@@ -94,10 +98,6 @@ export async function getStats(): Promise<ModelStats> {
     by_modality: byModality,
     cost: inputDist && outputDist ? { input: inputDist, output: outputDist } : null,
     newest_models: newest,
-    context_length: {
-      min: contexts[0],
-      max: contexts[contexts.length - 1],
-      median: percentile(contexts, 50),
-    },
+    context_length: contextStats,
   };
 }

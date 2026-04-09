@@ -1,12 +1,8 @@
-import { fetchModelsDevModels } from "../clients/models-dev";
 import type { ProviderInfo, UnifiedModel } from "../types";
-import { fetchUnifiedModels } from "./normalize";
+import { fetchUnifiedData } from "./normalize";
 
 export async function getProvider(providerId: string): Promise<ProviderInfo> {
-  const [allModels, modelsDevData] = await Promise.all([
-    fetchUnifiedModels(),
-    fetchModelsDevModels(),
-  ]);
+  const { models: allModels, modelsDevData } = await fetchUnifiedData();
 
   const providerModels = allModels.filter(
     (m) => m.provider.toLowerCase() === providerId.toLowerCase(),
@@ -31,10 +27,7 @@ export async function getProvider(providerId: string): Promise<ProviderInfo> {
 }
 
 export async function listProviders(): Promise<ProviderInfo[]> {
-  const [allModels, modelsDevData] = await Promise.all([
-    fetchUnifiedModels(),
-    fetchModelsDevModels(),
-  ]);
+  const { models: allModels, modelsDevData } = await fetchUnifiedData();
 
   const providerMap = new Map<string, UnifiedModel[]>();
   for (const model of allModels) {

@@ -1,7 +1,7 @@
 import type { ModelComparison, UnifiedModel } from "../types";
 import { fetchUnifiedModels } from "./normalize";
 
-function findModelById(models: UnifiedModel[], query: string): UnifiedModel | undefined {
+function findModelById(models: UnifiedModel[], query: string): UnifiedModel {
   // Exact match first
   const exact = models.find((m) => m.id === query);
   if (exact) return exact;
@@ -56,7 +56,7 @@ export async function compareModels(modelIds: string[]): Promise<ModelComparison
   }
 
   const allModels = await fetchUnifiedModels();
-  const models = modelIds.map((id) => findModelById(allModels, id) as UnifiedModel);
+  const models = modelIds.map((id) => findModelById(allModels, id));
 
   const contextValues: Record<string, number | null> = {};
   const outputLimitValues: Record<string, number | null> = {};

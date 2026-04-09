@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -53,6 +61,18 @@ export function readSnapshot<T>(key: string): { timestamp: number; data: T } | n
   }
 }
 
+export function readFallbackCache<T>(key: string): T | null {
+  const filePath = join(CACHE_DIR, `${key}.json`);
+  try {
+    if (!existsSync(filePath)) return null;
+    const raw = readFileSync(filePath, "utf-8");
+    const cached = JSON.parse(raw) as { timestamp: number; data: T };
+    return cached.data;
+  } catch {
+    return null;
+  }
+}
+
 export function clearCache(): void {
   if (existsSync(CACHE_DIR)) {
     rmSync(CACHE_DIR, { recursive: true });
@@ -68,8 +88,7 @@ export function getCacheInfo(): { files: number; sizeBytes: number } {
   let sizeBytes = 0;
   for (const file of files) {
     try {
-      const stat = Bun.file(join(CACHE_DIR, file));
-      sizeBytes += stat.size;
+      sizeBytes += statSync(join(CACHE_DIR, file)).size;
     } catch {
       // ignore
     }
