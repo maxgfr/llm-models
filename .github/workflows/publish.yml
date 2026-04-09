@@ -1,0 +1,117 @@
+name: Publish package to npm
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      new_release_published: ${{ steps.check_release.outputs.new_release }}
+      new_release_version: ${{ steps.version_after.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build:all
+
+      - name: Get version before release
+        id: version_before
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Semantic Release
+        run: bunx semantic-release
+
+      - name: Get version after release
+        id: version_after
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Check if new version was released
+        id: check_release
+        run: |
+          if [ "${{ steps.version_before.outputs.version }}" != "${{ steps.version_after.outputs.version }}" ]; then
+            echo "new_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "new_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to npm with OIDC
+        if: steps.check_release.outputs.new_release == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  build-binaries:
+    needs: release
+    if: needs.release.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.new_release_version }}
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build all binaries
+        run: |
+          mkdir -p dist
+          bun build src/index.ts --compile --target=bun-linux-x64 --outfile dist/llm-models-linux-x64
+          bun build src/index.ts --compile --target=bun-linux-arm64 --outfile dist/llm-models-linux-arm64
+          bun build src/index.ts --compile --target=bun-darwin-x64 --outfile dist/llm-models-macos-x64
+          bun build src/index.ts --compile --target=bun-darwin-arm64 --outfile dist/llm-models-macos-arm64
+          bun build src/index.ts --compile --target=bun-windows-x64 --outfile dist/llm-models-win-x64.exe
+
+      - name: Create checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Upload binaries to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.release.outputs.new_release_version }}
+          files: |
+            dist/llm-models-linux-x64
+            dist/llm-models-linux-arm64
+            dist/llm-models-macos-x64
+            dist/llm-models-macos-arm64
+            dist/llm-models-win-x64.exe
+            dist/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

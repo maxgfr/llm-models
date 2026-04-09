@@ -1,0 +1,27 @@
+name: Build code
+
+on: push
+
+jobs:
+  build-code:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install
+        run: bun install --frozen-lockfile
+      - name: Build library
+        run: bun run build:all
+      - name: Test binary compilation
+        run: |
+          bun run build:binary:linux-x64
+          if [ ! -f dist/llm-models-linux-x64 ]; then
+            echo "Binary not found!"
+            exit 1
+          fi
+          chmod +x dist/llm-models-linux-x64
+          ./dist/llm-models-linux-x64 --version
