@@ -157,12 +157,7 @@ export function runCommand(): void {
       "Sort by: cost_input, cost_output, context_length, release_date, name, knowledge_cutoff, value",
     )
     .option("--desc", "Sort descending")
-    .option(
-      "-n, --limit <n>",
-      "Max results (default: 20)",
-      (v: string) => Number.parseInt(v, 10),
-      20,
-    )
+    .option("-n, --limit <n>", "Max results", (v: string) => Number.parseInt(v, 10))
     .option("-c, --count", "Show model count only")
     .option("--ids-only", "Output model IDs only, one per line")
     .option("--json", "Output raw JSON")
