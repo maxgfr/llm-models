@@ -14,6 +14,8 @@ brew install maxgfr/tap/llm-models
 
 ### npm
 
+Requires Node.js >= 22.12.
+
 ```bash
 npm install -g llm-models
 ```

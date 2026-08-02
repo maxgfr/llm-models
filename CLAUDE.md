@@ -8,7 +8,7 @@ Features local caching (1h TTL), MCP server integration, multiple output formats
 a fluent query builder API. Distributed via npm, Homebrew, and standalone binaries.
 
 ## Tech stack
-- TypeScript 5.7+, Bun runtime, ESM modules
+- TypeScript 7, Bun runtime, ESM modules (Node.js >= 22.12 for the npm package)
 - Bun as package manager and test runner
 - Zod for API response validation
 - Commander.js for CLI
@@ -52,7 +52,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   - `functions/recommend.ts` - recommendModels, listUseCases (use-case presets)
   - `functions/diff.ts` - diffModels (compare current vs cached snapshot)
   - `functions/query.ts` - QueryBuilder fluent API
-  - `__tests__/` - 19 test files (164 tests, unit + live API schema validation)
+  - `__tests__/` - 19 test files (168 tests, unit + live API schema validation)
 - `build/` - compiled output (npm package)
 - `dist/` - binary output
 - `action.yml` - GitHub Action for CI/CD integration
