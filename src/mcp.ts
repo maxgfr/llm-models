@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { type ZodTypeAny, z } from "zod/v3";
+import pkg from "../package.json";
 import { compareModels } from "./functions/compare";
 import { cheapestModels, estimateCost } from "./functions/cost";
 import { getProvider, listProviders } from "./functions/provider";
@@ -64,7 +65,7 @@ type RegisterTool = (
 export async function startMcpServer(): Promise<void> {
   const server = new McpServer({
     name: "llm-models",
-    version: "1.0.0",
+    version: pkg.version,
   });
 
   // Single cast to a concrete signature avoids TS2589 on overload resolution
