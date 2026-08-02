@@ -926,5 +926,10 @@ export function runCommand(): void {
       await startMcpServer();
     });
 
-  program.parse();
+  // Async actions reject outside parse()'s call stack, so failures (unknown
+  // use case, network errors) would surface as raw unhandled rejections.
+  program.parseAsync().catch((err: unknown) => {
+    console.error(red(err instanceof Error ? err.message : String(err)));
+    process.exit(1);
+  });
 }
