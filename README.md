@@ -92,6 +92,38 @@ Detailed information about a single model (description, costs, capabilities, par
 llm-models info openai/gpt-4o
 ```
 
+#### Resolve a model against its endpoint
+
+The same model id is published under dozens of providers with different limits — OpenRouter routes
+`deepseek-chat` at 163,840 context while DeepSeek's own API serves 1,000,000. `resolve` takes the
+base URL you actually call and answers for *that* endpoint:
+
+```bash
+# Z.AI coding plan, not the OpenRouter reseller entry
+llm-models resolve glm-5.3 --endpoint https://api.z.ai/api/anthropic
+
+# Scope by provider id instead
+llm-models resolve deepseek-chat --provider deepseek
+```
+
+Exits 1 when nothing matches, so it composes in scripts.
+
+#### Script-friendly output (`--field`)
+
+`info`, `find` and `resolve` accept `--field` to print bare, tab-separated values instead of a
+formatted block — no JSON parsing needed. Dotted paths work, and a missing field exits 1:
+
+```bash
+llm-models info z-ai/glm-5.3 --field context_length
+# 1048576
+
+llm-models resolve glm-5.3 --endpoint https://api.z.ai/api/anthropic \
+  --field context_length,output_limit
+# 1000000	131072
+
+llm-models find -p anthropic --field id,cost.input
+```
+
 #### Cost estimation
 
 Estimate costs for specific token volumes:
@@ -256,8 +288,18 @@ Exposes 8 tools: `find_models`, `compare_models`, `estimate_cost`, `cheapest_mod
 | `-n, --limit <n>` | Max results (default: 20) |
 | `-c, --count` | Show model count only |
 | `--ids-only` | Output model IDs only, one per line |
+| `--field <names>` | Output only these fields, tab-separated, one line per model |
 | `--json` | Raw JSON output |
 | `--format <fmt>` | Output format: table, json, csv, markdown |
+
+### Resolve Options
+
+| Option | Description |
+|--------|-------------|
+| `-e, --endpoint <url>` | Base URL being called — disambiguates resellers by host |
+| `-p, --provider <id>` | Provider ID to scope the lookup to |
+| `--field <names>` | Output only these fields, tab-separated |
+| `--json` | Raw JSON output |
 
 ### Cost Options
 
@@ -284,6 +326,7 @@ import {
   recommendModels,
   listUseCases,
   diffModels,
+  resolveModel,
   query,
   setCacheEnabled,
   clearCache,
@@ -298,6 +341,12 @@ const cheap = await findModels({
   sort: "cost_input",
   limit: 5,
 });
+
+// Resolve a model against the endpoint that actually serves it
+const resolved = await resolveModel("glm-5.3", {
+  endpoint: "https://api.z.ai/api/anthropic",
+});
+// resolved.model.context_length === 1_000_000, resolved.matchedBy === "endpoint"
 
 // Fluent query builder
 const results = await query()
@@ -387,6 +436,11 @@ Use llm-models in CI/CD to check model costs and status:
 
 - **OpenRouter**: https://openrouter.ai/api/v1/models
 - **models.dev**: https://models.dev/api.json
+
+The two describe *different endpoints* for the same model id, so a merged entry takes its
+`context_length` and `output_limit` as a pair from one source (models.dev first, since it is
+provider-documented) rather than mixing them. Use `resolve --endpoint` when you need the limits of
+the endpoint you actually call.
 
 ## License
 

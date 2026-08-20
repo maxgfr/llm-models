@@ -8,6 +8,7 @@ const COMMANDS = [
   "stats",
   "diff",
   "info",
+  "resolve",
   "cache",
   "config",
   "openrouter",

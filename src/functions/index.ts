@@ -1,9 +1,11 @@
 export { compareModels } from "./compare";
 export { cheapestModels, estimateCost } from "./cost";
 export { diffModels } from "./diff";
-export { fetchUnifiedData, fetchUnifiedModels } from "./normalize";
+export { formatFields, parseFieldList, readField } from "./fields";
+export { fetchUnifiedData, fetchUnifiedModels, mergeModels } from "./normalize";
 export { getProvider, listProviders } from "./provider";
 export { QueryBuilder, query } from "./query";
 export { listUseCases, recommendModels } from "./recommend";
+export { pickBestModel, providersForEndpoint, resolveModel } from "./resolve";
 export { filterModels, findModels, sortModels } from "./search";
 export { getStats } from "./stats";

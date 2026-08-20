@@ -103,7 +103,7 @@ export function normalizeModelsDevModel(model: ModelsDevModel, providerId: strin
   };
 }
 
-function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): UnifiedModel {
+export function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): UnifiedModel {
   // Merge costs: prefer models.dev base costs but carry OpenRouter extras
   let cost = modelsDev.cost ?? openrouter.cost;
   if (cost && openrouter.cost && modelsDev.cost) {
@@ -114,6 +114,18 @@ function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): Unified
       cache_write: modelsDev.cost.cache_write ?? openrouter.cost.cache_write,
     };
   }
+
+  // Context and output must come from the SAME source. The two APIs describe
+  // different endpoints -- OpenRouter routes deepseek-chat at 163,840 context
+  // while DeepSeek's own API serves 1,000,000 -- so mixing them produced
+  // impossible pairs like context 163,840 with output 384,000. models.dev wins
+  // here for the same reason it wins for cost/family/status below: it is the
+  // provider-documented source.
+  const context_length = modelsDev.context_length ?? openrouter.context_length;
+  const output_limit =
+    modelsDev.context_length != null
+      ? (modelsDev.output_limit ?? openrouter.output_limit)
+      : (openrouter.output_limit ?? modelsDev.output_limit);
 
   return {
     ...openrouter,
@@ -126,7 +138,9 @@ function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): Unified
     family: modelsDev.family ?? openrouter.family,
     knowledge_cutoff: modelsDev.knowledge_cutoff ?? openrouter.knowledge_cutoff,
     cost,
-    output_limit: modelsDev.output_limit ?? openrouter.output_limit,
+    context_length,
+    // An output limit above the context window is never meaningful.
+    output_limit: output_limit != null ? Math.min(output_limit, context_length) : undefined,
     sources: { openrouter: true, models_dev: true },
   };
 }

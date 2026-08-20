@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import {
+  mergeModels,
   normalizeModelsDevModel,
   normalizeOpenRouterModel,
   openRouterPriceToPerMillion,
 } from "../functions/normalize";
-import type { ModelsDevModel, OpenRouterModel } from "../types";
+import type { ModelsDevModel, OpenRouterModel, UnifiedModel } from "../types";
 
 describe("openRouterPriceToPerMillion", () => {
   it("converts per-token string to per-million number", () => {
@@ -226,5 +227,60 @@ describe("normalizeModelsDevModel", () => {
     };
     const result = normalizeModelsDevModel(modelNoCost, "openai");
     expect(result.cost).toBeUndefined();
+  });
+});
+
+describe("mergeModels", () => {
+  const openrouter: UnifiedModel = {
+    id: "deepseek/deepseek-chat",
+    name: "DeepSeek Chat",
+    provider: "deepseek",
+    context_length: 163840,
+    output_limit: 16000,
+    cost: { input: 0.14, output: 0.28 },
+    modalities: { input: ["text"], output: ["text"] },
+    capabilities: { tool_call: true },
+    sources: { openrouter: true, models_dev: false },
+  };
+
+  const modelsDev: UnifiedModel = {
+    id: "deepseek/deepseek-chat",
+    name: "DeepSeek Chat",
+    provider: "deepseek",
+    context_length: 1000000,
+    output_limit: 384000,
+    cost: { input: 0.14, output: 0.28 },
+    modalities: { input: ["text"], output: ["text"] },
+    capabilities: { tool_call: true },
+    family: "deepseek",
+    sources: { openrouter: false, models_dev: true },
+  };
+
+  it("takes context and output from the same source", () => {
+    const merged = mergeModels(openrouter, modelsDev);
+    expect(merged.context_length).toBe(1000000);
+    expect(merged.output_limit).toBe(384000);
+  });
+
+  it("never reports an output limit above the context window", () => {
+    const merged = mergeModels(openrouter, { ...modelsDev, context_length: 200000 });
+    expect(merged.output_limit).toBe(200000);
+  });
+
+  it("falls back to OpenRouter limits when models.dev has none", () => {
+    const merged = mergeModels(openrouter, {
+      ...modelsDev,
+      context_length: undefined as unknown as number,
+      output_limit: undefined,
+    });
+    expect(merged.context_length).toBe(163840);
+    expect(merged.output_limit).toBe(16000);
+  });
+
+  it("marks both sources", () => {
+    expect(mergeModels(openrouter, modelsDev).sources).toEqual({
+      openrouter: true,
+      models_dev: true,
+    });
   });
 });

@@ -30,7 +30,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 ## Project structure
 - `src/` - source code
   - `index.ts` - entry point (CLI + library export)
-  - `cli.ts` - CLI commands (Commander.js, 15 commands)
+  - `cli.ts` - CLI commands (Commander.js, 16 commands)
   - `format.ts` - CLI formatting utilities (table, cost, context, CSV, markdown)
   - `types.ts` - Zod-inferred type exports
   - `cache.ts` - Local API response cache with TTL (~/.cache/llm-models/)
@@ -44,6 +44,8 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   - `clients/openrouter.ts` - OpenRouter fetch + parse + cache
   - `clients/models-dev.ts` - models.dev fetch + parse + cache
   - `functions/normalize.ts` - Cross-source normalization + merge into UnifiedModel
+  - `functions/resolve.ts` - resolveModel: endpoint/provider-scoped model lookup
+  - `functions/fields.ts` - readField/formatFields: dotted-path `--field` extraction
   - `functions/search.ts` - filterModels, sortModels, findModels
   - `functions/compare.ts` - compareModels (side-by-side)
   - `functions/provider.ts` - getProvider, listProviders
@@ -52,7 +54,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   - `functions/recommend.ts` - recommendModels, listUseCases (use-case presets)
   - `functions/diff.ts` - diffModels (compare current vs cached snapshot)
   - `functions/query.ts` - QueryBuilder fluent API
-  - `__tests__/` - 19 test files (168 tests, unit + live API schema validation)
+  - `__tests__/` - 21 test files (196 tests, unit + live API schema validation)
 - `build/` - compiled output (npm package)
 - `dist/` - binary output
 - `action.yml` - GitHub Action for CI/CD integration
@@ -69,3 +71,9 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 - All new domain types defined as Zod schemas in `schemas/functions.ts`
 - ANSI regex patterns use `biome-ignore` comment for control character rule
 - README.md must be updated whenever a command, option, or library export is added or changed
+- `context_length` and `output_limit` must always come from the SAME source when merging: the two
+  APIs describe different endpoints (OpenRouter routes deepseek-chat at 163,840 context, DeepSeek's
+  own API serves 1,000,000), so mixing them yields impossible pairs. models.dev wins; output is
+  clamped to context. See `mergeModels` in `functions/normalize.ts`.
+- Script-facing output (`--field`, `resolve`) is a contract: bare values on stdout, diagnostics on
+  stderr, exit 1 on no match. Keep it stable — `ccs` (claude-code-switch) depends on it.

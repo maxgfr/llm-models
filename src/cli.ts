@@ -22,9 +22,11 @@ import {
 import { compareModels } from "./functions/compare";
 import { cheapestModels, estimateCost } from "./functions/cost";
 import { diffModels } from "./functions/diff";
+import { formatFields, parseFieldList } from "./functions/fields";
 import { fetchUnifiedModels } from "./functions/normalize";
 import { getProvider, listProviders } from "./functions/provider";
 import { listUseCases, recommendModels } from "./functions/recommend";
+import { resolveModel } from "./functions/resolve";
 import { findModels } from "./functions/search";
 import { getStats } from "./functions/stats";
 import type { Capabilities, ModelFilter, ModelSortField } from "./types";
@@ -160,6 +162,10 @@ export function runCommand(): void {
     .option("-n, --limit <n>", "Max results", (v: string) => Number.parseInt(v, 10))
     .option("-c, --count", "Show model count only")
     .option("--ids-only", "Output model IDs only, one per line")
+    .option(
+      "--field <names>",
+      "Output only these fields, tab-separated, one line per model (e.g. context_length,output_limit)",
+    )
     .option("--json", "Output raw JSON")
     .option("--format <fmt>", "Output format: table, json, csv, markdown")
     .action(
@@ -178,6 +184,7 @@ export function runCommand(): void {
         limit?: number;
         count?: boolean;
         idsOnly?: boolean;
+        field?: string;
         json?: boolean;
         format?: string;
       }) => {
@@ -212,6 +219,16 @@ export function runCommand(): void {
 
         if (options.idsOnly) {
           for (const m of models) console.log(m.id);
+          return;
+        }
+
+        if (options.field) {
+          const paths = parseFieldList(options.field);
+          const lines = models
+            .map((m) => formatFields(m, paths))
+            .filter((line): line is string => line !== null);
+          if (lines.length === 0) process.exit(1);
+          for (const line of lines) console.log(line);
           return;
         }
 
@@ -546,8 +563,12 @@ export function runCommand(): void {
     .command("info")
     .description("Show detailed information about a model")
     .argument("<model>", "Model ID (supports partial match)")
+    .option(
+      "--field <names>",
+      "Output only these fields, tab-separated (e.g. context_length,output_limit)",
+    )
     .option("--json", "Output raw JSON")
-    .action(async (modelId: string, options: { json?: boolean }) => {
+    .action(async (modelId: string, options: { field?: string; json?: boolean }) => {
       const models = await fetchUnifiedModels();
       const lower = modelId.toLowerCase();
 
@@ -567,6 +588,13 @@ export function runCommand(): void {
           console.error(`Model "${modelId}" not found`);
           process.exit(1);
         }
+      }
+
+      if (options.field) {
+        const line = formatFields(model, parseFieldList(options.field));
+        if (line === null) process.exit(1);
+        console.log(line);
+        return;
       }
 
       if (options.json) {
@@ -647,6 +675,68 @@ export function runCommand(): void {
         ),
       );
     });
+
+  // --- Resolve command ---
+
+  program
+    .command("resolve")
+    .description("Resolve a model against the endpoint that actually serves it")
+    .argument("<model>", "Model ID as the provider names it (e.g. glm-5.3)")
+    .option(
+      "-e, --endpoint <url>",
+      "Base URL being called (e.g. https://api.z.ai/api/anthropic) — disambiguates resellers",
+    )
+    .option("-p, --provider <id>", "Provider ID to scope the lookup to (e.g. deepseek)")
+    .option(
+      "--field <names>",
+      "Output only these fields, tab-separated (e.g. context_length,output_limit)",
+    )
+    .option("--json", "Output raw JSON")
+    .action(
+      async (
+        modelId: string,
+        options: { endpoint?: string; provider?: string; field?: string; json?: boolean },
+      ) => {
+        const result = await resolveModel(modelId, {
+          endpoint: options.endpoint,
+          provider: options.provider,
+        });
+
+        if (!result) {
+          console.error(`Model "${modelId}" not found`);
+          process.exit(1);
+        }
+
+        if (program.opts().verbose) {
+          const via = result.endpointProviders.length
+            ? `${result.matchedBy} (${result.endpointProviders.join(", ")})`
+            : result.matchedBy;
+          console.error(`Resolved ${modelId} -> ${result.model.id} via ${via}`);
+        }
+
+        if (options.field) {
+          const line = formatFields(result.model, parseFieldList(options.field));
+          if (line === null) process.exit(1);
+          console.log(line);
+          return;
+        }
+
+        if (options.json) {
+          console.log(JSON.stringify(result.model, null, 2));
+          return;
+        }
+
+        console.log(bold(result.model.name));
+        console.log(dim(result.model.id));
+        console.log();
+        console.log(`${bold("Provider:")}      ${result.model.provider}`);
+        console.log(`${bold("Context:")}       ${formatContext(result.model.context_length)}`);
+        if (result.model.output_limit) {
+          console.log(`${bold("Output limit:")}  ${formatContext(result.model.output_limit)}`);
+        }
+        console.log(`${bold("Matched by:")}    ${result.matchedBy}`);
+      },
+    );
 
   // --- Recommend command ---
 
