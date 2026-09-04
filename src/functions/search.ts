@@ -66,7 +66,8 @@ export function sortModels(
   field: ModelSortField,
   descending = false,
 ): UnifiedModel[] {
-  const sorted = [...models].sort((a, b) => {
+  const direction = descending ? -1 : 1;
+  return [...models].sort((a, b) => {
     let valA: number | string | null;
     let valB: number | string | null;
 
@@ -110,13 +111,11 @@ export function sortModels(
     if (valB === null) return -1;
 
     if (typeof valA === "string" && typeof valB === "string") {
-      return valA < valB ? -1 : valA > valB ? 1 : 0;
+      return direction * (valA < valB ? -1 : valA > valB ? 1 : 0);
     }
 
-    return (valA as number) - (valB as number);
+    return direction * ((valA as number) - (valB as number));
   });
-
-  return descending ? sorted.reverse() : sorted;
 }
 
 export async function findModels(options: {

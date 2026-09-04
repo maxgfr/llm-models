@@ -54,7 +54,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   - `functions/recommend.ts` - recommendModels, listUseCases (use-case presets)
   - `functions/diff.ts` - diffModels (compare current vs cached snapshot)
   - `functions/query.ts` - QueryBuilder fluent API
-  - `__tests__/` - 21 test files (196 tests, unit + live API schema validation)
+  - `__tests__/` - 21 test files (203 tests, unit + live API schema validation)
 - `build/` - compiled output (npm package)
 - `dist/` - binary output
 - `action.yml` - GitHub Action for CI/CD integration

@@ -72,10 +72,26 @@ export type {
   UnifiedModel,
 } from "./types";
 
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { runCommand } from "./cli";
 
-const isCLI = typeof Bun !== "undefined" ? Bun.main === import.meta.path : true;
+/**
+ * True only when this file is the process entry point. Under Node the check
+ * goes through realpath so the npm bin symlink still counts, and importing the
+ * package as a library never starts the CLI.
+ */
+function isEntryPoint(): boolean {
+  if (typeof Bun !== "undefined") return Bun.main === import.meta.path;
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
 
-if (isCLI) {
+if (isEntryPoint()) {
   runCommand();
 }

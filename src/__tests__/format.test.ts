@@ -37,6 +37,13 @@ describe("formatContext", () => {
   it("returns raw number for small values", () => {
     expect(formatContext(512)).toBe("512");
   });
+
+  it("rolls over to the next unit instead of printing 1000.0K", () => {
+    expect(formatContext(999_990)).toBe("1.0M");
+    expect(formatContext(999_950)).toBe("1.0M");
+    expect(formatContext(999_949)).toBe("999.9K");
+    expect(formatContext(999.96)).toBe("1.0K");
+  });
 });
 
 describe("parseTokenCount", () => {

@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, InvalidArgumentError } from "commander";
 import pkg from "../package.json";
 import { clearCache, getCacheInfo, setCacheEnabled } from "./cache";
 import { fetchModelsDevModels } from "./clients/models-dev";
@@ -29,13 +29,48 @@ import { listUseCases, recommendModels } from "./functions/recommend";
 import { resolveModel } from "./functions/resolve";
 import { findModels } from "./functions/search";
 import { getStats } from "./functions/stats";
+import { CapabilityEnum, ModelFilterSchema, ModelSortFieldSchema } from "./schemas/functions";
 import type { Capabilities, ModelFilter, ModelSortField } from "./types";
 
-function resolveFormat(options: { json?: boolean; format?: string }): OutputFormat {
+const CAPABILITIES = CapabilityEnum.options;
+const STATUSES = ModelFilterSchema.shape.status.unwrap().options;
+const SORT_FIELDS = ModelSortFieldSchema.options;
+const FORMATS: readonly OutputFormat[] = ["table", "json", "csv", "markdown"];
+
+// Commander parsers: a bad value aborts with "error: option '--x' argument 'y'
+// is invalid. ..." and exit code 1 instead of silently filtering everything out.
+function oneOf<T extends string>(allowed: readonly T[]) {
+  return (value: string): T => {
+    if (!allowed.includes(value as T)) {
+      throw new InvalidArgumentError(`Expected one of: ${allowed.join(", ")}`);
+    }
+    return value as T;
+  };
+}
+
+function integer(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || String(parsed) !== value.trim()) {
+    throw new InvalidArgumentError("Expected an integer");
+  }
+  return parsed;
+}
+
+function decimal(value: string): number {
+  const parsed = Number.parseFloat(value);
+  if (Number.isNaN(parsed)) throw new InvalidArgumentError("Expected a number");
+  return parsed;
+}
+
+function resolveFormat(options: { json?: boolean; format?: OutputFormat }): OutputFormat {
   if (options.json) return "json";
-  if (options.format) return options.format as OutputFormat;
+  if (options.format) return options.format;
   const config = loadConfig();
   return config.defaults?.format ?? "table";
+}
+
+function fieldsNotFound(id: string, fields: string[]): void {
+  console.error(`None of the requested fields (${fields.join(", ")}) exist on ${id}`);
 }
 
 export function runCommand(): void {
@@ -146,20 +181,22 @@ export function runCommand(): void {
     .option(
       "-C, --capability <cap>",
       "Filter by capability: reasoning, tool_call, structured_output, open_weights, attachment",
+      oneOf(CAPABILITIES),
     )
     .option("-m, --modality <mod>", "Filter by input modality (e.g. image, audio, video, pdf)")
-    .option("--max-cost <n>", "Max input cost ($/million tokens)", Number.parseFloat)
-    .option("--max-cost-output <n>", "Max output cost ($/million tokens)", Number.parseFloat)
-    .option("--min-context <n>", "Min context window size", Number.parseInt)
+    .option("--max-cost <n>", "Max input cost ($/million tokens)", decimal)
+    .option("--max-cost-output <n>", "Max output cost ($/million tokens)", decimal)
+    .option("--min-context <n>", "Min context window size", integer)
     .option("-s, --search <term>", "Search by name or ID")
-    .option("--status <status>", "Filter by status: active, beta, deprecated")
+    .option("--status <status>", "Filter by status: active, beta, deprecated", oneOf(STATUSES))
     .option("-f, --family <name>", "Filter by model family (e.g. gpt, claude, gemini)")
     .option(
       "--sort <field>",
       "Sort by: cost_input, cost_output, context_length, release_date, name, knowledge_cutoff, value",
+      oneOf(SORT_FIELDS),
     )
     .option("--desc", "Sort descending")
-    .option("-n, --limit <n>", "Max results", (v: string) => Number.parseInt(v, 10))
+    .option("-n, --limit <n>", "Max results", integer)
     .option("-c, --count", "Show model count only")
     .option("--ids-only", "Output model IDs only, one per line")
     .option(
@@ -167,43 +204,43 @@ export function runCommand(): void {
       "Output only these fields, tab-separated, one line per model (e.g. context_length,output_limit)",
     )
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown")
+    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
     .action(
       async (options: {
         provider?: string;
-        capability?: string;
+        capability?: ModelFilter["capability"];
         modality?: string;
         maxCost?: number;
         maxCostOutput?: number;
         minContext?: number;
         search?: string;
-        status?: string;
+        status?: ModelFilter["status"];
         family?: string;
-        sort?: string;
+        sort?: ModelSortField;
         desc?: boolean;
         limit?: number;
         count?: boolean;
         idsOnly?: boolean;
         field?: string;
         json?: boolean;
-        format?: string;
+        format?: OutputFormat;
       }) => {
         const start = Date.now();
         const filter: ModelFilter = {
           provider: options.provider,
-          capability: options.capability as ModelFilter["capability"],
+          capability: options.capability,
           modality: options.modality,
           maxCostInput: options.maxCost,
           maxCostOutput: options.maxCostOutput,
           minContext: options.minContext,
           search: options.search,
-          status: options.status as ModelFilter["status"],
+          status: options.status,
           family: options.family,
         };
 
         const models = await findModels({
           filter,
-          sort: options.sort as ModelSortField | undefined,
+          sort: options.sort,
           descending: options.desc,
           limit: options.limit,
         });
@@ -227,7 +264,11 @@ export function runCommand(): void {
           const lines = models
             .map((m) => formatFields(m, paths))
             .filter((line): line is string => line !== null);
-          if (lines.length === 0) process.exit(1);
+          if (lines.length === 0) {
+            if (models.length === 0) console.error("No models found matching your criteria.");
+            else fieldsNotFound("any matching model", paths);
+            process.exit(1);
+          }
           for (const line of lines) console.log(line);
           return;
         }
@@ -269,8 +310,8 @@ export function runCommand(): void {
     .description("Compare models side by side")
     .argument("<models...>", "Model IDs to compare (at least 2)")
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown")
-    .action(async (modelIds: string[], options: { json?: boolean; format?: string }) => {
+    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
+    .action(async (modelIds: string[], options: { json?: boolean; format?: OutputFormat }) => {
       const comparison = await compareModels(modelIds);
       const fmt = resolveFormat(options);
 
@@ -280,6 +321,47 @@ export function runCommand(): void {
       }
 
       const ids = comparison.models.map((m) => m.id);
+
+      if (fmt === "csv" || fmt === "markdown") {
+        const cell = (
+          dim: { values: Record<string, number | null>; best: string | null },
+          id: string,
+          formatter: (v: number | null) => string,
+        ) => `${formatter(dim.values[id])}${dim.best === id ? " *" : ""}`;
+        const ctx = (v: number | null) => (v != null ? formatContext(v) : "-");
+        const rows: string[][] = [
+          ["Context", ...ids.map((id) => cell(comparison.dimensions.context_length, id, ctx))],
+          ["Output limit", ...ids.map((id) => cell(comparison.dimensions.output_limit, id, ctx))],
+          [
+            "$/M input",
+            ...ids.map((id) => cell(comparison.dimensions.cost_input, id, formatCostRaw)),
+          ],
+          [
+            "$/M output",
+            ...ids.map((id) => cell(comparison.dimensions.cost_output, id, formatCostRaw)),
+          ],
+          [
+            "Knowledge cutoff",
+            ...ids.map((id) => comparison.models.find((m) => m.id === id)?.knowledge_cutoff ?? "-"),
+          ],
+        ];
+        const capNames = new Set<string>();
+        for (const caps of Object.values(comparison.dimensions.capabilities)) {
+          for (const key of Object.keys(caps)) capNames.add(key);
+        }
+        for (const cap of capNames) {
+          rows.push([
+            cap,
+            ...ids.map((id) => {
+              const val = comparison.dimensions.capabilities[id]?.[cap];
+              return val === true ? "Yes" : val === false ? "No" : "-";
+            }),
+          ]);
+        }
+        outputFormatted(fmt, ["", ...ids], rows, comparison);
+        return;
+      }
+
       const labelWidth = 20;
 
       // Header
@@ -361,11 +443,11 @@ export function runCommand(): void {
     .argument("[id]", "Provider ID (e.g. openai, anthropic)")
     .option("--list", "List all providers with model counts")
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown")
+    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
     .action(
       async (
         id: string | undefined,
-        options: { list?: boolean; json?: boolean; format?: string },
+        options: { list?: boolean; json?: boolean; format?: OutputFormat },
       ) => {
         const fmt = resolveFormat(options);
 
@@ -415,26 +497,30 @@ export function runCommand(): void {
     .command("cost")
     .description("Estimate costs for models")
     .argument("<models...>", "Model IDs")
-    .requiredOption("-i, --input <tokens>", "Input tokens (supports K/M suffix: 100K, 1M)")
-    .requiredOption("-o, --output <tokens>", "Output tokens (supports K/M suffix: 10K)")
-    .option("--daily <n>", "Number of daily requests for projection", Number.parseInt)
-    .option("--monthly <n>", "Number of monthly requests for projection", Number.parseInt)
-    .option("-P, --profile <name>", "Use workload profile (chatbot, code-gen, rag, summarization)")
+    .option("-i, --input <tokens>", "Input tokens (supports K/M suffix: 100K, 1M)")
+    .option("-o, --output <tokens>", "Output tokens (supports K/M suffix: 10K)")
+    .option("--daily <n>", "Number of daily requests for projection", integer)
+    .option("--monthly <n>", "Number of monthly requests for projection", integer)
+    .option(
+      "-P, --profile <name>",
+      "Use workload profile instead of -i/-o (chatbot, code-gen, rag, summarization, translation)",
+    )
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown")
+    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
     .action(
       async (
         modelIds: string[],
         options: {
-          input: string;
-          output: string;
+          input?: string;
+          output?: string;
           daily?: number;
           monthly?: number;
           profile?: string;
           json?: boolean;
-          format?: string;
+          format?: OutputFormat;
         },
       ) => {
+        // A profile supplies the token counts; explicit -i/-o override its values.
         let inputStr = options.input;
         let outputStr = options.output;
 
@@ -445,8 +531,13 @@ export function runCommand(): void {
             console.error(`Unknown profile "${options.profile}". Available: ${available}`);
             process.exit(1);
           }
-          inputStr = profile.input;
-          outputStr = profile.output;
+          inputStr ??= profile.input;
+          outputStr ??= profile.output;
+        }
+
+        if (inputStr == null || outputStr == null) {
+          console.error("Provide both -i/--input and -o/--output, or a -P/--profile");
+          process.exit(1);
         }
 
         const inputTokens = parseTokenCount(inputStr);
@@ -508,26 +599,22 @@ export function runCommand(): void {
     .option(
       "-C, --capability <cap>",
       "Filter by capability: reasoning, tool_call, structured_output, open_weights, attachment",
+      oneOf(CAPABILITIES),
     )
-    .option("--min-context <n>", "Min context window size", Number.parseInt)
-    .option(
-      "-n, --limit <n>",
-      "Max results (default: 10)",
-      (v: string) => Number.parseInt(v, 10),
-      10,
-    )
+    .option("--min-context <n>", "Min context window size", integer)
+    .option("-n, --limit <n>", "Max results", integer, 10)
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown")
+    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
     .action(
       async (options: {
-        capability?: string;
+        capability?: keyof Capabilities;
         minContext?: number;
         limit?: number;
         json?: boolean;
-        format?: string;
+        format?: OutputFormat;
       }) => {
         const models = await cheapestModels({
-          capability: options.capability as keyof Capabilities | undefined,
+          capability: options.capability,
           minContext: options.minContext,
           limit: options.limit,
         });
@@ -591,8 +678,12 @@ export function runCommand(): void {
       }
 
       if (options.field) {
-        const line = formatFields(model, parseFieldList(options.field));
-        if (line === null) process.exit(1);
+        const paths = parseFieldList(options.field);
+        const line = formatFields(model, paths);
+        if (line === null) {
+          fieldsNotFound(model.id, paths);
+          process.exit(1);
+        }
         console.log(line);
         return;
       }
@@ -715,8 +806,12 @@ export function runCommand(): void {
         }
 
         if (options.field) {
-          const line = formatFields(result.model, parseFieldList(options.field));
-          if (line === null) process.exit(1);
+          const paths = parseFieldList(options.field);
+          const line = formatFields(result.model, paths);
+          if (line === null) {
+            fieldsNotFound(result.model.id, paths);
+            process.exit(1);
+          }
           console.log(line);
           return;
         }
@@ -747,17 +842,12 @@ export function runCommand(): void {
       "[use-case]",
       "Use case: code-gen, vision, cheap-chatbot, reasoning, long-context, open-source, audio, tool-use",
     )
-    .option("--max-cost <n>", "Max input cost budget ($/M tokens)", Number.parseFloat)
-    .option("--min-context <n>", "Min context window", Number.parseInt)
-    .option(
-      "-n, --limit <n>",
-      "Max results (default: 10)",
-      (v: string) => Number.parseInt(v, 10),
-      10,
-    )
+    .option("--max-cost <n>", "Max input cost budget ($/M tokens)", decimal)
+    .option("--min-context <n>", "Min context window", integer)
+    .option("-n, --limit <n>", "Max results", integer, 10)
     .option("--list", "List available use cases")
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown")
+    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
     .action(
       async (
         useCase: string | undefined,
@@ -767,7 +857,7 @@ export function runCommand(): void {
           limit?: number;
           list?: boolean;
           json?: boolean;
-          format?: string;
+          format?: OutputFormat;
         },
       ) => {
         if (options.list || !useCase) {

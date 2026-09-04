@@ -187,10 +187,18 @@ describe("sortModels", () => {
 
   it("sorts by value descending", () => {
     const result = sortModels(mockModels, "value", true);
-    // Descending reverses entire array: null first, then highest value
-    // Non-null models should be in descending value order
-    const withValue = result.filter((m) => m.cost != null);
-    expect(withValue[0].id).toBe("google/gemini-2.0-flash");
-    expect(withValue[withValue.length - 1].id).toBe("openai/gpt-4o");
+    expect(result.map((m) => m.id)).toEqual([
+      "google/gemini-2.0-flash",
+      "anthropic/claude-sonnet-4",
+      "openai/gpt-4o",
+      "meta/llama-3-70b",
+    ]);
+  });
+
+  it("keeps nulls last when sorting descending", () => {
+    expect(sortModels(mockModels, "cost_input", true).at(-1)?.id).toBe("meta/llama-3-70b");
+    expect(sortModels(mockModels, "release_date", true)[0].id).toBe("google/gemini-2.0-flash");
+    expect(sortModels(mockModels, "knowledge_cutoff", true)[0].knowledge_cutoff).toBe("2025-03");
+    expect(sortModels(mockModels, "knowledge_cutoff", true).at(-1)?.id).toBe("meta/llama-3-70b");
   });
 });

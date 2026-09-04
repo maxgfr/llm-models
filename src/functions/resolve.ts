@@ -34,6 +34,7 @@ function slashCount(id: string): number {
  * matches, which beat substring matches.
  */
 function matchRank(id: string, wanted: string): number | null {
+  if (wanted.length === 0) return null;
   const lowerId = id.toLowerCase();
   const lowerWanted = wanted.toLowerCase();
 
@@ -47,9 +48,10 @@ function matchRank(id: string, wanted: string): number | null {
 }
 
 /**
- * Pick the single best model for `wanted` out of `pool`. Ties break towards the
- * shortest, least-nested id so canonical entries ("deepseek/deepseek-chat")
- * win over reseller ones ("orcarouter/deepseek/deepseek-chat").
+ * Pick the single best model for `wanted` out of `pool`. Ties break towards
+ * the least-nested id, then towards entries OpenRouter lists (its ids use the
+ * vendor's own namespace, so "anthropic/claude-sonnet-5" beats the reseller
+ * "neon/claude-sonnet-5"), then towards the shortest id.
  */
 export function pickBestModel(pool: UnifiedModel[], wanted: string): UnifiedModel | null {
   let best: UnifiedModel | null = null;
@@ -69,6 +71,10 @@ export function pickBestModel(pool: UnifiedModel[], wanted: string): UnifiedMode
     const b = best.id;
     if (slashCount(a) !== slashCount(b)) {
       if (slashCount(a) < slashCount(b)) best = model;
+      continue;
+    }
+    if (model.sources.openrouter !== best.sources.openrouter) {
+      if (model.sources.openrouter) best = model;
       continue;
     }
     if (a.length !== b.length) {
@@ -108,10 +114,54 @@ function sharedPrefixLength(a: string[], b: string[]): number {
   return shared;
 }
 
+function alphanumeric(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 /**
- * models.dev provider ids whose documented `api` URL lives on the same host as
- * `endpoint`, best first. Providers whose api path shares a longer prefix with
- * the endpoint path rank higher, so a coding-plan endpoint beats the generic one.
+ * Provider ids that spell out the endpoint host itself: "anthropic" for
+ * api.anthropic.com, "xai" for api.x.ai, "google" for
+ * generativelanguage.googleapis.com. The id has to start on a host label, and
+ * a three-letter id has to end on one too, so "nan" never matches
+ * "nano-gpt.com" while "xai" still matches "x.ai". Longest id first.
+ */
+function providersNamedByHost(host: string, data: ModelsDevResponse): string[] {
+  const labels = host.split(".").map(alphanumeric);
+  const flat = labels.join("");
+  const labelStarts = new Set<number>();
+  const labelEnds = new Set<number>();
+  let offset = 0;
+  for (const label of labels) {
+    labelStarts.add(offset);
+    offset += label.length;
+    labelEnds.add(offset);
+  }
+
+  const matches: string[] = [];
+  for (const id of Object.keys(data)) {
+    const needle = alphanumeric(id);
+    if (needle.length < 3) continue;
+    let index = flat.indexOf(needle);
+    while (index !== -1) {
+      const end = index + needle.length;
+      if (labelStarts.has(index) && (needle.length >= 4 || labelEnds.has(end))) {
+        matches.push(id);
+        break;
+      }
+      index = flat.indexOf(needle, index + 1);
+    }
+  }
+
+  return matches.sort((a, b) => b.length - a.length || (a < b ? -1 : 1));
+}
+
+/**
+ * models.dev provider ids that serve `endpoint`, best first. Providers whose
+ * documented `api` URL lives on the same host come first, those whose api path
+ * shares a longer prefix with the endpoint path ranking higher so a coding-plan
+ * endpoint beats the generic one. Providers that have no documented `api` but
+ * whose id names the host (api.anthropic.com -> "anthropic") follow, so the
+ * vendor's own endpoint never falls through to a reseller.
  */
 export function providersForEndpoint(endpoint: string, data: ModelsDevResponse): string[] {
   const url = parseUrl(endpoint);
@@ -128,9 +178,13 @@ export function providersForEndpoint(endpoint: string, data: ModelsDevResponse):
     scored.push({ id, shared: sharedPrefixLength(wantedPath, pathSegments(providerUrl.pathname)) });
   }
 
-  return scored
+  const byApi = scored
     .sort((a, b) => b.shared - a.shared || a.id.length - b.id.length || (a.id < b.id ? -1 : 1))
     .map((entry) => entry.id);
+  const seen = new Set(byApi);
+  const byName = providersNamedByHost(host, data).filter((id) => !seen.has(id));
+
+  return [...byApi, ...byName];
 }
 
 /**

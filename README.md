@@ -106,12 +106,19 @@ llm-models resolve glm-5.3 --endpoint https://api.z.ai/api/anthropic
 llm-models resolve deepseek-chat --provider deepseek
 ```
 
+The endpoint is matched against each provider's documented API host first. Vendors that document no
+API URL on models.dev (Anthropic, OpenAI, Google, xAI, Mistral, ...) are matched by name in the host
+instead, so `--endpoint https://api.anthropic.com` answers with `anthropic/claude-sonnet-5` rather
+than a reseller's copy. Without `--endpoint` or `--provider`, ties between identical ids go to the
+vendor's own entry.
+
 Exits 1 when nothing matches, so it composes in scripts.
 
 #### Script-friendly output (`--field`)
 
 `info`, `find` and `resolve` accept `--field` to print bare, tab-separated values instead of a
-formatted block — no JSON parsing needed. Dotted paths work, and a missing field exits 1:
+formatted block — no JSON parsing needed. Dotted paths work. A field missing on one model renders
+as an empty column; when every requested field is missing the command explains on stderr and exits 1:
 
 ```bash
 llm-models info z-ai/glm-5.3 --field context_length
@@ -135,8 +142,8 @@ llm-models cost openai/gpt-4o anthropic/claude-sonnet-4 -i 1M -o 100K
 # With daily/monthly projections
 llm-models cost openai/gpt-4o -i 1M -o 100K --daily 1000
 
-# Using a workload profile
-llm-models cost openai/gpt-4o -i 1K -o 1K -P chatbot --daily 5000
+# Using a workload profile (supplies -i/-o; pass either flag to override it)
+llm-models cost openai/gpt-4o -P chatbot --daily 5000
 ```
 
 #### Cheapest models
@@ -284,7 +291,7 @@ Exposes 8 tools: `find_models`, `compare_models`, `estimate_cost`, `cheapest_mod
 | `--status <status>` | Filter: active, beta, deprecated |
 | `-f, --family <name>` | Filter by model family (e.g. gpt, claude, gemini) |
 | `--sort <field>` | Sort: cost_input, cost_output, context_length, release_date, name, knowledge_cutoff, value |
-| `--desc` | Sort descending |
+| `--desc` | Sort descending (models without a value for the field always sort last) |
 | `-n, --limit <n>` | Max results (default: 20) |
 | `-c, --count` | Show model count only |
 | `--ids-only` | Output model IDs only, one per line |
@@ -305,11 +312,11 @@ Exposes 8 tools: `find_models`, `compare_models`, `estimate_cost`, `cheapest_mod
 
 | Option | Description |
 |--------|-------------|
-| `-i, --input <n>` | Input tokens (supports K/M suffix) |
-| `-o, --output <n>` | Output tokens (supports K/M suffix) |
+| `-i, --input <n>` | Input tokens (supports K/M suffix); required unless `-P` is given |
+| `-o, --output <n>` | Output tokens (supports K/M suffix); required unless `-P` is given |
 | `--daily <n>` | Number of daily requests for cost projection |
 | `--monthly <n>` | Number of monthly requests for cost projection |
-| `-P, --profile <name>` | Use workload profile (chatbot, code-gen, rag, summarization, translation) |
+| `-P, --profile <name>` | Use workload profile (chatbot, code-gen, rag, summarization, translation) instead of `-i`/`-o` |
 
 ## Library Usage
 

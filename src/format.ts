@@ -19,14 +19,10 @@ export function formatCostRaw(cost: number | undefined | null): string {
 }
 
 export function formatContext(n: number): string {
-  if (n >= 1_000_000) {
-    const val = n / 1_000_000;
-    return Number.isInteger(val) ? `${val}M` : `${val.toFixed(1)}M`;
-  }
-  if (n >= 1_000) {
-    const val = n / 1_000;
-    return Number.isInteger(val) ? `${val}K` : `${val.toFixed(1)}K`;
-  }
+  const scaled = (val: number) => (Number.isInteger(val) ? `${val}` : val.toFixed(1));
+  // Pick the unit after rounding so 999,990 renders as "1.0M", never "1000.0K".
+  if (n >= 1_000_000 || Number(scaled(n / 1_000)) >= 1_000) return `${scaled(n / 1_000_000)}M`;
+  if (n >= 1_000 || Number(scaled(n)) >= 1_000) return `${scaled(n / 1_000)}K`;
   return String(n);
 }
 

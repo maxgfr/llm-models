@@ -1,23 +1,13 @@
 import type { Capabilities, CostEstimate, UnifiedModel } from "../types";
 import { fetchUnifiedModels } from "./normalize";
+import { pickBestModel } from "./resolve";
 import { filterModels, sortModels } from "./search";
 
 function findModelById(models: UnifiedModel[], query: string): UnifiedModel {
-  // Exact match first
-  const exact = models.find((m) => m.id === query);
-  if (exact) return exact;
-
-  // Partial match
-  const lower = query.toLowerCase();
-  const matches = models.filter((m) => m.id.toLowerCase().includes(lower));
-
-  if (matches.length === 1) return matches[0];
-  if (matches.length > 1) {
-    // Prefer shortest ID (most specific match)
-    matches.sort((a, b) => a.id.length - b.id.length);
-    return matches[0];
-  }
-
+  // Same ranking as `resolve`: exact id, then trailing segment, then substring,
+  // with canonical entries beating resellers on ties.
+  const model = pickBestModel(models, query);
+  if (model) return model;
   throw new Error(`Model "${query}" not found`);
 }
 
