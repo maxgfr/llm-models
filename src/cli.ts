@@ -23,6 +23,7 @@ import { compareModels } from "./functions/compare";
 import { cheapestModels, estimateCost } from "./functions/cost";
 import { diffModels } from "./functions/diff";
 import { formatFields, parseFieldList } from "./functions/fields";
+import { latestModels, TIERS, type Tier } from "./functions/latest";
 import { fetchUnifiedModels } from "./functions/normalize";
 import { getProvider, listProviders } from "./functions/provider";
 import { listUseCases, recommendModels } from "./functions/recommend";
@@ -30,7 +31,7 @@ import { resolveModel } from "./functions/resolve";
 import { findModels } from "./functions/search";
 import { getStats } from "./functions/stats";
 import { CapabilityEnum, ModelFilterSchema, ModelSortFieldSchema } from "./schemas/functions";
-import type { Capabilities, ModelFilter, ModelSortField } from "./types";
+import type { Capabilities, ModelFilter, ModelSortField, UnifiedModel } from "./types";
 
 const CAPABILITIES = CapabilityEnum.options;
 const STATUSES = ModelFilterSchema.shape.status.unwrap().options;
@@ -830,6 +831,97 @@ export function runCommand(): void {
           console.log(`${bold("Output limit:")}  ${formatContext(result.model.output_limit)}`);
         }
         console.log(`${bold("Matched by:")}    ${result.matchedBy}`);
+      },
+    );
+
+  // --- Latest command ---
+
+  program
+    .command("latest")
+    .description("Pick the newest flagship and fast model per tier for an endpoint")
+    .option(
+      "-e, --endpoint <url>",
+      "Base URL being called (e.g. https://api.z.ai/api/anthropic) — picks from that provider's catalogue",
+    )
+    .option("-p, --provider <id>", "Provider ID to pick from (e.g. deepseek)")
+    .option(
+      "--filter <token>",
+      "Only consider ids containing this token or families starting with it (e.g. anthropic/)",
+    )
+    .option("--tier <name>", "Print one tier only: opus, sonnet or haiku", oneOf(TIERS))
+    .option(
+      "--field <names>",
+      "Output one tab-separated line per tier with these fields (e.g. tier,id,context_length)",
+    )
+    .option("--json", "Output raw JSON")
+    .action(
+      async (
+        options: {
+          endpoint?: string;
+          provider?: string;
+          filter?: string;
+          tier?: Tier;
+          field?: string;
+          json?: boolean;
+        },
+        command: Command,
+      ) => {
+        if (!options.endpoint && !options.provider) {
+          command.error("error: one of --endpoint or --provider is required");
+        }
+
+        const result = await latestModels({
+          endpoint: options.endpoint,
+          provider: options.provider,
+          filter: options.filter,
+        });
+
+        if (!result) {
+          const scope = options.endpoint ?? options.provider ?? "";
+          const withFilter = options.filter ? ` (filter: ${options.filter})` : "";
+          console.error(`No eligible model for ${scope}${withFilter}`);
+          process.exit(1);
+        }
+
+        if (program.opts().verbose) {
+          const summary = result.picks.map((pick) => `${pick.tier}=${pick.model.id}`).join(" ");
+          const via = result.endpointProviders.length
+            ? `${result.provider} (${result.endpointProviders.join(", ")})`
+            : result.provider;
+          console.error(`Picked ${summary} via ${via}`);
+        }
+
+        const picks = options.tier
+          ? result.picks.filter((pick) => pick.tier === options.tier)
+          : result.picks;
+
+        if (options.field) {
+          const paths = parseFieldList(options.field);
+          const lines = picks.map((pick) =>
+            formatFields({ ...pick.model, tier: pick.tier } as UnifiedModel, paths),
+          );
+          if (lines.every((line) => line === null)) {
+            fieldsNotFound(picks[0]?.model.id ?? result.provider, paths);
+            process.exit(1);
+          }
+          for (const line of lines) if (line !== null) console.log(line);
+          return;
+        }
+
+        if (options.json) {
+          console.log(JSON.stringify({ provider: result.provider, picks }, null, 2));
+          return;
+        }
+
+        console.log(`${bold("Provider:")}  ${result.provider}`);
+        for (const pick of picks) {
+          const output = pick.model.output_limit
+            ? `, ${formatContext(pick.model.output_limit)} out`
+            : "";
+          console.log(
+            `${bold(`${pick.tier}:`.padEnd(8))} ${pick.model.id} ${dim(`(${formatContext(pick.model.context_length)} context${output})`)}`,
+          );
+        }
       },
     );
 

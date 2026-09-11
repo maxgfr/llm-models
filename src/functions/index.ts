@@ -2,6 +2,7 @@ export { compareModels } from "./compare";
 export { cheapestModels, estimateCost } from "./cost";
 export { diffModels } from "./diff";
 export { formatFields, parseFieldList, readField } from "./fields";
+export { latestModels, pickTiers } from "./latest";
 export { fetchUnifiedData, fetchUnifiedModels, mergeModels } from "./normalize";
 export { getProvider, listProviders } from "./provider";
 export { QueryBuilder, query } from "./query";

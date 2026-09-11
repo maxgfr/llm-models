@@ -25,6 +25,8 @@ describe("generateBashCompletion", () => {
       "stats",
       "diff",
       "info",
+      "resolve",
+      "latest",
       "cache",
       "config",
       "mcp",

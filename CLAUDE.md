@@ -30,7 +30,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 ## Project structure
 - `src/` - source code
   - `index.ts` - entry point (CLI + library export)
-  - `cli.ts` - CLI commands (Commander.js, 16 commands)
+  - `cli.ts` - CLI commands (Commander.js, 17 commands)
   - `format.ts` - CLI formatting utilities (table, cost, context, CSV, markdown)
   - `types.ts` - Zod-inferred type exports
   - `cache.ts` - Local API response cache with TTL (~/.cache/llm-models/)
@@ -45,6 +45,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   - `clients/models-dev.ts` - models.dev fetch + parse + cache
   - `functions/normalize.ts` - Cross-source normalization + merge into UnifiedModel
   - `functions/resolve.ts` - resolveModel: endpoint/provider-scoped model lookup
+  - `functions/latest.ts` - latestModels/pickTiers: newest flagship + fast model per tier for an endpoint
   - `functions/fields.ts` - readField/formatFields: dotted-path `--field` extraction
   - `functions/search.ts` - filterModels, sortModels, findModels
   - `functions/compare.ts` - compareModels (side-by-side)
@@ -54,7 +55,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   - `functions/recommend.ts` - recommendModels, listUseCases (use-case presets)
   - `functions/diff.ts` - diffModels (compare current vs cached snapshot)
   - `functions/query.ts` - QueryBuilder fluent API
-  - `__tests__/` - 21 test files (203 tests, unit + live API schema validation)
+  - `__tests__/` - 22 test files (220 tests, unit + live API schema validation)
 - `build/` - compiled output (npm package)
 - `dist/` - binary output
 - `action.yml` - GitHub Action for CI/CD integration
@@ -75,5 +76,5 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   APIs describe different endpoints (OpenRouter routes deepseek-chat at 163,840 context, DeepSeek's
   own API serves 1,000,000), so mixing them yields impossible pairs. models.dev wins; output is
   clamped to context. See `mergeModels` in `functions/normalize.ts`.
-- Script-facing output (`--field`, `resolve`) is a contract: bare values on stdout, diagnostics on
+- Script-facing output (`--field`, `resolve`, `latest`) is a contract: bare values on stdout, diagnostics on
   stderr, exit 1 on no match. Keep it stable — `ccs` (claude-code-switch) depends on it.

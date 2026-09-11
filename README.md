@@ -114,9 +114,40 @@ vendor's own entry.
 
 Exits 1 when nothing matches, so it composes in scripts.
 
+#### Pick the latest model per tier
+
+`latest` answers "which model should I be on?" for an endpoint: the newest flagship of the current
+generation (`opus`) and its fast sibling (`sonnet` and `haiku`), out of the provider's own catalogue.
+Batch and free routes, moving `~vendor/…` aliases, deprecated entries, models that cannot call tools
+and vision / speech / preview / experimental variants are left out:
+
+```bash
+llm-models latest --endpoint https://api.z.ai/api/anthropic
+# Provider:  zai
+# opus:    zai/glm-5.3 (1M context, 131.1K out)
+# sonnet:  zai/glm-5.3-flash (1M context, 131.1K out)
+# haiku:   zai/glm-5.3-flash (1M context, 131.1K out)
+
+# One tab-separated line per tier, for scripts
+llm-models latest --endpoint https://api.z.ai/api/anthropic \
+  --field tier,id,context_length,output_limit
+# opus	zai/glm-5.3	1000000	131072
+# sonnet	zai/glm-5.3-flash	1000000	131072
+# haiku	zai/glm-5.3-flash	1000000	131072
+
+# Narrow a multi-vendor catalogue; Claude tiers map literally
+llm-models latest --endpoint https://openrouter.ai/api --filter anthropic/ --tier sonnet --field id
+# openrouter/anthropic/claude-sonnet-5
+```
+
+A fast variant only pairs with a flagship of the same major version, so a generation that ships
+no fast model answers with the flagship on every tier. `--filter` keeps ids containing the token
+(or families starting with it); `--tier` prints one tier; `--json` prints `{ provider, picks }`.
+One of `--endpoint` or `--provider` is required, and the command exits 1 when nothing is eligible.
+
 #### Script-friendly output (`--field`)
 
-`info`, `find` and `resolve` accept `--field` to print bare, tab-separated values instead of a
+`info`, `find`, `resolve` and `latest` accept `--field` to print bare, tab-separated values instead of a
 formatted block — no JSON parsing needed. Dotted paths work. A field missing on one model renders
 as an empty column; when every requested field is missing the command explains on stderr and exits 1:
 
@@ -334,6 +365,7 @@ import {
   listUseCases,
   diffModels,
   resolveModel,
+  latestModels,
   query,
   setCacheEnabled,
   clearCache,
@@ -354,6 +386,10 @@ const resolved = await resolveModel("glm-5.3", {
   endpoint: "https://api.z.ai/api/anthropic",
 });
 // resolved.model.context_length === 1_000_000, resolved.matchedBy === "endpoint"
+
+// Newest flagship and fast model per tier for that endpoint
+const latest = await latestModels({ endpoint: "https://api.z.ai/api/anthropic" });
+// latest.picks -> [{ tier: "opus", model: glm-5.3 }, { tier: "sonnet", model: glm-5.3-flash }, ...]
 
 // Fluent query builder
 const results = await query()

@@ -138,6 +138,22 @@ describe("CLI smart commands", () => {
     expect(stdout).toContain("--json");
   });
 
+  it("latest --help shows expected flags", async () => {
+    const proc = Bun.spawn(["bun", "run", "src/index.ts", "latest", "--help"], {
+      cwd,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const stdout = await new Response(proc.stdout).text();
+    await proc.exited;
+    expect(stdout).toContain("--endpoint");
+    expect(stdout).toContain("--provider");
+    expect(stdout).toContain("--filter");
+    expect(stdout).toContain("--tier");
+    expect(stdout).toContain("--field");
+    expect(stdout).toContain("--json");
+  });
+
   it("completion --help shows shell argument", async () => {
     const proc = Bun.spawn(["bun", "run", "src/index.ts", "completion", "--help"], {
       cwd,
