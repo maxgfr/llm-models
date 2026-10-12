@@ -87,6 +87,48 @@ export function pickBestModel(pool: UnifiedModel[], wanted: string): UnifiedMode
   return best;
 }
 
+/** Rank of a substring-only match in `matchRank`. */
+const SUBSTRING_RANK = 5;
+
+/**
+ * Look a model up by what a user typed: "gpt-4o", "openai/gpt-4o", "GPT-4o".
+ * Any id-level match (exact id, exact trailing segment, either case-insensitive)
+ * wins outright, ties broken as in `pickBestModel`, so "gpt-4o" finds
+ * openai/gpt-4o even though dozens of ids contain it. A bare substring match
+ * (on the id or the display name) is only accepted when it is unique.
+ *
+ * Throws "not found", or "Ambiguous" with up to 10 suggestions.
+ */
+export function findModel(models: UnifiedModel[], query: string): UnifiedModel {
+  const wanted = query.trim();
+  let bestRank = Number.POSITIVE_INFINITY;
+  for (const model of models) {
+    const rank = matchRank(model.id, wanted);
+    if (rank !== null && rank < bestRank) bestRank = rank;
+  }
+
+  if (bestRank < SUBSTRING_RANK) {
+    const best = pickBestModel(models, wanted);
+    if (best) return best;
+  }
+
+  const lower = wanted.toLowerCase();
+  const candidates =
+    lower.length === 0
+      ? []
+      : models.filter(
+          (m) => matchRank(m.id, wanted) !== null || m.name.toLowerCase().includes(lower),
+        );
+
+  if (candidates.length === 1) return candidates[0];
+  if (candidates.length > 1) {
+    const ids = candidates.slice(0, 10).map((m) => `  - ${m.id}`);
+    const more = candidates.length > 10 ? `\n  … and ${candidates.length - 10} more` : "";
+    throw new Error(`Ambiguous model "${query}". Did you mean one of:\n${ids.join("\n")}${more}`);
+  }
+  throw new Error(`Model "${query}" not found`);
+}
+
 function parseUrl(value: string): URL | null {
   const candidates = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? [value] : [`https://${value}`];
   for (const candidate of candidates) {

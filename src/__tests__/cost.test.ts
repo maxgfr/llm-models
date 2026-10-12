@@ -99,3 +99,29 @@ describe("estimateCost", () => {
     ).rejects.toThrow("not found");
   });
 });
+
+describe("projectCost", () => {
+  it("returns null without a volume", async () => {
+    const { projectCost } = await import("../functions/cost");
+    expect(projectCost(2, {})).toBeNull();
+  });
+
+  it("derives monthly from daily and daily from monthly", async () => {
+    const { projectCost } = await import("../functions/cost");
+    expect(projectCost(2, { daily: 10 })).toEqual({ daily_cost_usd: 20, monthly_cost_usd: 600 });
+    expect(projectCost(2, { monthly: 300 })).toEqual({ daily_cost_usd: 20, monthly_cost_usd: 600 });
+  });
+
+  it("uses each volume as stated when both are given", async () => {
+    const { projectCost } = await import("../functions/cost");
+    expect(projectCost(2, { daily: 10, monthly: 100 })).toEqual({
+      daily_cost_usd: 20,
+      monthly_cost_usd: 200,
+    });
+  });
+
+  it("treats a zero volume as a volume", async () => {
+    const { projectCost } = await import("../functions/cost");
+    expect(projectCost(2, { daily: 0 })).toEqual({ daily_cost_usd: 0, monthly_cost_usd: 0 });
+  });
+});

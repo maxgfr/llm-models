@@ -1,18 +1,26 @@
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   clearCache,
+  getCacheDir,
   isCacheEnabled,
   readCache,
   readSnapshot,
+  setCacheDir,
   setCacheEnabled,
   writeCache,
 } from "../cache";
 
-const CACHE_DIR = join(homedir(), ".cache", "llm-models");
+// Never touch the real ~/.cache/llm-models: clearCache() below wipes the directory.
+const REAL_CACHE_DIR = getCacheDir();
+const CACHE_DIR = join(mkdtempSync(join(tmpdir(), "llm-models-cache-")), "llm-models");
 const TEST_KEY = "__test_cache_key__";
+
+beforeAll(() => {
+  setCacheDir(CACHE_DIR);
+});
 
 beforeEach(() => {
   setCacheEnabled(true);
@@ -24,10 +32,8 @@ beforeEach(() => {
 });
 
 afterAll(() => {
-  const filePath = join(CACHE_DIR, `${TEST_KEY}.json`);
-  if (existsSync(filePath)) {
-    rmSync(filePath);
-  }
+  rmSync(join(CACHE_DIR, ".."), { recursive: true, force: true });
+  setCacheDir(REAL_CACHE_DIR);
 });
 
 describe("setCacheEnabled / isCacheEnabled", () => {

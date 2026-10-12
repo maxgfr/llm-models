@@ -1,14 +1,34 @@
-import { afterEach, beforeAll, describe, expect, it, mock } from "bun:test";
-import { setCacheEnabled, writeCache } from "../cache";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from "bun:test";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { getCacheDir, removeCache, setCacheDir, setCacheEnabled, writeCache } from "../cache";
+import { diffModels } from "../functions/diff";
+import { fetchUnifiedModels } from "../functions/normalize";
+
+// diff persists its snapshot, so these tests run the cache for real, in a
+// throwaway directory.
+const realCacheDir = getCacheDir();
+const originalFetch = globalThis.fetch;
+let dir = "";
 
 beforeAll(() => {
-  setCacheEnabled(false);
+  setCacheEnabled(true);
 });
 
-const originalFetch = globalThis.fetch;
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), "llm-models-diff-"));
+  setCacheDir(dir);
+});
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  rmSync(dir, { recursive: true, force: true });
+});
+
+afterAll(() => {
+  setCacheDir(realCacheDir);
+  setCacheEnabled(false);
 });
 
 const mockOpenRouterResponse = {
@@ -59,73 +79,80 @@ const mockModelsDevResponse = {
   },
 };
 
-function mockFetch() {
+/** Serve the fixtures with gpt-4o's input price set to `inputPerMillion`. */
+function mockFetch(inputPerMillion = 2.5) {
+  // Drop the cached API responses so the next fetch sees this mock.
+  removeCache("openrouter");
+  removeCache("models-dev");
+  const openrouter = structuredClone(mockOpenRouterResponse);
+  openrouter.data[0].pricing.prompt = String(inputPerMillion / 1_000_000);
+  const modelsDev = structuredClone(mockModelsDevResponse);
+  modelsDev.openai.models["gpt-4o"].cost.input = inputPerMillion;
   globalThis.fetch = mock((url: string) => {
-    if (url.includes("openrouter")) {
-      return Promise.resolve(new Response(JSON.stringify(mockOpenRouterResponse), { status: 200 }));
-    }
-    return Promise.resolve(new Response(JSON.stringify(mockModelsDevResponse), { status: 200 }));
-  }) as typeof fetch;
+    const body = url.includes("openrouter") ? openrouter : modelsDev;
+    return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+  }) as unknown as typeof fetch;
 }
 
 describe("diffModels", () => {
-  it("returns all models as added when no previous snapshot", async () => {
+  it("saves a baseline on the first run", async () => {
     mockFetch();
-    // Ensure no unified snapshot exists by writing an invalid key
-    setCacheEnabled(true);
-    // Clear unified cache by writing empty
-    const { existsSync, rmSync } = require("node:fs");
-    const { join } = require("node:path");
-    const { homedir } = require("node:os");
-    const path = join(homedir(), ".cache", "llm-models", "unified.json");
-    if (existsSync(path)) rmSync(path);
-    setCacheEnabled(false);
-
-    const { diffModels } = await import("../functions/diff");
     const diff = await diffModels();
 
     expect(diff.timestamp_previous).toBeNull();
     expect(diff.total_before).toBe(0);
     expect(diff.total_after).toBeGreaterThan(0);
-    expect(diff.added.length).toBeGreaterThan(0);
+    expect(diff.added).toHaveLength(diff.total_after);
     expect(diff.removed).toHaveLength(0);
-    expect(diff.price_changes).toHaveLength(0);
+    expect(existsSync(join(dir, "snapshot.json"))).toBe(true);
   });
 
-  it("detects no changes when snapshot matches current", async () => {
+  it("keeps its baseline when other commands refresh the data", async () => {
     mockFetch();
+    const first = await diffModels();
 
-    // First, fetch to get current models
-    const { fetchUnifiedModels } = await import("../functions/normalize");
+    // Any other command fetching unified data must not reset diff's baseline.
+    mockFetch(5);
+    await fetchUnifiedModels();
+
+    const second = await diffModels();
+    expect(second.timestamp_previous).toBe(first.timestamp_current);
+    expect(second.price_changes).toEqual([
+      { model_id: "openai/gpt-4o", field: "cost_input", old_value: 2.5, new_value: 5 },
+    ]);
+  });
+
+  it("compares against the previous diff, not the first one", async () => {
+    mockFetch();
+    await diffModels();
+    mockFetch(5);
+    await diffModels();
+
+    const third = await diffModels();
+    expect(third.price_changes).toHaveLength(0);
+    expect(third.added).toHaveLength(0);
+    expect(third.removed).toHaveLength(0);
+  });
+
+  it("uses a pre-1.5 unified.json once as the baseline, then drops it", async () => {
+    mockFetch();
     const current = await fetchUnifiedModels();
+    writeCache("unified", [...current, { ...current[0], id: "openai/gone" }]);
 
-    // Write as snapshot
-    setCacheEnabled(true);
-    writeCache("unified", current);
-    setCacheEnabled(false);
-
-    const { diffModels } = await import("../functions/diff");
     const diff = await diffModels();
-
     expect(diff.timestamp_previous).not.toBeNull();
-    expect(diff.added).toHaveLength(0);
-    expect(diff.removed).toHaveLength(0);
-    expect(diff.price_changes).toHaveLength(0);
-    expect(diff.status_changes).toHaveLength(0);
+    expect(diff.removed).toEqual(["openai/gone"]);
+    expect(existsSync(join(dir, "unified.json"))).toBe(false);
   });
 
-  it("returns correct structure", async () => {
+  it("does not persist a snapshot when the cache is disabled", async () => {
     mockFetch();
-    const { diffModels } = await import("../functions/diff");
-    const diff = await diffModels();
-
-    expect(typeof diff.timestamp_current).toBe("number");
-    expect(diff.timestamp_current).toBeGreaterThan(0);
-    expect(Array.isArray(diff.added)).toBe(true);
-    expect(Array.isArray(diff.removed)).toBe(true);
-    expect(Array.isArray(diff.price_changes)).toBe(true);
-    expect(Array.isArray(diff.status_changes)).toBe(true);
-    expect(typeof diff.total_before).toBe("number");
-    expect(typeof diff.total_after).toBe("number");
+    setCacheEnabled(false);
+    try {
+      await diffModels();
+    } finally {
+      setCacheEnabled(true);
+    }
+    expect(existsSync(join(dir, "snapshot.json"))).toBe(false);
   });
 });

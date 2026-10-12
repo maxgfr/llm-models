@@ -1,4 +1,4 @@
-import { readFallbackCache, writeCache } from "../cache";
+import { readFallbackCache } from "../cache";
 import { fetchModelsDevModels } from "../clients/models-dev";
 import { fetchOpenRouterModels } from "../clients/openrouter";
 import type {
@@ -208,7 +208,6 @@ export async function fetchUnifiedData(): Promise<{
   }
 
   const unified = Array.from(result.values());
-  writeCache("unified", unified);
   return { models: unified, modelsDevData: modelsDevData ?? ({} as ModelsDevResponse) };
 }
 

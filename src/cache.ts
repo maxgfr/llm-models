@@ -10,9 +10,9 @@ import {
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const CACHE_DIR = join(homedir(), ".cache", "llm-models");
 const DEFAULT_TTL = 3_600_000; // 1 hour
 
+let cacheDir = join(homedir(), ".cache", "llm-models");
 let cacheEnabled = true;
 
 export function setCacheEnabled(enabled: boolean): void {
@@ -23,15 +23,25 @@ export function isCacheEnabled(): boolean {
   return cacheEnabled;
 }
 
+/** Where cached API responses and the diff snapshot live. */
+export function getCacheDir(): string {
+  return cacheDir;
+}
+
+/** Point the cache somewhere else (tests, sandboxes). */
+export function setCacheDir(dir: string): void {
+  cacheDir = dir;
+}
+
 function ensureCacheDir(): void {
-  if (!existsSync(CACHE_DIR)) {
-    mkdirSync(CACHE_DIR, { recursive: true });
+  if (!existsSync(cacheDir)) {
+    mkdirSync(cacheDir, { recursive: true });
   }
 }
 
 export function readCache<T>(key: string, ttlMs = DEFAULT_TTL): T | null {
   if (!cacheEnabled) return null;
-  const filePath = join(CACHE_DIR, `${key}.json`);
+  const filePath = join(cacheDir, `${key}.json`);
   try {
     if (!existsSync(filePath)) return null;
     const raw = readFileSync(filePath, "utf-8");
@@ -46,12 +56,22 @@ export function readCache<T>(key: string, ttlMs = DEFAULT_TTL): T | null {
 export function writeCache<T>(key: string, data: T): void {
   if (!cacheEnabled) return;
   ensureCacheDir();
-  const filePath = join(CACHE_DIR, `${key}.json`);
+  const filePath = join(cacheDir, `${key}.json`);
   writeFileSync(filePath, JSON.stringify({ timestamp: Date.now(), data }));
 }
 
+/** Delete one cache entry, if present. */
+export function removeCache(key: string): void {
+  if (!cacheEnabled) return;
+  try {
+    rmSync(join(cacheDir, `${key}.json`), { force: true });
+  } catch {
+    // best effort
+  }
+}
+
 export function readSnapshot<T>(key: string): { timestamp: number; data: T } | null {
-  const filePath = join(CACHE_DIR, `${key}.json`);
+  const filePath = join(cacheDir, `${key}.json`);
   try {
     if (!existsSync(filePath)) return null;
     const raw = readFileSync(filePath, "utf-8");
@@ -62,7 +82,7 @@ export function readSnapshot<T>(key: string): { timestamp: number; data: T } | n
 }
 
 export function readFallbackCache<T>(key: string): T | null {
-  const filePath = join(CACHE_DIR, `${key}.json`);
+  const filePath = join(cacheDir, `${key}.json`);
   try {
     if (!existsSync(filePath)) return null;
     const raw = readFileSync(filePath, "utf-8");
@@ -74,8 +94,8 @@ export function readFallbackCache<T>(key: string): T | null {
 }
 
 export function clearCache(): void {
-  if (existsSync(CACHE_DIR)) {
-    rmSync(CACHE_DIR, { recursive: true });
+  if (existsSync(cacheDir)) {
+    rmSync(cacheDir, { recursive: true });
     console.log("Cache cleared.");
   } else {
     console.log("No cache to clear.");
@@ -83,12 +103,12 @@ export function clearCache(): void {
 }
 
 export function getCacheInfo(): { files: number; sizeBytes: number } {
-  if (!existsSync(CACHE_DIR)) return { files: 0, sizeBytes: 0 };
-  const files = readdirSync(CACHE_DIR).filter((f) => f.endsWith(".json"));
+  if (!existsSync(cacheDir)) return { files: 0, sizeBytes: 0 };
+  const files = readdirSync(cacheDir).filter((f) => f.endsWith(".json"));
   let sizeBytes = 0;
   for (const file of files) {
     try {
-      sizeBytes += statSync(join(CACHE_DIR, file)).size;
+      sizeBytes += statSync(join(cacheDir, file)).size;
     } catch {
       // ignore
     }

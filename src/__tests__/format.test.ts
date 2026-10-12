@@ -67,6 +67,14 @@ describe("parseTokenCount", () => {
   it("throws on invalid input", () => {
     expect(() => parseTokenCount("abc")).toThrow("Invalid token count");
     expect(() => parseTokenCount("")).toThrow("Invalid token count");
+    expect(() => parseTokenCount("1.2.3")).toThrow("Invalid token count");
+    expect(() => parseTokenCount(".")).toThrow("Invalid token count");
+    expect(() => parseTokenCount("5.K")).toThrow("Invalid token count");
+  });
+
+  it("rounds to whole tokens", () => {
+    expect(parseTokenCount("1.2345K")).toBe(1235);
+    expect(parseTokenCount("10.6")).toBe(11);
   });
 });
 
@@ -93,6 +101,15 @@ describe("formatCostRaw", () => {
   it("returns dash for null/undefined", () => {
     expect(formatCostRaw(null)).toBe("-");
     expect(formatCostRaw(undefined)).toBe("-");
+  });
+
+  it("keeps two significant digits below one cent instead of rounding to $0.00", () => {
+    expect(formatCostRaw(0.0015)).toBe("$0.0015");
+    expect(formatCostRaw(0.00012345)).toBe("$0.00012");
+    expect(formatCostRaw(0.001)).toBe("$0.001");
+    expect(formatCostRaw(0.0099999)).toBe("$0.01");
+    expect(formatCostRaw(0.01)).toBe("$0.01");
+    expect(formatCost(0.0015)).toBe("$0.0015");
   });
 });
 

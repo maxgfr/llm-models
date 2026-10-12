@@ -12,11 +12,13 @@ export async function getProvider(providerId: string): Promise<ProviderInfo> {
     throw new Error(`Provider "${providerId}" not found`);
   }
 
-  const devProvider = modelsDevData[providerId];
+  // The lookup above ignores case; models.dev keys do not, so use the canonical id.
+  const id = providerModels[0].provider;
+  const devProvider = modelsDevData[id];
 
   return {
-    id: providerId,
-    name: devProvider?.name ?? providerId,
+    id,
+    name: devProvider?.name ?? id,
     model_count: providerModels.length,
     doc: devProvider?.doc,
     env: devProvider?.env,
