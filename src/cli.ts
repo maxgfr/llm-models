@@ -1,6 +1,14 @@
-import { Argument, Command, InvalidArgumentError } from "commander";
+import { Argument, Command, InvalidArgumentError, Option } from "commander";
 import pkg from "../package.json";
-import { clearCache, getCacheDir, getCacheInfo, setCacheEnabled } from "./cache";
+import {
+  clearCache,
+  getCacheDir,
+  getCacheInfo,
+  getCacheTtl,
+  isCacheEnabled,
+  setCacheEnabled,
+  setCacheTtl,
+} from "./cache";
 import { fetchModelsDevModels } from "./clients/models-dev";
 import { fetchOpenRouterModels } from "./clients/openrouter";
 import { bold, cyan, dim, green, red, yellow } from "./colors";
@@ -31,23 +39,24 @@ import { findModel, resolveModel } from "./functions/resolve";
 import { filterModels, sortModels } from "./functions/search";
 import { getStats } from "./functions/stats";
 import { setVerbose } from "./log";
-import { CapabilityEnum, ModelFilterSchema, ModelSortFieldSchema } from "./schemas/functions";
+import {
+  CapabilityEnum,
+  ModelFilterSchema,
+  ModelSortFieldSchema,
+  OutputFormatSchema,
+} from "./schemas/functions";
 import type { Capabilities, ModelFilter, ModelSortField, UnifiedModel } from "./types";
 
 const CAPABILITIES = CapabilityEnum.options;
 const STATUSES = ModelFilterSchema.shape.status.unwrap().options;
 const SORT_FIELDS = ModelSortFieldSchema.options;
-const FORMATS: readonly OutputFormat[] = ["table", "json", "csv", "markdown"];
+const FORMATS = OutputFormatSchema.options;
 
-// Commander parsers: a bad value aborts with "error: option '--x' argument 'y'
-// is invalid. ..." and exit code 1 instead of silently filtering everything out.
-function oneOf<T extends string>(allowed: readonly T[]) {
-  return (value: string): T => {
-    if (!allowed.includes(value as T)) {
-      throw new InvalidArgumentError(`Expected one of: ${allowed.join(", ")}`);
-    }
-    return value as T;
-  };
+// An enum option: a bad value aborts with "error: option '--x' argument 'y' is
+// invalid. Allowed choices are ..." and exit code 1 instead of silently
+// filtering everything out. Shell completions read the same choices.
+function choice(flags: string, description: string, allowed: readonly string[]): Option {
+  return new Option(flags, description).choices(allowed);
 }
 
 function integer(value: string): number {
@@ -90,7 +99,8 @@ function modelRow(m: UnifiedModel): string[] {
   ];
 }
 
-export function runCommand(): void {
+/** The full CLI definition, unparsed: what runCommand runs and completions describe. */
+export function createProgram(): Command {
   const program = new Command();
 
   program
@@ -103,7 +113,10 @@ export function runCommand(): void {
     .hook("preAction", (_thisCommand, _actionCommand) => {
       const opts = program.opts();
       setVerbose(opts.verbose === true);
-      if (opts.cache === false) {
+      const { cache } = loadConfig();
+      if (cache?.ttl != null) setCacheTtl(cache.ttl);
+      // --no-cache wins over the config; the config can only turn caching off.
+      if (opts.cache === false || cache?.enabled === false) {
         setCacheEnabled(false);
       }
     });
@@ -196,23 +209,15 @@ export function runCommand(): void {
     .command("find")
     .description("Discover models across both APIs with smart filtering")
     .option("-p, --provider <id>", "Filter by provider")
-    .option(
-      "-C, --capability <cap>",
-      "Filter by capability: reasoning, tool_call, structured_output, open_weights, attachment",
-      oneOf(CAPABILITIES),
-    )
+    .addOption(choice("-C, --capability <cap>", "Filter by capability", CAPABILITIES))
     .option("-m, --modality <mod>", "Filter by input modality (e.g. image, audio, video, pdf)")
     .option("--max-cost <n>", "Max input cost ($/million tokens)", decimal)
     .option("--max-cost-output <n>", "Max output cost ($/million tokens)", decimal)
     .option("--min-context <n>", "Min context window size", integer)
     .option("-s, --search <term>", "Search by name or ID")
-    .option("--status <status>", "Filter by status: active, beta, deprecated", oneOf(STATUSES))
+    .addOption(choice("--status <status>", "Filter by status", STATUSES))
     .option("-f, --family <name>", "Filter by model family (e.g. gpt, claude, gemini)")
-    .option(
-      "--sort <field>",
-      "Sort by: cost_input, cost_output, context_length, release_date, name, knowledge_cutoff, value",
-      oneOf(SORT_FIELDS),
-    )
+    .addOption(choice("--sort <field>", "Sort by", SORT_FIELDS))
     .option("--desc", "Sort descending (needs --sort, or defaults.sort in the config)")
     .option(
       "-n, --limit <n>",
@@ -226,7 +231,7 @@ export function runCommand(): void {
       "Output only these fields, tab-separated, one line per model (e.g. context_length,output_limit)",
     )
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
     .action(
       async (
         options: {
@@ -252,11 +257,7 @@ export function runCommand(): void {
       ) => {
         const start = Date.now();
         const defaults = loadConfig().defaults ?? {};
-        const sort =
-          options.sort ??
-          (SORT_FIELDS.includes(defaults.sort as ModelSortField)
-            ? (defaults.sort as ModelSortField)
-            : undefined);
+        const sort = options.sort ?? defaults.sort;
         if (options.desc && !sort) {
           command.error("error: --desc needs --sort <field> (or defaults.sort in the config)");
         }
@@ -339,7 +340,7 @@ export function runCommand(): void {
     .description("Compare models side by side")
     .argument("<models...>", "Model IDs to compare (at least 2)")
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
     .action(async (modelIds: string[], options: { json?: boolean; format?: OutputFormat }) => {
       const comparison = await compareModels(modelIds);
       const fmt = resolveFormat(options);
@@ -401,7 +402,7 @@ export function runCommand(): void {
     .argument("[id]", "Provider ID (e.g. openai, anthropic)")
     .option("--list", "List all providers with model counts")
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
     .action(
       async (
         id: string | undefined,
@@ -458,7 +459,7 @@ export function runCommand(): void {
       "Use workload profile instead of -i/-o (chatbot, code-gen, rag, summarization, translation)",
     )
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
     .action(
       async (
         modelIds: string[],
@@ -539,15 +540,11 @@ export function runCommand(): void {
   program
     .command("cheapest")
     .description("Find the cheapest models matching your criteria")
-    .option(
-      "-C, --capability <cap>",
-      "Filter by capability: reasoning, tool_call, structured_output, open_weights, attachment",
-      oneOf(CAPABILITIES),
-    )
+    .addOption(choice("-C, --capability <cap>", "Filter by capability", CAPABILITIES))
     .option("--min-context <n>", "Min context window size", integer)
     .option("-n, --limit <n>", "Max results", integer, 10)
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
     .action(
       async (options: {
         capability?: keyof Capabilities;
@@ -762,7 +759,7 @@ export function runCommand(): void {
       "--filter <token>",
       "Only consider ids containing this token or families starting with it (e.g. anthropic/)",
     )
-    .option("--tier <name>", "Print one tier only: opus, sonnet or haiku", oneOf(TIERS))
+    .addOption(choice("--tier <name>", "Print one tier only", TIERS))
     .option(
       "--field <names>",
       "Output one tab-separated line per tier with these fields (e.g. tier,id,context_length)",
@@ -844,16 +841,13 @@ export function runCommand(): void {
   program
     .command("recommend")
     .description("Get model recommendations for a use case")
-    .argument(
-      "[use-case]",
-      "Use case: code-gen, vision, cheap-chatbot, reasoning, long-context, open-source, audio, tool-use",
-    )
+    .addArgument(new Argument("[use-case]", "Use case").choices(Object.keys(listUseCases())))
     .option("--max-cost <n>", "Max input cost budget ($/M tokens)", decimal)
     .option("--min-context <n>", "Min context window", integer)
     .option("-n, --limit <n>", "Max results", integer, 10)
     .option("--list", "List available use cases")
     .option("--json", "Output raw JSON")
-    .option("--format <fmt>", "Output format: table, json, csv, markdown", oneOf(FORMATS))
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
     .action(
       async (
         useCase: string | undefined,
@@ -1037,6 +1031,8 @@ export function runCommand(): void {
       } else {
         const info = getCacheInfo();
         console.log(`Cache directory: ${getCacheDir()}`);
+        console.log(`Enabled: ${isCacheEnabled() ? "yes" : "no"}`);
+        console.log(`TTL: ${Math.round(getCacheTtl() / 1000)}s`);
         console.log(`Files: ${info.files}`);
         console.log(`Size: ${(info.sizeBytes / 1024).toFixed(1)} KB`);
         console.log(`\nUse ${cyan("llm-models cache clear")} to clear.`);
@@ -1088,13 +1084,13 @@ export function runCommand(): void {
     .action((shell: "bash" | "zsh" | "fish") => {
       switch (shell) {
         case "bash":
-          console.log(generateBashCompletion());
+          console.log(generateBashCompletion(program));
           break;
         case "zsh":
-          console.log(generateZshCompletion());
+          console.log(generateZshCompletion(program));
           break;
         case "fish":
-          console.log(generateFishCompletion());
+          console.log(generateFishCompletion(program));
           break;
       }
     });
@@ -1109,10 +1105,16 @@ export function runCommand(): void {
       await startMcpServer();
     });
 
+  return program;
+}
+
+export function runCommand(): void {
   // Async actions reject outside parse()'s call stack, so failures (unknown
   // use case, network errors) would surface as raw unhandled rejections.
-  program.parseAsync().catch((err: unknown) => {
-    console.error(red(err instanceof Error ? err.message : String(err)));
-    process.exit(1);
-  });
+  createProgram()
+    .parseAsync()
+    .catch((err: unknown) => {
+      console.error(red(err instanceof Error ? err.message : String(err)));
+      process.exit(1);
+    });
 }

@@ -1,169 +1,251 @@
-const COMMANDS = [
-  "find",
-  "compare",
-  "provider",
-  "cost",
-  "cheapest",
-  "recommend",
-  "stats",
-  "diff",
-  "info",
-  "resolve",
-  "latest",
-  "cache",
-  "config",
-  "openrouter",
-  "models-dev",
-  "mcp",
-  "completion",
-];
+import type { Command, Option } from "commander";
+import { listProfiles } from "./config";
 
-const CAPABILITIES = ["reasoning", "tool_call", "structured_output", "open_weights", "attachment"];
-const SORT_FIELDS = [
-  "cost_input",
-  "cost_output",
-  "context_length",
-  "release_date",
-  "name",
-  "knowledge_cutoff",
-  "value",
-];
-const FORMATS = ["table", "json", "csv", "markdown"];
-const STATUSES = ["active", "beta", "deprecated"];
-const USE_CASES = [
-  "code-gen",
-  "vision",
-  "cheap-chatbot",
-  "reasoning",
-  "long-context",
-  "open-source",
-  "audio",
-  "tool-use",
-];
+// Completions are generated from the Commander program itself, so a new
+// command, option or enum value shows up in every shell without editing a list.
 
-export function generateBashCompletion(): string {
+interface OptionSpec {
+  short?: string;
+  long?: string;
+  description: string;
+  takesValue: boolean;
+  values?: string[];
+}
+
+interface ArgumentSpec {
+  name: string;
+  variadic: boolean;
+  values?: string[];
+}
+
+interface CommandSpec {
+  name: string;
+  description: string;
+  options: OptionSpec[];
+  args: ArgumentSpec[];
+}
+
+const HELP: OptionSpec = {
+  short: "-h",
+  long: "--help",
+  description: "Display help",
+  takesValue: false,
+};
+
+/** Values an option accepts that Commander cannot know: they live in the config. */
+function dynamicValues(option: Option): string[] | undefined {
+  if (option.long === "--profile") return Object.keys(listProfiles());
+  return undefined;
+}
+
+function optionSpec(option: Option): OptionSpec {
+  return {
+    short: option.short,
+    long: option.long,
+    description: option.description,
+    takesValue: option.required || option.optional,
+    values: option.argChoices ?? dynamicValues(option),
+  };
+}
+
+function describeProgram(program: Command): { globals: OptionSpec[]; commands: CommandSpec[] } {
+  const visible = (options: readonly Option[]) => options.filter((o) => !o.hidden).map(optionSpec);
+  const commands: CommandSpec[] = program.commands.map((command) => ({
+    name: command.name(),
+    description: command.description(),
+    options: [...visible(command.options), HELP],
+    args: command.registeredArguments.map((arg) => ({
+      name: arg.name(),
+      variadic: arg.variadic,
+      values: arg.argChoices,
+    })),
+  }));
+  commands.push({
+    name: "help",
+    description: "Display help for a command",
+    options: [],
+    args: [{ name: "command", variadic: false, values: commands.map((c) => c.name) }],
+  });
+  return { globals: [...visible(program.options), HELP], commands };
+}
+
+function flags(option: OptionSpec): string[] {
+  return [option.short, option.long].filter((f): f is string => f !== undefined);
+}
+
+// --- bash ---
+
+function bashCase(command: CommandSpec): string {
+  const valueCases = command.options
+    .filter((o) => o.takesValue)
+    .map((o) => {
+      const reply = o.values
+        ? `COMPREPLY=( $(compgen -W "${o.values.join(" ")}" -- "$cur") ); `
+        : "";
+      return `        ${flags(o).join("|")}) ${reply}return 0 ;;`;
+    });
+  const argValues = command.args.flatMap((a) => a.values ?? []);
+  const allFlags = command.options.flatMap(flags).join(" ");
+  return [
+    `    ${command.name})`,
+    ...(valueCases.length > 0 ? ['      case "$prev" in', ...valueCases, "      esac"] : []),
+    `      if [[ "$cur" == -* ]]; then`,
+    `        COMPREPLY=( $(compgen -W "${allFlags}" -- "$cur") )`,
+    ...(argValues.length > 0
+      ? ["      else", `        COMPREPLY=( $(compgen -W "${argValues.join(" ")}" -- "$cur") )`]
+      : []),
+    "      fi",
+    "      ;;",
+  ].join("\n");
+}
+
+export function generateBashCompletion(program: Command): string {
+  const { globals, commands } = describeProgram(program);
   return `# bash completion for llm-models
 _llm_models() {
-  local cur prev commands
+  local cur prev cmd i
   COMPREPLY=()
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
-  commands="${COMMANDS.join(" ")}"
 
-  case "\${prev}" in
-    --capability|-C)
-      COMPREPLY=( $(compgen -W "${CAPABILITIES.join(" ")}" -- "\${cur}") )
-      return 0
+  # The first word that is not a flag is the command (global flags take no value).
+  cmd=""
+  for ((i = 1; i < COMP_CWORD; i++)); do
+    if [[ "\${COMP_WORDS[i]}" != -* ]]; then
+      cmd="\${COMP_WORDS[i]}"
+      break
+    fi
+  done
+
+  case "$cmd" in
+    "")
+      if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "${globals.flatMap(flags).join(" ")}" -- "$cur") )
+      else
+        COMPREPLY=( $(compgen -W "${commands.map((c) => c.name).join(" ")}" -- "$cur") )
+      fi
       ;;
-    --sort)
-      COMPREPLY=( $(compgen -W "${SORT_FIELDS.join(" ")}" -- "\${cur}") )
-      return 0
-      ;;
-    --format)
-      COMPREPLY=( $(compgen -W "${FORMATS.join(" ")}" -- "\${cur}") )
-      return 0
-      ;;
-    --status)
-      COMPREPLY=( $(compgen -W "${STATUSES.join(" ")}" -- "\${cur}") )
-      return 0
-      ;;
-    --use-case|-u)
-      COMPREPLY=( $(compgen -W "${USE_CASES.join(" ")}" -- "\${cur}") )
-      return 0
-      ;;
+${commands.map(bashCase).join("\n")}
   esac
-
-  if [[ \${COMP_CWORD} -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "\${commands}" -- "\${cur}") )
-    return 0
-  fi
+  return 0
 }
 complete -F _llm_models llm-models
 `;
 }
 
-export function generateZshCompletion(): string {
+// --- zsh ---
+
+/** Text safe inside a single-quoted zsh word and an _arguments [description]. */
+function zshText(text: string): string {
+  return text.replace(/'/g, "'\\''").replace(/\[/g, "(").replace(/\]/g, ")").replace(/:/g, " -");
+}
+
+function zshOption(option: OptionSpec): string[] {
+  const all = flags(option);
+  const exclusion = all.length > 1 ? `(${all.join(" ")})` : "";
+  const value = option.takesValue
+    ? `:${zshText(option.long?.replace(/^--/, "") ?? "value")}:${option.values ? `(${option.values.join(" ")})` : " "}`
+    : "";
+  return all.map((flag) => `'${exclusion}${flag}[${zshText(option.description)}]${value}'`);
+}
+
+function zshArgument(arg: ArgumentSpec, position: number): string {
+  const action = arg.values ? `(${arg.values.join(" ")})` : " ";
+  const spec = arg.variadic ? "*" : String(position);
+  return `'${spec}:${zshText(arg.name)}:${action}'`;
+}
+
+function zshCase(command: CommandSpec): string {
+  const specs = [
+    ...command.options.flatMap(zshOption),
+    ...command.args.map((arg, index) => zshArgument(arg, index + 1)),
+  ];
+  return [
+    `        ${command.name})`,
+    `          _arguments \\`,
+    specs.map((spec) => `            ${spec}`).join(" \\\n"),
+    "          ;;",
+  ].join("\n");
+}
+
+export function generateZshCompletion(program: Command): string {
+  const { globals, commands } = describeProgram(program);
+  const commandList = commands
+    .map((c) => `    '${zshText(c.name)}:${zshText(c.description)}'`)
+    .join("\n");
   return `#compdef llm-models
 _llm_models() {
-  local -a commands capabilities sort_fields formats statuses use_cases
-  commands=(${COMMANDS.map((c) => `'${c}'`).join(" ")})
-  capabilities=(${CAPABILITIES.join(" ")})
-  sort_fields=(${SORT_FIELDS.join(" ")})
-  formats=(${FORMATS.join(" ")})
-  statuses=(${STATUSES.join(" ")})
-  use_cases=(${USE_CASES.map((u) => `'${u}'`).join(" ")})
+  local curcontext="$curcontext" state line
+  typeset -A opt_args
 
   _arguments -C \\
-    '1:command:(\${commands})' \\
-    '--capability[Filter by capability]:capability:(\${capabilities})' \\
-    '-C[Filter by capability]:capability:(\${capabilities})' \\
-    '--sort[Sort field]:field:(\${sort_fields})' \\
-    '--format[Output format]:format:(\${formats})' \\
-    '--status[Filter by status]:status:(\${statuses})' \\
-    '--use-case[Use case]:use_case:(\${use_cases})' \\
-    '-u[Use case]:use_case:(\${use_cases})' \\
-    '-p[Provider ID]:provider:' \\
-    '--provider[Provider ID]:provider:' \\
-    '-s[Search term]:search:' \\
-    '--search[Search term]:search:' \\
-    '-n[Limit results]:limit:' \\
-    '--limit[Limit results]:limit:' \\
-    '--json[Output as JSON]' \\
-    '--desc[Sort descending]' \\
-    '--count[Show count only]' \\
-    '--ids-only[Output IDs only]' \\
-    '--no-cache[Disable cache]' \\
-    '--quiet[Suppress info messages]' \\
-    '--verbose[Show debug info]' \\
-    '*:model ID:'
+${globals
+  .flatMap(zshOption)
+  .map((spec) => `    ${spec} \\`)
+  .join("\n")}
+    '1: :->command' \\
+    '*:: :->args'
+
+  case $state in
+    command)
+      local -a commands
+      commands=(
+${commandList}
+      )
+      _describe -t commands 'llm-models command' commands
+      ;;
+    args)
+      case $line[1] in
+${commands.map(zshCase).join("\n")}
+      esac
+      ;;
+  esac
 }
 _llm_models "$@"
 `;
 }
 
-export function generateFishCompletion(): string {
+// --- fish ---
+
+/** A single-quoted fish string. */
+function fishQuote(text: string): string {
+  return `'${text.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+}
+
+function fishOption(option: OptionSpec, condition: string): string {
+  const parts = ["complete -c llm-models", `-n ${fishQuote(condition)}`];
+  if (option.short) parts.push(`-s ${option.short.replace(/^-/, "")}`);
+  if (option.long) parts.push(`-l ${option.long.replace(/^--/, "")}`);
+  if (option.takesValue) parts.push("-x");
+  if (option.values) parts.push(`-a ${fishQuote(option.values.join(" "))}`);
+  parts.push(`-d ${fishQuote(option.description)}`);
+  return parts.join(" ");
+}
+
+export function generateFishCompletion(program: Command): string {
+  const { globals, commands } = describeProgram(program);
   const lines = ["# fish completion for llm-models", "complete -c llm-models -f", "", "# Commands"];
 
-  for (const cmd of COMMANDS) {
-    lines.push(`complete -c llm-models -n '__fish_use_subcommand' -a '${cmd}' -d '${cmd} command'`);
+  for (const command of commands) {
+    lines.push(
+      `complete -c llm-models -n __fish_use_subcommand -a ${command.name} -d ${fishQuote(command.description)}`,
+    );
   }
 
-  lines.push("", "# Capabilities");
-  for (const cap of CAPABILITIES) {
-    lines.push(`complete -c llm-models -l capability -s C -a '${cap}'`);
-  }
+  lines.push("", "# Global options");
+  for (const option of globals) lines.push(fishOption(option, "__fish_use_subcommand"));
 
-  lines.push("", "# Sort fields");
-  for (const field of SORT_FIELDS) {
-    lines.push(`complete -c llm-models -l sort -a '${field}'`);
+  for (const command of commands) {
+    const condition = `__fish_seen_subcommand_from ${command.name}`;
+    lines.push("", `# ${command.name}`);
+    for (const option of command.options) lines.push(fishOption(option, condition));
+    const argValues = command.args.flatMap((a) => a.values ?? []);
+    if (argValues.length > 0) {
+      lines.push(
+        `complete -c llm-models -n ${fishQuote(condition)} -a ${fishQuote(argValues.join(" "))}`,
+      );
+    }
   }
-
-  lines.push("", "# Formats");
-  for (const fmt of FORMATS) {
-    lines.push(`complete -c llm-models -l format -a '${fmt}'`);
-  }
-
-  lines.push("", "# Statuses");
-  for (const status of STATUSES) {
-    lines.push(`complete -c llm-models -l status -a '${status}'`);
-  }
-
-  lines.push("", "# Use cases");
-  for (const uc of USE_CASES) {
-    lines.push(`complete -c llm-models -l use-case -s u -a '${uc}'`);
-  }
-
-  lines.push(
-    "",
-    "# Flags",
-    "complete -c llm-models -l json -d 'Output as JSON'",
-    "complete -c llm-models -l desc -d 'Sort descending'",
-    "complete -c llm-models -l count -s c -d 'Show count only'",
-    "complete -c llm-models -l ids-only -d 'Output IDs only'",
-    "complete -c llm-models -l no-cache -d 'Disable cache'",
-    "complete -c llm-models -l quiet -d 'Suppress info messages'",
-    "complete -c llm-models -l verbose -d 'Show debug info'",
-  );
 
   return `${lines.join("\n")}\n`;
 }

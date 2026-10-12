@@ -35,6 +35,7 @@ export {
 export {
   CapabilitiesSchema,
   CostEstimateSchema,
+  LlmModelsConfigSchema,
   ModelComparisonSchema,
   ModelFilterSchema,
   ModelSortFieldSchema,
@@ -62,6 +63,7 @@ export {
 export type {
   Capabilities,
   CostEstimate,
+  LlmModelsConfig,
   ModelComparison,
   ModelFilter,
   ModelSortField,

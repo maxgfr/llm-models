@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -98,9 +98,16 @@ afterAll(() => {
 });
 
 async function run(...args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
+  return runIn(home, ...args);
+}
+
+async function runIn(
+  homeDir: string,
+  ...args: string[]
+): Promise<{ stdout: string; stderr: string; code: number }> {
   const proc = Bun.spawn(["bun", "run", "src/index.ts", ...args], {
     cwd: ROOT,
-    env: { ...process.env, HOME: home, NO_COLOR: "1" },
+    env: { ...process.env, HOME: homeDir, NO_COLOR: "1" },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -217,5 +224,60 @@ describe("cache and config actions", () => {
   it("reports the real cache directory", async () => {
     const { stdout } = await run("cache");
     expect(stdout).toContain(join(home, ".cache", "llm-models"));
+    expect(stdout).toContain("Enabled: yes");
+    expect(stdout).toContain("TTL: 3600s");
+  });
+});
+
+describe("config file", () => {
+  /** A HOME sharing the fixture cache, with its own config.json. */
+  function homeWithConfig(config: string): string {
+    const dir = mkdtempSync(join(tmpdir(), "llm-models-config-"));
+    mkdirSync(join(dir, ".config", "llm-models"), { recursive: true });
+    writeFileSync(join(dir, ".config", "llm-models", "config.json"), config);
+    symlinkSync(join(home, ".cache"), join(dir, ".cache"));
+    return dir;
+  }
+
+  it("applies cache.enabled and cache.ttl", async () => {
+    const dir = homeWithConfig(JSON.stringify({ cache: { enabled: false, ttl: 60_000 } }));
+    try {
+      const { stdout } = await runIn(dir, "cache");
+      expect(stdout).toContain("Enabled: no");
+      expect(stdout).toContain("TTL: 60s");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("applies defaults.limit, defaults.sort and defaults.desc to find", async () => {
+    const config = { defaults: { limit: 3, sort: "cost_input", desc: true } };
+    const dir = homeWithConfig(JSON.stringify(config));
+    try {
+      const { stdout } = await runIn(dir, "find");
+      const rows = lines(stdout).slice(2, 5);
+      expect(rows.map((row) => row.split(/\s+/)[0])).toEqual([
+        "acme/model-25",
+        "acme/model-24",
+        "acme/model-23",
+      ]);
+      expect(stdout).toContain(`(3 of ${TOTAL} models shown`);
+      // --desc alone is fine once the config supplies the sort field.
+      expect((await runIn(dir, "find", "--desc", "-c")).code).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("warns about an invalid config instead of ignoring it silently", async () => {
+    const dir = homeWithConfig(JSON.stringify({ defaults: { sort: "bogus" } }));
+    try {
+      const { stderr, code } = await runIn(dir, "cache");
+      expect(code).toBe(0);
+      expect(stderr).toContain("Warning: ignoring config");
+      expect(stderr).toContain("defaults.sort");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

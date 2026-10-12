@@ -1,4 +1,5 @@
 import { bold, colorizeCost, stripAnsi } from "./colors";
+import type { OutputFormat } from "./types";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape codes require control characters
 const ANSI_RE = /\x1b\[\d+m/g;
@@ -87,7 +88,7 @@ export function printTable(headers: string[], rows: string[][]): void {
 
 // --- Multiple output formats ---
 
-export type OutputFormat = "table" | "json" | "csv" | "markdown";
+export type { OutputFormat };
 
 export function formatAsCSV(headers: string[], rows: string[][]): string {
   const csvEscape = (s: string) => {

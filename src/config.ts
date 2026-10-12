@@ -1,25 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { LlmModelsConfigSchema } from "./schemas/functions";
+import type { LlmModelsConfig, WorkloadProfile } from "./types";
 
-export interface WorkloadProfile {
-  input: string;
-  output: string;
-}
-
-export interface LlmModelsConfig {
-  cache?: {
-    enabled?: boolean;
-    ttl?: number;
-  };
-  defaults?: {
-    format?: "table" | "json" | "csv" | "markdown";
-    limit?: number;
-    sort?: string;
-    desc?: boolean;
-  };
-  profiles?: Record<string, WorkloadProfile>;
-}
+export type { LlmModelsConfig, WorkloadProfile };
 
 const CONFIG_DIR = join(homedir(), ".config", "llm-models");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
@@ -42,14 +27,26 @@ export function loadConfig(): LlmModelsConfig {
   const paths = [localPath, CONFIG_PATH];
 
   for (const p of paths) {
-    if (existsSync(p)) {
-      try {
-        configCache = JSON.parse(readFileSync(p, "utf-8")) as LlmModelsConfig;
-        return configCache;
-      } catch {
-        // ignore invalid config
-      }
+    if (!existsSync(p)) continue;
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(p, "utf-8"));
+    } catch (err) {
+      console.error(
+        `Warning: ignoring config ${p}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      continue;
     }
+    const parsed = LlmModelsConfigSchema.safeParse(raw);
+    if (!parsed.success) {
+      const issues = parsed.error.issues
+        .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+        .join("; ");
+      console.error(`Warning: ignoring config ${p}: ${issues}`);
+      continue;
+    }
+    configCache = parsed.data;
+    return configCache;
   }
 
   configCache = {};
