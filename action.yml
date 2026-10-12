@@ -45,7 +45,8 @@ runs:
       id: run
       shell: bash
       run: |
-        RESULT=$(npx -y llm-models@latest ${{ inputs.command }} ${{ inputs.args }} --json 2>&1)
+        # stderr (warnings, diagnostics) stays in the log: mixing it in would break the JSON.
+        RESULT=$(npx -y llm-models@latest ${{ inputs.command }} ${{ inputs.args }} --json)
         echo "result<<EOF" >> $GITHUB_OUTPUT
         echo "$RESULT" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
