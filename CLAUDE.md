@@ -23,6 +23,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 - `bun test` - run tests (includes live API schema validation)
 - `bun run lint` - run Biome linter
 - `bun run lint:fix` - auto-fix lint issues
+- `bunx tsc --noEmit` - type-check (CI runs it; `tsconfig` excludes tests)
 - `bun run dev` - watch mode
 - `bun run build:binary:macos-arm64` - build macOS ARM binary
 - `bun run release` - semantic-release
@@ -30,21 +31,23 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 ## Project structure
 - `src/` - source code
   - `index.ts` - entry point (CLI + library export)
-  - `cli.ts` - CLI commands (Commander.js, 17 commands)
+  - `cli.ts` - CLI commands (Commander.js, 17 commands); `createProgram()` builds, `runCommand()` parses
   - `format.ts` - CLI formatting utilities (table, cost, context, CSV, markdown)
   - `types.ts` - Zod-inferred type exports
-  - `cache.ts` - Local API response cache with TTL (~/.cache/llm-models/)
+  - `cache.ts` - Local API response cache with configurable TTL (~/.cache/llm-models/), atomic best-effort writes
+  - `log.ts` - `--verbose` diagnostics (stderr only)
   - `colors.ts` - ANSI color helpers with NO_COLOR/TTY detection
-  - `config.ts` - Config file loading (~/.config/llm-models/, .llm-modelsrc)
-  - `completions.ts` - Shell completion generators (bash, zsh, fish)
-  - `mcp.ts` - MCP server (8 tools for AI agent integration)
+  - `config.ts` - Config file loading (~/.config/llm-models/, .llm-modelsrc), validated by `LlmModelsConfigSchema`
+  - `completions.ts` - Shell completions (bash, zsh, fish) generated from the Commander program
+  - `mcp.ts` - MCP server (11 tools for AI agent integration); `createMcpServer()` is testable in memory
   - `schemas/openrouter.ts` - Zod schemas for OpenRouter API
   - `schemas/models-dev.ts` - Zod schemas for models.dev API
-  - `schemas/functions.ts` - Zod schemas for unified types (UnifiedModel, ProviderInfo, etc.)
-  - `clients/openrouter.ts` - OpenRouter fetch + parse + cache
-  - `clients/models-dev.ts` - models.dev fetch + parse + cache
-  - `functions/normalize.ts` - Cross-source normalization + merge into UnifiedModel
-  - `functions/resolve.ts` - resolveModel: endpoint/provider-scoped model lookup
+  - `schemas/functions.ts` - Zod schemas for unified types (UnifiedModel, ProviderInfo, config, etc.)
+  - `clients/http.ts` - fetchJson: 15s timeout, User-Agent
+  - `clients/openrouter.ts` - OpenRouter fetch + per-entry tolerant parse + cache
+  - `clients/models-dev.ts` - models.dev fetch + per-model tolerant parse + cache
+  - `functions/normalize.ts` - Cross-source normalization + merge into UnifiedModel (exact, then loose 1:1 ids)
+  - `functions/resolve.ts` - resolveModel (endpoint/provider-scoped lookup); findModel (lookup for info/compare/cost)
   - `functions/latest.ts` - latestModels/pickTiers: newest flagship + fast model per tier for an endpoint
   - `functions/fields.ts` - readField/formatFields: dotted-path `--field` extraction
   - `functions/search.ts` - filterModels, sortModels, findModels
@@ -53,9 +56,10 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   - `functions/cost.ts` - estimateCost, cheapestModels
   - `functions/stats.ts` - getStats (aggregate market statistics)
   - `functions/recommend.ts` - recommendModels, listUseCases (use-case presets)
-  - `functions/diff.ts` - diffModels (compare current vs cached snapshot)
+  - `functions/diff.ts` - diffModels (compare current vs its own snapshot.json, then save it)
   - `functions/query.ts` - QueryBuilder fluent API
-  - `__tests__/` - 22 test files (220 tests, unit + live API schema validation)
+  - `__tests__/` - 24 test files (289 tests: unit, CLI end-to-end on a fixture HOME, in-memory MCP,
+    live API schema validation)
 - `build/` - compiled output (npm package)
 - `dist/` - binary output
 - `action.yml` - GitHub Action for CI/CD integration
@@ -67,6 +71,9 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 - ESM modules (`"type": "module"`)
 - Tests use `describe`/`it` blocks with `bun:test`
 - Tests that mock `fetch` must call `setCacheEnabled(false)` in `beforeAll`
+- Tests that need a real cache use `setCacheDir()` on a temp dir; never touch the real ~/.cache
+- Merged models keep the models.dev id; OpenRouter's spelling lives in `openrouter_id`, and lookups
+  (`pickBestModel`, `findModel`) match both
 - Conventional commits (semantic-release parses them)
 - Types inferred from Zod schemas, never manually duplicated
 - All new domain types defined as Zod schemas in `schemas/functions.ts`
