@@ -42,7 +42,7 @@ export class QueryBuilder {
     return this;
   }
 
-  status(s: "active" | "deprecated" | "beta"): this {
+  status(s: NonNullable<ModelFilter["status"]>): this {
     this.filter.status = s;
     return this;
   }

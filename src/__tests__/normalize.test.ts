@@ -1,10 +1,14 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it, mock } from "bun:test";
+import { setCacheEnabled } from "../cache";
 import {
+  fetchUnifiedData,
+  looseModelKey,
   mergeModels,
   normalizeModelsDevModel,
   normalizeOpenRouterModel,
   openRouterPriceToPerMillion,
 } from "../functions/normalize";
+import { pickBestModel } from "../functions/resolve";
 import type { ModelsDevModel, OpenRouterModel, UnifiedModel } from "../types";
 
 describe("openRouterPriceToPerMillion", () => {
@@ -282,5 +286,193 @@ describe("mergeModels", () => {
       openrouter: true,
       models_dev: true,
     });
+  });
+
+  it("keeps the models.dev id and OpenRouter's as openrouter_id", () => {
+    const merged = mergeModels(
+      {
+        ...openrouter,
+        id: "anthropic/claude-opus-4.5",
+        openrouter_id: "anthropic/claude-opus-4.5",
+      },
+      { ...modelsDev, id: "anthropic/claude-opus-4-5", provider: "anthropic" },
+    );
+    expect(merged.id).toBe("anthropic/claude-opus-4-5");
+    expect(merged.provider).toBe("anthropic");
+    expect(merged.openrouter_id).toBe("anthropic/claude-opus-4.5");
+  });
+
+  it("lets models.dev win on release date and status", () => {
+    const merged = mergeModels(
+      { ...openrouter, release_date: "2025-01-01", status: "deprecated" },
+      { ...modelsDev, release_date: "2024-12-26", status: "beta" },
+    );
+    expect(merged.release_date).toBe("2024-12-26");
+    expect(merged.status).toBe("beta");
+  });
+
+  it("keeps OpenRouter's date and deprecation when models.dev has none", () => {
+    const merged = mergeModels(
+      { ...openrouter, release_date: "2025-01-01", status: "deprecated" },
+      {
+        ...modelsDev,
+        release_date: undefined,
+        status: undefined,
+      },
+    );
+    expect(merged.release_date).toBe("2025-01-01");
+    expect(merged.status).toBe("deprecated");
+  });
+});
+
+describe("normalizeOpenRouterModel data quality", () => {
+  const base: OpenRouterModel = {
+    id: "acme/model-1.5",
+    canonical_slug: "acme/model-1.5",
+    name: "Model 1.5",
+    description: "",
+    created: 1700000000, // 2023-11-14T22:13:20Z
+    context_length: 1000,
+    supported_parameters: [],
+    architecture: {
+      modality: "text->text",
+      input_modalities: ["text"],
+      output_modalities: ["text"],
+      tokenizer: "Other",
+    },
+    pricing: { prompt: "0", completion: "0" },
+    top_provider: { context_length: 1000, max_completion_tokens: 100, is_moderated: false },
+    links: { details: "/x" },
+  };
+
+  it("records its own id as openrouter_id", () => {
+    expect(normalizeOpenRouterModel(base).openrouter_id).toBe("acme/model-1.5");
+  });
+
+  it("dates the model from created, in UTC", () => {
+    expect(normalizeOpenRouterModel(base).release_date).toBe("2023-11-14");
+    expect(normalizeOpenRouterModel({ ...base, created: 1700006400 }).release_date).toBe(
+      "2023-11-15",
+    );
+  });
+
+  it("marks a model with an expiration date as deprecated", () => {
+    expect(normalizeOpenRouterModel(base).status).toBeUndefined();
+    expect(normalizeOpenRouterModel({ ...base, expiration_date: "2026-10-31" }).status).toBe(
+      "deprecated",
+    );
+  });
+});
+
+describe("looseModelKey", () => {
+  it("ignores case and dots versus dashes", () => {
+    expect(looseModelKey("anthropic/claude-opus-4.5")).toBe(
+      looseModelKey("anthropic/claude-opus-4-5"),
+    );
+    expect(looseModelKey("minimax/minimax-m2.7")).toBe(looseModelKey("minimax/MiniMax-M2.7"));
+    expect(looseModelKey("openai/gpt-4o")).not.toBe(looseModelKey("openai/gpt-4o-mini"));
+  });
+});
+
+describe("fetchUnifiedData merging", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeAll(() => {
+    setCacheEnabled(false);
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function openRouterEntry(id: string) {
+    return {
+      id,
+      canonical_slug: id,
+      name: id,
+      description: "",
+      created: 1700000000,
+      context_length: 200000,
+      supported_parameters: ["tools"],
+      architecture: {
+        modality: "text->text",
+        input_modalities: ["text"],
+        output_modalities: ["text"],
+        tokenizer: "Claude",
+      },
+      pricing: { prompt: "0.000003", completion: "0.000015" },
+      top_provider: { context_length: 200000, max_completion_tokens: 32000, is_moderated: false },
+      links: { details: "/x" },
+    };
+  }
+
+  function modelsDevEntry(id: string) {
+    return {
+      id,
+      name: id,
+      attachment: true,
+      reasoning: true,
+      tool_call: true,
+      open_weights: false,
+      release_date: "2025-09-29",
+      last_updated: "2025-09-29",
+      modalities: { input: ["text"], output: ["text"] },
+      limit: { context: 200000, output: 64000 },
+    };
+  }
+
+  function serve(openRouterIds: string[], modelsDevIds: string[]) {
+    const openRouter = { data: openRouterIds.map(openRouterEntry) };
+    const modelsDev = {
+      anthropic: {
+        id: "anthropic",
+        name: "Anthropic",
+        doc: "https://docs.anthropic.com",
+        env: ["ANTHROPIC_API_KEY"],
+        npm: "@ai-sdk/anthropic",
+        models: Object.fromEntries(modelsDevIds.map((id) => [id, modelsDevEntry(id)])),
+      },
+    };
+    globalThis.fetch = mock((url: string) =>
+      Promise.resolve(
+        new Response(JSON.stringify(url.includes("openrouter") ? openRouter : modelsDev), {
+          status: 200,
+        }),
+      ),
+    ) as unknown as typeof fetch;
+  }
+
+  it("merges ids that differ only by dots, under the models.dev id", async () => {
+    serve(["anthropic/claude-sonnet-4.5"], ["claude-sonnet-4-5"]);
+    const { models } = await fetchUnifiedData();
+    expect(models).toHaveLength(1);
+    expect(models[0].id).toBe("anthropic/claude-sonnet-4-5");
+    expect(models[0].openrouter_id).toBe("anthropic/claude-sonnet-4.5");
+    expect(models[0].output_limit).toBe(64000);
+    expect(models[0].sources).toEqual({ openrouter: true, models_dev: true });
+  });
+
+  it("prefers an exact id over a loose one", async () => {
+    serve(["anthropic/claude-x-1.5", "anthropic/claude-x-1-5"], ["claude-x-1-5"]);
+    const { models } = await fetchUnifiedData();
+    const exact = models.find((m) => m.id === "anthropic/claude-x-1-5");
+    expect(exact?.openrouter_id).toBe("anthropic/claude-x-1-5");
+    expect(models.find((m) => m.id === "anthropic/claude-x-1.5")?.sources.models_dev).toBe(false);
+  });
+
+  it("does not merge when the loose key is ambiguous", async () => {
+    serve(["anthropic/claude-y-2.0"], ["claude-y-2-0", "Claude-Y-2-0"]);
+    const { models } = await fetchUnifiedData();
+    expect(models).toHaveLength(3);
+    expect(models.find((m) => m.id === "anthropic/claude-y-2.0")?.sources.models_dev).toBe(false);
+  });
+
+  it("still resolves the OpenRouter spelling of a merged model", async () => {
+    serve(["anthropic/claude-sonnet-4.5"], ["claude-sonnet-4-5"]);
+    const { models } = await fetchUnifiedData();
+    expect(pickBestModel(models, "claude-sonnet-4.5")?.id).toBe("anthropic/claude-sonnet-4-5");
+    expect(pickBestModel(models, "anthropic/claude-sonnet-4.5")?.id).toBe(
+      "anthropic/claude-sonnet-4-5",
+    );
   });
 });

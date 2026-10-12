@@ -13,6 +13,12 @@ export function openRouterPriceToPerMillion(perToken: string): number {
   return Number.parseFloat(perToken) * 1_000_000;
 }
 
+/** OpenRouter's `created` (unix seconds) as a YYYY-MM-DD date in UTC. */
+function createdToDate(created: number): string | undefined {
+  if (!Number.isFinite(created) || created <= 0) return undefined;
+  return new Date(created * 1000).toISOString().slice(0, 10);
+}
+
 export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
   const slashIndex = model.id.indexOf("/");
   const provider = slashIndex > -1 ? model.id.slice(0, slashIndex) : model.id;
@@ -23,6 +29,7 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
 
   return {
     id: model.id,
+    openrouter_id: model.id,
     name: model.name,
     provider,
     context_length: model.context_length,
@@ -55,8 +62,10 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
           : undefined,
     },
     knowledge_cutoff: model.knowledge_cutoff ?? null,
-    release_date: undefined,
-    status: undefined,
+    // When OpenRouter listed it: the closest thing to a release date it publishes.
+    release_date: createdToDate(model.created),
+    // A scheduled removal date means the route is on its way out.
+    status: model.expiration_date ? "deprecated" : undefined,
     family: undefined,
     description: model.description,
     supported_parameters: model.supported_parameters,
@@ -129,6 +138,12 @@ export function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): 
 
   return {
     ...openrouter,
+    // models.dev's id is the one the provider's own API accepts
+    // ("claude-opus-4-5", not OpenRouter's "claude-opus-4.5"); OpenRouter's
+    // stays reachable as openrouter_id.
+    id: modelsDev.id,
+    provider: modelsDev.provider,
+    openrouter_id: openrouter.openrouter_id ?? openrouter.id,
     capabilities: {
       ...openrouter.capabilities,
       ...modelsDev.capabilities,
@@ -143,6 +158,44 @@ export function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): 
     output_limit: output_limit != null ? Math.min(output_limit, context_length) : undefined,
     sources: { openrouter: true, models_dev: true },
   };
+}
+
+/**
+ * Ids that name the same model in both APIs once case and "." vs "-" are
+ * ignored: OpenRouter's "anthropic/claude-opus-4.5" is models.dev's
+ * "anthropic/claude-opus-4-5", "minimax/minimax-m2.7" is "minimax/MiniMax-M2.7".
+ */
+export function looseModelKey(id: string): string {
+  return id.toLowerCase().replace(/\./g, "-");
+}
+
+/**
+ * Pair the OpenRouter models no exact id matched with the models.dev models
+ * left over, on `looseModelKey`. Only strict 1:1 pairs count: when either side
+ * has two candidates for a key, nothing is merged rather than guessing.
+ * Returns OpenRouter id -> models.dev model.
+ */
+function pairLooseIds(
+  openRouter: UnifiedModel[],
+  modelsDev: UnifiedModel[],
+): Map<string, UnifiedModel> {
+  const group = (models: UnifiedModel[]) => {
+    const byKey = new Map<string, UnifiedModel[]>();
+    for (const model of models) {
+      const key = looseModelKey(model.id);
+      byKey.set(key, [...(byKey.get(key) ?? []), model]);
+    }
+    return byKey;
+  };
+  const openRouterByKey = group(openRouter);
+  const modelsDevByKey = group(modelsDev);
+
+  const pairs = new Map<string, UnifiedModel>();
+  for (const [key, candidates] of openRouterByKey) {
+    const matches = modelsDevByKey.get(key);
+    if (candidates.length === 1 && matches?.length === 1) pairs.set(candidates[0].id, matches[0]);
+  }
+  return pairs;
 }
 
 export async function fetchUnifiedData(): Promise<{
@@ -214,13 +267,21 @@ export async function fetchUnifiedData(): Promise<{
   const result = new Map<string, UnifiedModel>();
 
   if (openRouterData) {
-    for (const orModel of openRouterData.data) {
-      const normalized = normalizeOpenRouterModel(orModel);
-      const modelsDevMatch = modelsDevMap.get(normalized.id);
+    const openRouterModels = openRouterData.data.map(normalizeOpenRouterModel);
+    const openRouterIds = new Set(openRouterModels.map((m) => m.id));
+    // Exact ids pair first; only what is left on both sides is tried loosely.
+    const looseMatches = pairLooseIds(
+      openRouterModels.filter((m) => !modelsDevMap.has(m.id)),
+      [...modelsDevMap.values()].filter((m) => !openRouterIds.has(m.id)),
+    );
+
+    for (const normalized of openRouterModels) {
+      const modelsDevMatch = modelsDevMap.get(normalized.id) ?? looseMatches.get(normalized.id);
 
       if (modelsDevMatch) {
-        result.set(normalized.id, mergeModels(normalized, modelsDevMatch));
-        modelsDevMap.delete(normalized.id);
+        const merged = mergeModels(normalized, modelsDevMatch);
+        result.set(merged.id, merged);
+        modelsDevMap.delete(modelsDevMatch.id);
       } else {
         result.set(normalized.id, normalized);
       }

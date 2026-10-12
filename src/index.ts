@@ -12,6 +12,7 @@ export {
   fetchUnifiedData,
   fetchUnifiedModels,
   filterModels,
+  findModel,
   findModels,
   formatFields,
   getProvider,

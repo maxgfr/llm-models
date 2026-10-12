@@ -19,7 +19,10 @@ export const CapabilitiesSchema = z.object({
 });
 
 export const UnifiedModelSchema = z.object({
+  /** models.dev's id when the model is listed there (the provider's own API id), else OpenRouter's. */
   id: z.string(),
+  /** OpenRouter's id for this model, when OpenRouter lists it (e.g. "anthropic/claude-opus-4.5"). */
+  openrouter_id: z.string().optional(),
   name: z.string(),
   provider: z.string(),
   context_length: z.number(),
@@ -71,7 +74,7 @@ export const ModelFilterSchema = z.object({
   maxCostOutput: z.number().optional(),
   minContext: z.number().optional(),
   search: z.string().optional(),
-  status: z.enum(["active", "deprecated", "beta"]).optional(),
+  status: z.enum(["active", "deprecated", "beta", "alpha"]).optional(),
   family: z.string().optional(),
 });
 
