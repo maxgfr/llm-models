@@ -18,6 +18,34 @@ describe("openRouterPriceToPerMillion", () => {
     expect(openRouterPriceToPerMillion("0.0000025")).toBeCloseTo(2.5);
   });
 
+  it("returns exact decimals, without floating-point noise", () => {
+    expect(openRouterPriceToPerMillion("0.00000005")).toBe(0.05);
+    expect(openRouterPriceToPerMillion("0.0000001")).toBe(0.1);
+    expect(openRouterPriceToPerMillion("0.00000015")).toBe(0.15);
+  });
+
+  it("cleans the same noise out of models.dev prices, keeping real digits", () => {
+    const model = normalizeModelsDevModel(
+      {
+        id: "m",
+        name: "M",
+        attachment: false,
+        reasoning: false,
+        tool_call: true,
+        open_weights: false,
+        release_date: "2025-01-01",
+        last_updated: "2025-01-01",
+        modalities: { input: ["text"], output: ["text"] },
+        limit: { context: 1000, output: 100 },
+        cost: { input: 2.499999, output: 10, cache_read: 0.024999999999999998 },
+      },
+      "acme",
+    );
+    expect(model.cost?.cache_read).toBe(0.025);
+    expect(model.cost?.input).toBe(2.499999);
+    expect(model.cost?.cache_write).toBeUndefined();
+  });
+
   it("handles zero", () => {
     expect(openRouterPriceToPerMillion("0")).toBe(0);
   });

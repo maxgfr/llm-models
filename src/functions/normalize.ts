@@ -9,8 +9,17 @@ import type {
   UnifiedModel,
 } from "../types";
 
+/**
+ * Drop binary floating-point noise from a price: "0.00000005" * 1e6 is
+ * 0.049999999999999996, and models.dev publishes values like
+ * 0.024999999999999998. 12 significant digits stay far finer than any price.
+ */
+function cleanPrice<T extends number | undefined>(price: T): T {
+  return (price === undefined ? price : Number(price.toPrecision(12))) as T;
+}
+
 export function openRouterPriceToPerMillion(perToken: string): number {
-  return Number.parseFloat(perToken) * 1_000_000;
+  return cleanPrice(Number.parseFloat(perToken) * 1_000_000);
 }
 
 /** OpenRouter's `created` (unix seconds) as a YYYY-MM-DD date in UTC. */
@@ -84,13 +93,13 @@ export function normalizeModelsDevModel(model: ModelsDevModel, providerId: strin
     output_limit: model.limit.output,
     cost: model.cost
       ? {
-          input: model.cost.input,
-          output: model.cost.output,
-          cache_read: model.cost.cache_read,
-          cache_write: model.cost.cache_write,
-          reasoning: model.cost.reasoning,
-          input_audio: model.cost.input_audio,
-          output_audio: model.cost.output_audio,
+          input: cleanPrice(model.cost.input),
+          output: cleanPrice(model.cost.output),
+          cache_read: cleanPrice(model.cost.cache_read),
+          cache_write: cleanPrice(model.cost.cache_write),
+          reasoning: cleanPrice(model.cost.reasoning),
+          input_audio: cleanPrice(model.cost.input_audio),
+          output_audio: cleanPrice(model.cost.output_audio),
         }
       : undefined,
     modalities: {
