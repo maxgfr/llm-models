@@ -1,27 +1,6 @@
 import type { ModelComparison, UnifiedModel } from "../types";
 import { fetchUnifiedModels } from "./normalize";
-
-function findModelById(models: UnifiedModel[], query: string): UnifiedModel {
-  // Exact match first
-  const exact = models.find((m) => m.id === query);
-  if (exact) return exact;
-
-  // Partial match: search in id and name
-  const lower = query.toLowerCase();
-  const matches = models.filter(
-    (m) => m.id.toLowerCase().includes(lower) || m.name.toLowerCase().includes(lower),
-  );
-
-  if (matches.length === 1) return matches[0];
-  if (matches.length > 1) {
-    const ids = matches.slice(0, 10).map((m) => m.id);
-    throw new Error(
-      `Ambiguous model "${query}". Did you mean one of:\n${ids.map((id) => `  - ${id}`).join("\n")}`,
-    );
-  }
-
-  throw new Error(`Model "${query}" not found`);
-}
+import { findModel } from "./resolve";
 
 function findBest(
   values: Record<string, number | null>,
@@ -56,7 +35,15 @@ export async function compareModels(modelIds: string[]): Promise<ModelComparison
   }
 
   const allModels = await fetchUnifiedModels();
-  const models = modelIds.map((id) => findModelById(allModels, id));
+  // Two spellings of the same model ("gpt-4o", "openai/gpt-4o") collapse to one column.
+  const models: UnifiedModel[] = [];
+  for (const id of modelIds) {
+    const model = findModel(allModels, id);
+    if (!models.some((m) => m.id === model.id)) models.push(model);
+  }
+  if (models.length < 2) {
+    throw new Error("At least 2 distinct models are required for comparison");
+  }
 
   const contextValues: Record<string, number | null> = {};
   const outputLimitValues: Record<string, number | null> = {};

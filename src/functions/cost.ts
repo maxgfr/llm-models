@@ -1,14 +1,30 @@
 import type { Capabilities, CostEstimate, UnifiedModel } from "../types";
 import { fetchUnifiedModels } from "./normalize";
-import { pickBestModel } from "./resolve";
+import { findModel } from "./resolve";
 import { filterModels, sortModels } from "./search";
 
-function findModelById(models: UnifiedModel[], query: string): UnifiedModel {
-  // Same ranking as `resolve`: exact id, then trailing segment, then substring,
-  // with canonical entries beating resellers on ties.
-  const model = pickBestModel(models, query);
-  if (model) return model;
-  throw new Error(`Model "${query}" not found`);
+export interface CostProjection {
+  daily_cost_usd: number;
+  monthly_cost_usd: number;
+}
+
+/**
+ * Daily and monthly spend for a per-request cost. Either volume implies the
+ * other (a month is 30 days); when both are given each is used as stated.
+ * Returns null when neither volume is given.
+ */
+export function projectCost(
+  totalPerRequest: number,
+  volume: { daily?: number; monthly?: number },
+): CostProjection | null {
+  const { daily, monthly } = volume;
+  if (daily == null && monthly == null) return null;
+  return {
+    daily_cost_usd:
+      daily != null ? totalPerRequest * daily : (totalPerRequest * (monthly ?? 0)) / 30,
+    monthly_cost_usd:
+      monthly != null ? totalPerRequest * monthly : totalPerRequest * (daily ?? 0) * 30,
+  };
 }
 
 export async function estimateCost(options: {
@@ -19,7 +35,7 @@ export async function estimateCost(options: {
   const allModels = await fetchUnifiedModels();
 
   return options.modelIds.map((id) => {
-    const model = findModelById(allModels, id);
+    const model = findModel(allModels, id);
 
     const inputCost = model.cost ? (options.inputTokens / 1_000_000) * model.cost.input : 0;
     const outputCost = model.cost ? (options.outputTokens / 1_000_000) * model.cost.output : 0;
@@ -42,8 +58,8 @@ export async function cheapestModels(options?: {
 }): Promise<UnifiedModel[]> {
   let models = await fetchUnifiedModels();
 
-  // Only include models with pricing
-  models = models.filter((m) => m.cost != null);
+  // Only priced models, and never a deprecated one: it is on its way out.
+  models = models.filter((m) => m.cost != null && m.status !== "deprecated");
 
   models = filterModels(models, {
     minContext: options?.minContext,

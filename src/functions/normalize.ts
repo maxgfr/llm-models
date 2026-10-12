@@ -1,4 +1,4 @@
-import { readFallbackCache, writeCache } from "../cache";
+import { readFallbackCache } from "../cache";
 import { fetchModelsDevModels } from "../clients/models-dev";
 import { fetchOpenRouterModels } from "../clients/openrouter";
 import type {
@@ -9,8 +9,23 @@ import type {
   UnifiedModel,
 } from "../types";
 
+/**
+ * Drop binary floating-point noise from a price: "0.00000005" * 1e6 is
+ * 0.049999999999999996, and models.dev publishes values like
+ * 0.024999999999999998. 12 significant digits stay far finer than any price.
+ */
+function cleanPrice<T extends number | undefined>(price: T): T {
+  return (price === undefined ? price : Number(price.toPrecision(12))) as T;
+}
+
 export function openRouterPriceToPerMillion(perToken: string): number {
-  return Number.parseFloat(perToken) * 1_000_000;
+  return cleanPrice(Number.parseFloat(perToken) * 1_000_000);
+}
+
+/** OpenRouter's `created` (unix seconds) as a YYYY-MM-DD date in UTC. */
+function createdToDate(created: number): string | undefined {
+  if (!Number.isFinite(created) || created <= 0) return undefined;
+  return new Date(created * 1000).toISOString().slice(0, 10);
 }
 
 export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
@@ -23,6 +38,7 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
 
   return {
     id: model.id,
+    openrouter_id: model.id,
     name: model.name,
     provider,
     context_length: model.context_length,
@@ -55,8 +71,10 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
           : undefined,
     },
     knowledge_cutoff: model.knowledge_cutoff ?? null,
-    release_date: undefined,
-    status: undefined,
+    // When OpenRouter listed it: the closest thing to a release date it publishes.
+    release_date: createdToDate(model.created),
+    // A scheduled removal date means the route is on its way out.
+    status: model.expiration_date ? "deprecated" : undefined,
     family: undefined,
     description: model.description,
     supported_parameters: model.supported_parameters,
@@ -75,13 +93,13 @@ export function normalizeModelsDevModel(model: ModelsDevModel, providerId: strin
     output_limit: model.limit.output,
     cost: model.cost
       ? {
-          input: model.cost.input,
-          output: model.cost.output,
-          cache_read: model.cost.cache_read,
-          cache_write: model.cost.cache_write,
-          reasoning: model.cost.reasoning,
-          input_audio: model.cost.input_audio,
-          output_audio: model.cost.output_audio,
+          input: cleanPrice(model.cost.input),
+          output: cleanPrice(model.cost.output),
+          cache_read: cleanPrice(model.cost.cache_read),
+          cache_write: cleanPrice(model.cost.cache_write),
+          reasoning: cleanPrice(model.cost.reasoning),
+          input_audio: cleanPrice(model.cost.input_audio),
+          output_audio: cleanPrice(model.cost.output_audio),
         }
       : undefined,
     modalities: {
@@ -129,6 +147,12 @@ export function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): 
 
   return {
     ...openrouter,
+    // models.dev's id is the one the provider's own API accepts
+    // ("claude-opus-4-5", not OpenRouter's "claude-opus-4.5"); OpenRouter's
+    // stays reachable as openrouter_id.
+    id: modelsDev.id,
+    provider: modelsDev.provider,
+    openrouter_id: openrouter.openrouter_id ?? openrouter.id,
     capabilities: {
       ...openrouter.capabilities,
       ...modelsDev.capabilities,
@@ -145,6 +169,44 @@ export function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): 
   };
 }
 
+/**
+ * Ids that name the same model in both APIs once case and "." vs "-" are
+ * ignored: OpenRouter's "anthropic/claude-opus-4.5" is models.dev's
+ * "anthropic/claude-opus-4-5", "minimax/minimax-m2.7" is "minimax/MiniMax-M2.7".
+ */
+export function looseModelKey(id: string): string {
+  return id.toLowerCase().replace(/\./g, "-");
+}
+
+/**
+ * Pair the OpenRouter models no exact id matched with the models.dev models
+ * left over, on `looseModelKey`. Only strict 1:1 pairs count: when either side
+ * has two candidates for a key, nothing is merged rather than guessing.
+ * Returns OpenRouter id -> models.dev model.
+ */
+function pairLooseIds(
+  openRouter: UnifiedModel[],
+  modelsDev: UnifiedModel[],
+): Map<string, UnifiedModel> {
+  const group = (models: UnifiedModel[]) => {
+    const byKey = new Map<string, UnifiedModel[]>();
+    for (const model of models) {
+      const key = looseModelKey(model.id);
+      byKey.set(key, [...(byKey.get(key) ?? []), model]);
+    }
+    return byKey;
+  };
+  const openRouterByKey = group(openRouter);
+  const modelsDevByKey = group(modelsDev);
+
+  const pairs = new Map<string, UnifiedModel>();
+  for (const [key, candidates] of openRouterByKey) {
+    const matches = modelsDevByKey.get(key);
+    if (candidates.length === 1 && matches?.length === 1) pairs.set(candidates[0].id, matches[0]);
+  }
+  return pairs;
+}
+
 export async function fetchUnifiedData(): Promise<{
   models: UnifiedModel[];
   modelsDevData: ModelsDevResponse;
@@ -156,22 +218,47 @@ export async function fetchUnifiedData(): Promise<{
   let modelsDevData: ModelsDevResponse | null =
     results[1].status === "fulfilled" ? results[1].value : null;
 
+  const reason = (result: PromiseSettledResult<unknown>) =>
+    result.status === "rejected"
+      ? result.reason instanceof Error
+        ? result.reason.message
+        : String(result.reason)
+      : "";
+
   // Fallback to expired cache if an API failed
   if (!openRouterData) {
     openRouterData = readFallbackCache<OpenRouterResponse>("openrouter");
     if (openRouterData) {
-      console.error("Warning: OpenRouter API unavailable, using expired cache");
+      console.error(
+        `Warning: OpenRouter API unavailable (${reason(results[0])}), using expired cache`,
+      );
     }
   }
   if (!modelsDevData) {
     modelsDevData = readFallbackCache<ModelsDevResponse>("models-dev");
     if (modelsDevData) {
-      console.error("Warning: models.dev API unavailable, using expired cache");
+      console.error(
+        `Warning: models.dev API unavailable (${reason(results[1])}), using expired cache`,
+      );
     }
   }
 
   if (!openRouterData && !modelsDevData) {
-    throw new Error("Both APIs are unavailable and no cached data exists");
+    throw new Error(
+      `Both APIs are unavailable and no cached data exists (OpenRouter: ${reason(results[0])}; models.dev: ${reason(results[1])})`,
+    );
+  }
+
+  // One source down with nothing cached: carry on, but never silently.
+  if (!openRouterData) {
+    console.error(
+      `Warning: OpenRouter API unavailable (${reason(results[0])}), showing models.dev data only`,
+    );
+  }
+  if (!modelsDevData) {
+    console.error(
+      `Warning: models.dev API unavailable (${reason(results[1])}), showing OpenRouter data only`,
+    );
   }
 
   // Index models.dev models by "provider/modelId"
@@ -189,13 +276,21 @@ export async function fetchUnifiedData(): Promise<{
   const result = new Map<string, UnifiedModel>();
 
   if (openRouterData) {
-    for (const orModel of openRouterData.data) {
-      const normalized = normalizeOpenRouterModel(orModel);
-      const modelsDevMatch = modelsDevMap.get(normalized.id);
+    const openRouterModels = openRouterData.data.map(normalizeOpenRouterModel);
+    const openRouterIds = new Set(openRouterModels.map((m) => m.id));
+    // Exact ids pair first; only what is left on both sides is tried loosely.
+    const looseMatches = pairLooseIds(
+      openRouterModels.filter((m) => !modelsDevMap.has(m.id)),
+      [...modelsDevMap.values()].filter((m) => !openRouterIds.has(m.id)),
+    );
+
+    for (const normalized of openRouterModels) {
+      const modelsDevMatch = modelsDevMap.get(normalized.id) ?? looseMatches.get(normalized.id);
 
       if (modelsDevMatch) {
-        result.set(normalized.id, mergeModels(normalized, modelsDevMatch));
-        modelsDevMap.delete(normalized.id);
+        const merged = mergeModels(normalized, modelsDevMatch);
+        result.set(merged.id, merged);
+        modelsDevMap.delete(modelsDevMatch.id);
       } else {
         result.set(normalized.id, normalized);
       }
@@ -208,7 +303,6 @@ export async function fetchUnifiedData(): Promise<{
   }
 
   const unified = Array.from(result.values());
-  writeCache("unified", unified);
   return { models: unified, modelsDevData: modelsDevData ?? ({} as ModelsDevResponse) };
 }
 

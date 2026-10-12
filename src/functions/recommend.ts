@@ -72,12 +72,11 @@ export async function recommendModels(
     ...(options?.minContext != null ? { minContext: options.minContext } : {}),
   };
 
-  const models = await findModels({
-    filter,
-    sort: preset.sort,
-    descending: preset.descending,
-    limit: options?.limit ?? 10,
-  });
+  // Deprecated models are on their way out: never recommend one.
+  const limit = options?.limit ?? 10;
+  const models = (await findModels({ filter, sort: preset.sort, descending: preset.descending }))
+    .filter((m) => m.status !== "deprecated")
+    .slice(0, limit > 0 ? limit : undefined);
 
   return { preset, models };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { pickBestModel, providersForEndpoint } from "../functions/resolve";
+import { findModel, pickBestModel, providersForEndpoint } from "../functions/resolve";
 import type { ModelsDevResponse, UnifiedModel } from "../types";
 
 function model(
@@ -18,6 +18,52 @@ function model(
     sources,
   };
 }
+
+describe("findModel", () => {
+  const openrouter = { openrouter: true, models_dev: true };
+  const pool = [
+    model("openai/gpt-4o", "openai", 1000, openrouter),
+    model("openai/gpt-4o-mini", "openai", 1000, openrouter),
+    model("azure/gpt-4o", "azure"),
+    model("openai/gpt-4o-2024-08-06", "openai"),
+    model("anthropic/claude-sonnet-4-5", "anthropic"),
+  ];
+
+  it("lets an id-level match win over the many ids that merely contain it", () => {
+    expect(findModel(pool, "gpt-4o").id).toBe("openai/gpt-4o");
+    expect(findModel(pool, "azure/gpt-4o").id).toBe("azure/gpt-4o");
+    expect(findModel(pool, "GPT-4O-MINI").id).toBe("openai/gpt-4o-mini");
+  });
+
+  it("accepts a substring match when it is unique", () => {
+    expect(findModel(pool, "sonnet").id).toBe("anthropic/claude-sonnet-4-5");
+  });
+
+  it("matches the display name as a substring", () => {
+    const named = [{ ...model("x/abc-1", "x"), name: "Fancy Model One" }];
+    expect(findModel(named, "fancy model").id).toBe("x/abc-1");
+  });
+
+  it("refuses an ambiguous substring with suggestions", () => {
+    expect(() => findModel(pool, "gpt-4")).toThrow(/Ambiguous model "gpt-4"[\s\S]*openai\/gpt-4o/);
+  });
+
+  it("caps suggestions at 10", () => {
+    const many = Array.from({ length: 15 }, (_, i) => model(`p/thing-${i}`, "p"));
+    let message = "";
+    try {
+      findModel(many, "thing");
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    expect(message.match(/^ {2}- /gm)).toHaveLength(10);
+    expect(message).toContain("and 5 more");
+  });
+
+  it("throws not found", () => {
+    expect(() => findModel(pool, "nope-zzz")).toThrow('Model "nope-zzz" not found');
+  });
+});
 
 describe("pickBestModel", () => {
   it("prefers an exact id", () => {

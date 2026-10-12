@@ -19,7 +19,10 @@ export const CapabilitiesSchema = z.object({
 });
 
 export const UnifiedModelSchema = z.object({
+  /** models.dev's id when the model is listed there (the provider's own API id), else OpenRouter's. */
   id: z.string(),
+  /** OpenRouter's id for this model, when OpenRouter lists it (e.g. "anthropic/claude-opus-4.5"). */
+  openrouter_id: z.string().optional(),
   name: z.string(),
   provider: z.string(),
   context_length: z.number(),
@@ -71,7 +74,7 @@ export const ModelFilterSchema = z.object({
   maxCostOutput: z.number().optional(),
   minContext: z.number().optional(),
   search: z.string().optional(),
-  status: z.enum(["active", "deprecated", "beta"]).optional(),
+  status: z.enum(["active", "deprecated", "beta", "alpha"]).optional(),
   family: z.string().optional(),
 });
 
@@ -84,6 +87,39 @@ export const ModelSortFieldSchema = z.enum([
   "knowledge_cutoff",
   "value",
 ]);
+
+export const OutputFormatSchema = z.enum(["table", "json", "csv", "markdown"]);
+
+/** A token count as typed on the command line: 5000, 10K, 1.5M. */
+const TokenCountSchema = z.string().regex(/^\d+(\.\d+)?[KkMm]?$/, "Use a number or suffix K/M");
+
+export const WorkloadProfileSchema = z.object({
+  input: TokenCountSchema,
+  output: TokenCountSchema,
+});
+
+/** `.llm-modelsrc` / `~/.config/llm-models/config.json`. */
+export const LlmModelsConfigSchema = z.object({
+  cache: z
+    .object({
+      enabled: z.boolean().optional(),
+      /** Freshness window for API responses, milliseconds. */
+      ttl: z.number().int().positive().optional(),
+    })
+    .optional(),
+  defaults: z
+    .object({
+      format: OutputFormatSchema.optional(),
+      /** `find` rows in table/markdown output; 0 = all. */
+      limit: z.number().int().min(0).optional(),
+      /** `find` sort field when --sort is absent. */
+      sort: ModelSortFieldSchema.optional(),
+      /** `find` sort direction when --desc is absent. */
+      desc: z.boolean().optional(),
+    })
+    .optional(),
+  profiles: z.record(z.string(), WorkloadProfileSchema).optional(),
+});
 
 export const CostEstimateSchema = z.object({
   model: z.string(),

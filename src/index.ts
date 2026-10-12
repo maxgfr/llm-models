@@ -12,6 +12,7 @@ export {
   fetchUnifiedData,
   fetchUnifiedModels,
   filterModels,
+  findModel,
   findModels,
   formatFields,
   getProvider,
@@ -34,6 +35,7 @@ export {
 export {
   CapabilitiesSchema,
   CostEstimateSchema,
+  LlmModelsConfigSchema,
   ModelComparisonSchema,
   ModelFilterSchema,
   ModelSortFieldSchema,
@@ -61,6 +63,7 @@ export {
 export type {
   Capabilities,
   CostEstimate,
+  LlmModelsConfig,
   ModelComparison,
   ModelFilter,
   ModelSortField,

@@ -1,6 +1,16 @@
-import { readSnapshot } from "../cache";
+import { readSnapshot, removeCache, writeCache } from "../cache";
 import type { UnifiedModel } from "../types";
 import { fetchUnifiedModels } from "./normalize";
+
+/** diff's own baseline, written only by diffModels. */
+const SNAPSHOT_KEY = "snapshot";
+/** Before 1.5, every command rewrote this file; read once as a baseline, then dropped. */
+const LEGACY_SNAPSHOT_KEY = "unified";
+
+function readBaseline(key: string): { timestamp: number; data: UnifiedModel[] } | null {
+  const snapshot = readSnapshot<UnifiedModel[]>(key);
+  return snapshot && Array.isArray(snapshot.data) ? snapshot : null;
+}
 
 export interface ModelChange {
   model_id: string;
@@ -20,10 +30,20 @@ export interface ModelDiff {
   total_after: number;
 }
 
+/**
+ * Changes since the previous diffModels() call. Each call compares against the
+ * snapshot the previous call saved, then saves the current list in its place,
+ * so other commands refreshing the API cache never reset the baseline.
+ */
 export async function diffModels(): Promise<ModelDiff> {
-  const snapshot = readSnapshot<UnifiedModel[]>("unified");
   const current = await fetchUnifiedModels();
   const now = Date.now();
+
+  const saved = readBaseline(SNAPSHOT_KEY);
+  const legacy = saved ? null : readBaseline(LEGACY_SNAPSHOT_KEY);
+  const snapshot = saved ?? legacy;
+  writeCache(SNAPSHOT_KEY, current);
+  if (legacy) removeCache(LEGACY_SNAPSHOT_KEY);
 
   if (!snapshot) {
     return {

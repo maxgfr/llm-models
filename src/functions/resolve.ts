@@ -48,6 +48,19 @@ function matchRank(id: string, wanted: string): number | null {
 }
 
 /**
+ * `matchRank` over every id a model answers to: its own and, for a model
+ * merged across both APIs, OpenRouter's spelling ("claude-opus-4.5").
+ */
+function modelRank(model: UnifiedModel, wanted: string): number | null {
+  const byId = matchRank(model.id, wanted);
+  if (!model.openrouter_id || model.openrouter_id === model.id) return byId;
+  const byOpenRouterId = matchRank(model.openrouter_id, wanted);
+  if (byId === null) return byOpenRouterId;
+  if (byOpenRouterId === null) return byId;
+  return Math.min(byId, byOpenRouterId);
+}
+
+/**
  * Pick the single best model for `wanted` out of `pool`. Ties break towards
  * the least-nested id, then towards entries OpenRouter lists (its ids use the
  * vendor's own namespace, so "anthropic/claude-sonnet-5" beats the reseller
@@ -58,7 +71,7 @@ export function pickBestModel(pool: UnifiedModel[], wanted: string): UnifiedMode
   let bestRank = Number.POSITIVE_INFINITY;
 
   for (const model of pool) {
-    const rank = matchRank(model.id, wanted);
+    const rank = modelRank(model, wanted);
     if (rank === null) continue;
     if (best === null || rank < bestRank) {
       best = model;
@@ -85,6 +98,46 @@ export function pickBestModel(pool: UnifiedModel[], wanted: string): UnifiedMode
   }
 
   return best;
+}
+
+/** Rank of a substring-only match in `matchRank`. */
+const SUBSTRING_RANK = 5;
+
+/**
+ * Look a model up by what a user typed: "gpt-4o", "openai/gpt-4o", "GPT-4o".
+ * Any id-level match (exact id, exact trailing segment, either case-insensitive)
+ * wins outright, ties broken as in `pickBestModel`, so "gpt-4o" finds
+ * openai/gpt-4o even though dozens of ids contain it. A bare substring match
+ * (on the id or the display name) is only accepted when it is unique.
+ *
+ * Throws "not found", or "Ambiguous" with up to 10 suggestions.
+ */
+export function findModel(models: UnifiedModel[], query: string): UnifiedModel {
+  const wanted = query.trim();
+  let bestRank = Number.POSITIVE_INFINITY;
+  for (const model of models) {
+    const rank = modelRank(model, wanted);
+    if (rank !== null && rank < bestRank) bestRank = rank;
+  }
+
+  if (bestRank < SUBSTRING_RANK) {
+    const best = pickBestModel(models, wanted);
+    if (best) return best;
+  }
+
+  const lower = wanted.toLowerCase();
+  const candidates =
+    lower.length === 0
+      ? []
+      : models.filter((m) => modelRank(m, wanted) !== null || m.name.toLowerCase().includes(lower));
+
+  if (candidates.length === 1) return candidates[0];
+  if (candidates.length > 1) {
+    const ids = candidates.slice(0, 10).map((m) => `  - ${m.id}`);
+    const more = candidates.length > 10 ? `\n  … and ${candidates.length - 10} more` : "";
+    throw new Error(`Ambiguous model "${query}". Did you mean one of:\n${ids.join("\n")}${more}`);
+  }
+  throw new Error(`Model "${query}" not found`);
 }
 
 function parseUrl(value: string): URL | null {

@@ -1,4 +1,5 @@
 import { bold, colorizeCost, stripAnsi } from "./colors";
+import type { OutputFormat } from "./types";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape codes require control characters
 const ANSI_RE = /\x1b\[\d+m/g;
@@ -9,13 +10,21 @@ export function formatNumber(n: number): string {
 
 export function formatCost(cost: number | undefined | null): string {
   if (cost == null) return "-";
-  const formatted = `$${cost.toFixed(2)}`;
-  return colorizeCost(cost, formatted);
+  return colorizeCost(cost, formatCostRaw(cost));
 }
 
+/**
+ * Cents from $0.01 up; below that, two significant digits so a $0.0015 request
+ * never reads as free. Only an actual 0 renders as "$0.00".
+ */
 export function formatCostRaw(cost: number | undefined | null): string {
   if (cost == null) return "-";
-  return `$${cost.toFixed(2)}`;
+  const abs = Math.abs(cost);
+  if (abs === 0 || abs >= 0.01) return `$${cost.toFixed(2)}`;
+  const decimals = Math.min(20, 1 - Math.floor(Math.log10(abs)));
+  const fixed = cost.toFixed(decimals);
+  // 0.0010 -> 0.001, but rounding up to 0.0100 -> 0.01
+  return `$${fixed.replace(/0+$/, "").replace(/\.$/, ".00")}`;
 }
 
 export function formatContext(n: number): string {
@@ -28,15 +37,16 @@ export function formatContext(n: number): string {
 
 export function parseTokenCount(input: string): number {
   const normalized = input.trim().toUpperCase();
-  const match = normalized.match(/^([\d.]+)(K|M)?$/);
+  const match = normalized.match(/^(\d+(?:\.\d+)?)(K|M)?$/);
   if (!match) {
     throw new Error(`Invalid token count: "${input}". Use a number or suffix K/M (e.g., 100K, 1M)`);
   }
   const value = Number.parseFloat(match[1]);
   const suffix = match[2];
-  if (suffix === "M") return value * 1_000_000;
-  if (suffix === "K") return value * 1_000;
-  return value;
+  // Tokens are whole: 1.2345K is 1,235, not 1234.5.
+  if (suffix === "M") return Math.round(value * 1_000_000);
+  if (suffix === "K") return Math.round(value * 1_000);
+  return Math.round(value);
 }
 
 export function formatCapabilities(caps: Record<string, boolean | undefined>): string {
@@ -65,9 +75,8 @@ export function printTable(headers: string[], rows: string[][]): void {
     return /^[\d$.-]+$/.test(raw);
   });
 
-  const headerLine = headers
-    .map((h, i) => pad(bold(h), widths[i] + (bold(h).length - h.length), rightAlign[i]))
-    .join("  ");
+  // pad() measures the visible width, so the bold escape codes need no allowance.
+  const headerLine = headers.map((h, i) => pad(bold(h), widths[i], rightAlign[i])).join("  ");
   const separator = widths.map((w) => "-".repeat(w)).join("  ");
 
   console.log(headerLine);
@@ -79,7 +88,7 @@ export function printTable(headers: string[], rows: string[][]): void {
 
 // --- Multiple output formats ---
 
-export type OutputFormat = "table" | "json" | "csv" | "markdown";
+export type { OutputFormat };
 
 export function formatAsCSV(headers: string[], rows: string[][]): string {
   const csvEscape = (s: string) => {

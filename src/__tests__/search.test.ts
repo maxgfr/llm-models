@@ -72,6 +72,17 @@ describe("filterModels", () => {
     expect(result[0].id).toBe("google/gemini-2.0-flash");
   });
 
+  it("filters modality on the input side only", () => {
+    const imageGenerator: UnifiedModel = {
+      ...mockModels[3],
+      id: "acme/image-gen",
+      modalities: { input: ["text"], output: ["image"] },
+    };
+    const result = filterModels([...mockModels, imageGenerator], { modality: "image" });
+    expect(result.map((m) => m.id)).not.toContain("acme/image-gen");
+    expect(result).toHaveLength(3);
+  });
+
   it("filters by maxCostInput", () => {
     const result = filterModels(mockModels, { maxCostInput: 1 });
     expect(result).toHaveLength(1);

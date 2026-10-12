@@ -2,12 +2,15 @@ import type { z } from "zod";
 import type {
   CapabilitiesSchema,
   CostEstimateSchema,
+  LlmModelsConfigSchema,
   ModelComparisonSchema,
   ModelFilterSchema,
   ModelSortFieldSchema,
   NormalizedCostSchema,
+  OutputFormatSchema,
   ProviderInfoSchema,
   UnifiedModelSchema,
+  WorkloadProfileSchema,
 } from "./schemas/functions";
 import type {
   ModelsDevModelSchema,
@@ -30,3 +33,6 @@ export type ModelFilter = z.infer<typeof ModelFilterSchema>;
 export type ModelSortField = z.infer<typeof ModelSortFieldSchema>;
 export type CostEstimate = z.infer<typeof CostEstimateSchema>;
 export type ModelComparison = z.infer<typeof ModelComparisonSchema>;
+export type OutputFormat = z.infer<typeof OutputFormatSchema>;
+export type WorkloadProfile = z.infer<typeof WorkloadProfileSchema>;
+export type LlmModelsConfig = z.infer<typeof LlmModelsConfigSchema>;

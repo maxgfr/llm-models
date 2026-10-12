@@ -83,8 +83,12 @@ export async function getStats(): Promise<ModelStats> {
     release_date: m.release_date as string,
   }));
 
-  // Context length distribution
-  const contexts = models.map((m) => m.context_length).sort((a, b) => a - b);
+  // Context length distribution. A 0 means "not a text model" (video, image
+  // generators) rather than a tiny window, so it would only drag the minimum down.
+  const contexts = models
+    .map((m) => m.context_length)
+    .filter((n) => n > 0)
+    .sort((a, b) => a - b);
   const contextStats =
     contexts.length > 0
       ? { min: contexts[0], max: contexts[contexts.length - 1], median: percentile(contexts, 50) }

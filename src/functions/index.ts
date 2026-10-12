@@ -7,6 +7,6 @@ export { fetchUnifiedData, fetchUnifiedModels, mergeModels } from "./normalize";
 export { getProvider, listProviders } from "./provider";
 export { QueryBuilder, query } from "./query";
 export { listUseCases, recommendModels } from "./recommend";
-export { pickBestModel, providersForEndpoint, resolveModel } from "./resolve";
+export { findModel, pickBestModel, providersForEndpoint, resolveModel } from "./resolve";
 export { filterModels, findModels, sortModels } from "./search";
 export { getStats } from "./stats";

@@ -1,18 +1,27 @@
-import { afterAll, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   clearCache,
+  getCacheDir,
   isCacheEnabled,
   readCache,
   readSnapshot,
+  setCacheDir,
   setCacheEnabled,
+  setCacheTtl,
   writeCache,
 } from "../cache";
 
-const CACHE_DIR = join(homedir(), ".cache", "llm-models");
+// Never touch the real ~/.cache/llm-models: clearCache() below wipes the directory.
+const REAL_CACHE_DIR = getCacheDir();
+const CACHE_DIR = join(mkdtempSync(join(tmpdir(), "llm-models-cache-")), "llm-models");
 const TEST_KEY = "__test_cache_key__";
+
+beforeAll(() => {
+  setCacheDir(CACHE_DIR);
+});
 
 beforeEach(() => {
   setCacheEnabled(true);
@@ -24,10 +33,8 @@ beforeEach(() => {
 });
 
 afterAll(() => {
-  const filePath = join(CACHE_DIR, `${TEST_KEY}.json`);
-  if (existsSync(filePath)) {
-    rmSync(filePath);
-  }
+  rmSync(join(CACHE_DIR, ".."), { recursive: true, force: true });
+  setCacheDir(REAL_CACHE_DIR);
 });
 
 describe("setCacheEnabled / isCacheEnabled", () => {
@@ -88,6 +95,43 @@ describe("writeCache / readCache", () => {
     writeCache(TEST_KEY, { fresh: true });
     const result = readCache<{ fresh: boolean }>(TEST_KEY, 60_000);
     expect(result).toEqual({ fresh: true });
+  });
+});
+
+describe("writeCache robustness", () => {
+  it("never throws when the cache directory cannot be created", () => {
+    // A regular file where the directory should be: mkdir fails with ENOTDIR.
+    const blocker = join(CACHE_DIR, "..", "blocker");
+    writeFileSync(blocker, "");
+    setCacheDir(join(blocker, "llm-models"));
+    try {
+      expect(() => writeCache(TEST_KEY, { x: 1 })).not.toThrow();
+      expect(readCache(TEST_KEY)).toBeNull();
+    } finally {
+      setCacheDir(CACHE_DIR);
+    }
+  });
+
+  it("leaves no temp file behind", () => {
+    writeCache(TEST_KEY, { x: 1 });
+    expect(readdirSync(CACHE_DIR).filter((f) => f.endsWith(".tmp"))).toEqual([]);
+  });
+});
+
+describe("setCacheTtl", () => {
+  it("governs the default freshness window", () => {
+    writeFileSync(
+      join(CACHE_DIR, `${TEST_KEY}.json`),
+      JSON.stringify({ timestamp: Date.now() - 10_000, data: { old: true } }),
+    );
+    try {
+      setCacheTtl(5_000);
+      expect(readCache(TEST_KEY)).toBeNull();
+      setCacheTtl(60_000);
+      expect(readCache(TEST_KEY)).toEqual({ old: true });
+    } finally {
+      setCacheTtl(3_600_000);
+    }
   });
 });
 

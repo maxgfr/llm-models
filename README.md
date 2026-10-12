@@ -76,12 +76,18 @@ llm-models find -p anthropic --format markdown
 llm-models find -p google --json
 ```
 
+Table and Markdown output stop at 20 rows (or `defaults.limit` from the config) and the table ends
+with `(20 of N models shown, -n 0 to show all)`. JSON, CSV, `--count`, `--ids-only` and `--field`
+return every match unless you pass `-n`. `-m/--modality` matches what a model *accepts*: `-m image`
+finds models that read images, not image generators.
+
 #### Compare models
 
 Side-by-side model comparison with context, output limit, costs, knowledge cutoff, and capabilities:
 
 ```bash
 llm-models compare openai/gpt-4o anthropic/claude-sonnet-4 google/gemini-2.0-flash
+llm-models compare gpt-4o claude-sonnet-4-5    # bare ids work too
 ```
 
 #### Model info
@@ -90,7 +96,14 @@ Detailed information about a single model (description, costs, capabilities, par
 
 ```bash
 llm-models info openai/gpt-4o
+llm-models info gpt-4o
 ```
+
+`info`, `compare` and `cost` look models up the same way. An exact id, an exact trailing segment
+(`gpt-4o`) or either one case-insensitively wins outright, even when dozens of other ids contain the
+text; ties go to the vendor's own entry. OpenRouter's spelling of a merged model
+(`anthropic/claude-sonnet-4.5`) works too. A plain substring of an id or name is accepted only when a
+single model matches; otherwise the command lists up to 10 candidates and exits 1.
 
 #### Resolve a model against its endpoint
 
@@ -177,6 +190,10 @@ llm-models cost openai/gpt-4o -i 1M -o 100K --daily 1000
 llm-models cost openai/gpt-4o -P chatbot --daily 5000
 ```
 
+Costs from $0.01 up show cents; smaller amounts keep two significant digits (`$0.0015`), so only
+a genuinely free request reads `$0.00`. `--daily` implies a monthly figure (×30) and `--monthly` a
+daily one (÷30); given both, each is used as stated. JSON and table output always agree.
+
 #### Cheapest models
 
 Find the cheapest models matching your criteria:
@@ -184,6 +201,8 @@ Find the cheapest models matching your criteria:
 ```bash
 llm-models cheapest -C reasoning --min-context 100000
 ```
+
+`cheapest` and `recommend` never suggest a deprecated model.
 
 #### Recommendations
 
@@ -214,13 +233,16 @@ Shows: total models/providers, top providers, capabilities distribution, modalit
 
 #### Diff
 
-Show changes since last cached fetch:
+Show what changed since the previous `diff` run:
 
 ```bash
-llm-models diff
+llm-models diff   # first run: saves a baseline
+llm-models diff   # later: changes since the run above
 ```
 
-Shows: new models added, models removed, price changes, status changes.
+Shows: new models added, models removed, price changes, status changes. `diff` keeps its own
+snapshot (`snapshot.json` in the cache directory), so other commands refreshing the API cache never
+reset the baseline. With `--no-cache` it compares but does not save a new snapshot.
 
 #### Provider info
 
@@ -262,7 +284,11 @@ llm-models cache              # Show cache info
 llm-models cache clear        # Clear cache
 ```
 
-API responses are cached for 1 hour in `~/.cache/llm-models/`. Use `--no-cache` to bypass.
+API responses are cached for 1 hour (configurable, see below) in `~/.cache/llm-models/`. Use
+`--no-cache` to bypass, and `--verbose` to see each source's hit/miss and age on stderr. Requests
+time out after 15 seconds. When an API is down, an expired cached copy is used if there is one;
+otherwise the command carries on with the other source and says so on stderr. A read-only cache
+directory never fails a command.
 
 #### Configuration
 
@@ -274,6 +300,24 @@ llm-models config profiles    # List workload profiles
 ```
 
 Config file locations: `.llm-modelsrc` (project) or `~/.config/llm-models/config.json` (global).
+The file is validated; an invalid one is reported on stderr and ignored.
+
+```json
+{
+  "cache": { "enabled": true, "ttl": 3600000 },
+  "defaults": { "format": "table", "limit": 20, "sort": "cost_input", "desc": false },
+  "profiles": { "batch": { "input": "200K", "output": "20K" } }
+}
+```
+
+| Key | Effect |
+|-----|--------|
+| `cache.enabled` | `false` disables the cache like `--no-cache` |
+| `cache.ttl` | Freshness of cached API responses, in milliseconds |
+| `defaults.format` | Output format when neither `--json` nor `--format` is given |
+| `defaults.limit` | `find` rows in table/Markdown output (`0` = all) |
+| `defaults.sort` / `defaults.desc` | `find` sort when `--sort` / `--desc` are absent |
+| `profiles` | Extra workload profiles for `cost -P` |
 
 #### Shell completions
 
@@ -288,6 +332,9 @@ llm-models completion zsh >> ~/.zshrc
 llm-models completion fish > ~/.config/fish/completions/llm-models.fish
 ```
 
+The scripts are generated from the CLI definition: every command and option, plus the allowed
+values of enum options (capabilities, sort fields, statuses, formats, tiers, use cases, profiles).
+
 #### MCP Server
 
 Start an MCP (Model Context Protocol) server for AI agent integration:
@@ -296,7 +343,24 @@ Start an MCP (Model Context Protocol) server for AI agent integration:
 llm-models mcp
 ```
 
-Exposes 8 tools: `find_models`, `compare_models`, `estimate_cost`, `cheapest_models`, `get_provider`, `list_providers`, `get_stats`, `recommend_models`.
+Exposes 11 tools:
+
+| Tool | Purpose |
+|------|---------|
+| `find_models` | Filter (provider, capability, modality, cost, context, search, status, family) and sort; 20 results by default |
+| `get_model` | One model's details, looked up like `info` |
+| `resolve_model` | A model as served by an endpoint or provider, like `resolve` |
+| `latest_models` | Newest flagship and fast model per tier, like `latest` |
+| `compare_models` | Side-by-side comparison |
+| `estimate_cost` | Token cost estimates |
+| `cheapest_models` | Cheapest non-deprecated models |
+| `recommend_models` | Non-deprecated recommendations for a use case |
+| `get_provider` | Provider details and models |
+| `list_providers` | Providers with model counts (without their model lists) |
+| `get_stats` | Market statistics |
+
+Enum parameters (capability, status, sort, use case) are validated, so a typo is an error rather
+than an empty result.
 
 ### Global Options
 
@@ -314,16 +378,16 @@ Exposes 8 tools: `find_models`, `compare_models`, `estimate_cost`, `cheapest_mod
 |--------|-------------|
 | `-p, --provider <id>` | Filter by provider |
 | `-C, --capability <cap>` | Filter: reasoning, tool_call, structured_output, open_weights, attachment |
-| `-m, --modality <mod>` | Filter by input modality (image, audio, video, pdf) |
+| `-m, --modality <mod>` | Filter by input modality (image, audio, video, pdf); output modalities are ignored |
 | `--max-cost <n>` | Max input cost ($/million tokens) |
 | `--max-cost-output <n>` | Max output cost ($/million tokens) |
 | `--min-context <n>` | Min context window |
 | `-s, --search <term>` | Search by name or ID |
-| `--status <status>` | Filter: active, beta, deprecated |
+| `--status <status>` | Filter: active, deprecated, beta, alpha |
 | `-f, --family <name>` | Filter by model family (e.g. gpt, claude, gemini) |
 | `--sort <field>` | Sort: cost_input, cost_output, context_length, release_date, name, knowledge_cutoff, value |
-| `--desc` | Sort descending (models without a value for the field always sort last) |
-| `-n, --limit <n>` | Max results (default: 20) |
+| `--desc` | Sort descending (models without a value for the field always sort last); needs `--sort` or `defaults.sort` |
+| `-n, --limit <n>` | Max results; `0` = all (default: 20 in table/Markdown output, all otherwise) |
 | `-c, --count` | Show model count only |
 | `--ids-only` | Output model IDs only, one per line |
 | `--field <names>` | Output only these fields, tab-separated, one line per model |
@@ -345,8 +409,8 @@ Exposes 8 tools: `find_models`, `compare_models`, `estimate_cost`, `cheapest_mod
 |--------|-------------|
 | `-i, --input <n>` | Input tokens (supports K/M suffix); required unless `-P` is given |
 | `-o, --output <n>` | Output tokens (supports K/M suffix); required unless `-P` is given |
-| `--daily <n>` | Number of daily requests for cost projection |
-| `--monthly <n>` | Number of monthly requests for cost projection |
+| `--daily <n>` | Daily requests for the projection (monthly = ×30 unless `--monthly` is given) |
+| `--monthly <n>` | Monthly requests for the projection (daily = ÷30 unless `--daily` is given) |
 | `-P, --profile <name>` | Use workload profile (chatbot, code-gen, rag, summarization, translation) instead of `-i`/`-o` |
 
 ## Library Usage
@@ -364,6 +428,7 @@ import {
   recommendModels,
   listUseCases,
   diffModels,
+  findModel,
   resolveModel,
   latestModels,
   query,
@@ -380,6 +445,9 @@ const cheap = await findModels({
   sort: "cost_input",
   limit: 5,
 });
+
+// Look one model up the way `info` does (throws "not found" / "Ambiguous")
+const gpt4o = findModel(models, "gpt-4o"); // openai/gpt-4o
 
 // Resolve a model against the endpoint that actually serves it
 const resolved = await resolveModel("glm-5.3", {
@@ -420,7 +488,7 @@ const recs = await recommendModels("code-gen", { maxCost: 5, limit: 5 });
 // Get market statistics
 const stats = await getStats();
 
-// Detect changes since last fetch
+// Detect changes since the previous diffModels() call (saves a new snapshot)
 const diff = await diffModels();
 
 // Cache control
@@ -442,8 +510,16 @@ const modelsDev = await fetchModelsDevModels();
 All schemas are exported for custom validation:
 
 ```typescript
-import { UnifiedModelSchema, OpenRouterResponseSchema, ModelsDevResponseSchema } from "llm-models";
+import {
+  UnifiedModelSchema,
+  OpenRouterResponseSchema,
+  ModelsDevResponseSchema,
+  LlmModelsConfigSchema, // the config file format
+} from "llm-models";
 ```
+
+`fetchOpenRouterModels` and `fetchModelsDevModels` validate entry by entry: an entry that no longer
+matches its schema is skipped (counted under `--verbose`) rather than failing the whole fetch.
 
 ### Types
 
@@ -459,6 +535,7 @@ import type {
   ModelSortField,
   CostEstimate,
   ModelComparison,
+  LlmModelsConfig,
 } from "llm-models";
 ```
 
@@ -484,6 +561,14 @@ The two describe *different endpoints* for the same model id, so a merged entry 
 `context_length` and `output_limit` as a pair from one source (models.dev first, since it is
 provider-documented) rather than mixing them. Use `resolve --endpoint` when you need the limits of
 the endpoint you actually call.
+
+The two APIs sometimes spell the same model differently (OpenRouter's `anthropic/claude-opus-4.5`
+is models.dev's `anthropic/claude-opus-4-5`). Ids that differ only by case or `.` versus `-` are
+merged when the pairing is one-to-one. The merged model keeps the **models.dev id**, the id the
+provider's own API accepts, and OpenRouter's id is kept in `openrouter_id`, which every model
+OpenRouter lists carries. Models only OpenRouter lists are dated from its `created` timestamp
+(`release_date`, UTC), and those with an `expiration_date` are marked `deprecated`. On a merged
+model, models.dev's date and status win.
 
 ## License
 

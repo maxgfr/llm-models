@@ -14,13 +14,10 @@ export function filterModels(models: UnifiedModel[], filter: ModelFilter): Unifi
     result = result.filter((m) => m.capabilities[cap] === true);
   }
 
+  // Input side only: "image" means "can read images", not "generates images".
   if (filter.modality) {
     const mod = filter.modality.toLowerCase();
-    result = result.filter(
-      (m) =>
-        m.modalities.input.some((i) => i.toLowerCase() === mod) ||
-        m.modalities.output.some((o) => o.toLowerCase() === mod),
-    );
+    result = result.filter((m) => m.modalities.input.some((i) => i.toLowerCase() === mod));
   }
 
   if (filter.maxCostInput != null) {

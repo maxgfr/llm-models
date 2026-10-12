@@ -1,101 +1,82 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createProgram } from "../cli";
 import {
   generateBashCompletion,
   generateFishCompletion,
   generateZshCompletion,
 } from "../completions";
+import { TIERS } from "../functions/latest";
+import { listUseCases } from "../functions/recommend";
+import { CapabilityEnum, ModelSortFieldSchema } from "../schemas/functions";
 
-describe("generateBashCompletion", () => {
-  it("returns a string with bash header", () => {
-    const result = generateBashCompletion();
-    expect(result).toContain("# bash completion for llm-models");
-    expect(result).toContain("_llm_models");
-    expect(result).toContain("complete -F _llm_models llm-models");
-  });
+const program = createProgram();
+const generators = {
+  bash: generateBashCompletion,
+  zsh: generateZshCompletion,
+  fish: generateFishCompletion,
+};
 
-  it("includes all commands", () => {
-    const result = generateBashCompletion();
-    for (const cmd of [
-      "find",
-      "compare",
-      "provider",
-      "cost",
-      "cheapest",
-      "recommend",
-      "stats",
-      "diff",
-      "info",
-      "resolve",
-      "latest",
-      "cache",
-      "config",
-      "mcp",
-    ]) {
-      expect(result).toContain(cmd);
-    }
-  });
+/** How each shell spells a flag in its script. */
+function spelled(shell: keyof typeof generators, flag: string): string {
+  if (shell !== "fish") return flag;
+  return flag.startsWith("--") ? `-l ${flag.slice(2)}` : `-s ${flag.slice(1)}`;
+}
 
-  it("includes capabilities for completion", () => {
-    const result = generateBashCompletion();
-    expect(result).toContain("reasoning");
-    expect(result).toContain("tool_call");
-    expect(result).toContain("structured_output");
-  });
+for (const [shell, generate] of Object.entries(generators) as [
+  keyof typeof generators,
+  typeof generateBashCompletion,
+][]) {
+  describe(`${shell} completion`, () => {
+    const script = generate(program);
 
-  it("includes sort fields", () => {
-    const result = generateBashCompletion();
-    expect(result).toContain("cost_input");
-    expect(result).toContain("context_length");
-    expect(result).toContain("knowledge_cutoff");
-    expect(result).toContain("value");
-  });
+    it("names every command", () => {
+      for (const command of program.commands) expect(script).toContain(command.name());
+    });
 
-  it("includes output formats", () => {
-    const result = generateBashCompletion();
-    expect(result).toContain("table");
-    expect(result).toContain("json");
-    expect(result).toContain("csv");
-    expect(result).toContain("markdown");
-  });
-});
+    it("offers every option of every command", () => {
+      for (const command of [program, ...program.commands]) {
+        for (const option of command.options) {
+          if (option.long) expect(script).toContain(spelled(shell, option.long));
+          if (option.short) expect(script).toContain(spelled(shell, option.short));
+        }
+      }
+    });
 
-describe("generateZshCompletion", () => {
-  it("returns a string with zsh header", () => {
-    const result = generateZshCompletion();
-    expect(result).toContain("#compdef llm-models");
-    expect(result).toContain("_llm_models");
-    expect(result).toContain("_arguments");
-  });
+    it("completes values from the schemas", () => {
+      for (const value of [
+        ...CapabilityEnum.options,
+        ...ModelSortFieldSchema.options,
+        ...TIERS,
+        ...Object.keys(listUseCases()),
+        "alpha",
+        "markdown",
+        "chatbot",
+      ]) {
+        expect(script).toContain(value);
+      }
+    });
 
-  it("includes commands and flags", () => {
-    const result = generateZshCompletion();
-    expect(result).toContain("find");
-    expect(result).toContain("--json");
-    expect(result).toContain("--no-cache");
-    expect(result).toContain("--quiet");
-    expect(result).toContain("--verbose");
-  });
-});
+    it("drops the --use-case option that never existed", () => {
+      expect(script).not.toContain("use-case[");
+      expect(script).not.toContain("-l use-case");
+      expect(script).not.toContain("--use-case");
+    });
 
-describe("generateFishCompletion", () => {
-  it("returns a string with fish header", () => {
-    const result = generateFishCompletion();
-    expect(result).toContain("# fish completion for llm-models");
-    expect(result).toContain("complete -c llm-models");
+    const binary = Bun.which(shell);
+    it.if(binary !== null)("parses with the shell's syntax check", () => {
+      const dir = mkdtempSync(join(tmpdir(), "llm-models-completion-"));
+      const file = join(dir, `completion.${shell}`);
+      writeFileSync(file, script);
+      try {
+        const result = Bun.spawnSync([binary as string, "-n", file]);
+        expect(result.stderr.toString()).toBe("");
+        expect(result.exitCode).toBe(0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
   });
-
-  it("includes all commands", () => {
-    const result = generateFishCompletion();
-    expect(result).toContain("__fish_use_subcommand");
-    expect(result).toContain("find");
-    expect(result).toContain("recommend");
-    expect(result).toContain("stats");
-  });
-
-  it("includes flag completions", () => {
-    const result = generateFishCompletion();
-    expect(result).toContain("-l json");
-    expect(result).toContain("-l no-cache");
-    expect(result).toContain("-l quiet");
-  });
-});
+}
