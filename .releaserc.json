@@ -16,6 +16,12 @@
         "npmPublish": true
       }
     ],
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "bun run build:all && test \"$(node build/index.js --version)\" = \"${nextRelease.version}\""
+      }
+    ],
     "@semantic-release/github",
     [
       "@semantic-release/git",
