@@ -1,7 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it, mock } from "bun:test";
-import { setCacheEnabled } from "../cache";
-import { fetchModelsDevModels } from "../clients/models-dev";
-import { fetchOpenRouterModels } from "../clients/openrouter";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { getCacheDir, setCacheDir, setCacheEnabled } from "../cache";
+import { fetchModelsDevModels, parseModelsDevResponse } from "../clients/models-dev";
+import { fetchOpenRouterModels, parseOpenRouterResponse } from "../clients/openrouter";
+import { fetchUnifiedData } from "../functions/normalize";
 
 beforeAll(() => {
   setCacheEnabled(false);
@@ -136,5 +140,137 @@ describe("fetchModelsDevModels", () => {
     expect(Object.keys(result)).toHaveLength(1);
     expect(result.openai.name).toBe("OpenAI");
     expect(Object.keys(result.openai.models)).toHaveLength(1);
+  });
+});
+
+const validOpenRouterModel = {
+  id: "test/model",
+  canonical_slug: "test/model",
+  name: "Test Model",
+  description: "A test model",
+  created: 1700000000,
+  context_length: 4096,
+  supported_parameters: [],
+  architecture: {
+    modality: "text->text",
+    input_modalities: ["text"],
+    output_modalities: ["text"],
+    tokenizer: "GPT",
+  },
+  pricing: { prompt: "0.001", completion: "0.002" },
+  top_provider: { context_length: 4096, max_completion_tokens: 2048, is_moderated: false },
+  links: { details: "/test" },
+};
+
+const validModelsDevModel = {
+  id: "good",
+  name: "Good",
+  attachment: false,
+  reasoning: false,
+  tool_call: true,
+  open_weights: false,
+  release_date: "2024-05-13",
+  last_updated: "2024-05-13",
+  modalities: { input: ["text"], output: ["text"] },
+  limit: { context: 1000, output: 100 },
+};
+
+const provider = (models: Record<string, unknown>) => ({
+  id: "acme",
+  name: "Acme",
+  doc: "https://acme.example",
+  env: ["ACME_API_KEY"],
+  npm: "@ai-sdk/acme",
+  models,
+});
+
+describe("tolerant parsing", () => {
+  it("drops an invalid OpenRouter entry and keeps the rest", () => {
+    const result = parseOpenRouterResponse({
+      data: [validOpenRouterModel, { id: "broken/model" }],
+    });
+    expect(result.data.map((m) => m.id)).toEqual(["test/model"]);
+  });
+
+  it("throws when no OpenRouter entry is valid", () => {
+    expect(() => parseOpenRouterResponse({ data: [{ id: "broken" }] })).toThrow("no valid models");
+  });
+
+  it("drops one invalid models.dev model without losing its provider", () => {
+    const result = parseModelsDevResponse({
+      acme: provider({ good: validModelsDevModel, bad: { id: "bad" } }),
+    });
+    expect(Object.keys(result.acme.models)).toEqual(["good"]);
+  });
+
+  it("drops an invalid models.dev provider and keeps the others", () => {
+    const result = parseModelsDevResponse({
+      acme: provider({ good: validModelsDevModel }),
+      broken: { id: "broken" },
+    });
+    expect(Object.keys(result)).toEqual(["acme"]);
+  });
+
+  it("throws when no models.dev model is valid", () => {
+    expect(() => parseModelsDevResponse({ acme: provider({ bad: {} }) })).toThrow(
+      "no valid models",
+    );
+  });
+});
+
+describe("fetch behaviour", () => {
+  it("sends a User-Agent and a timeout signal", async () => {
+    let init: RequestInit | undefined;
+    globalThis.fetch = mock((_url: string, options?: RequestInit) => {
+      init = options;
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: [validOpenRouterModel] }), { status: 200 }),
+      );
+    }) as unknown as typeof fetch;
+
+    await fetchOpenRouterModels();
+    const headers = (init?.headers ?? {}) as Record<string, string>;
+    expect(headers["User-Agent"]).toMatch(/^llm-models\/\d+\.\d+\.\d+/);
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("reports a timeout explicitly", async () => {
+    globalThis.fetch = mock(() =>
+      Promise.reject(new DOMException("The operation timed out.", "TimeoutError")),
+    ) as unknown as typeof fetch;
+
+    expect(fetchModelsDevModels()).rejects.toThrow("models.dev API timed out after 15s");
+  });
+});
+
+describe("fetchUnifiedData with one API down", () => {
+  it("warns on stderr instead of silently dropping a source", async () => {
+    const realDir = getCacheDir();
+    const emptyDir = mkdtempSync(join(tmpdir(), "llm-models-empty-"));
+    setCacheDir(emptyDir); // no expired cache to fall back on
+    const originalError = console.error;
+    const errors: string[] = [];
+    console.error = (message: string) => errors.push(message);
+    globalThis.fetch = mock((url: string) =>
+      Promise.resolve(
+        url.includes("openrouter")
+          ? new Response("down", { status: 503, statusText: "Service Unavailable" })
+          : new Response(JSON.stringify({ acme: provider({ good: validModelsDevModel }) }), {
+              status: 200,
+            }),
+      ),
+    ) as unknown as typeof fetch;
+
+    try {
+      const { models } = await fetchUnifiedData();
+      expect(models.map((m) => m.id)).toEqual(["acme/good"]);
+      expect(errors.join("\n")).toContain(
+        "OpenRouter API unavailable (OpenRouter API error: 503 Service Unavailable), showing models.dev data only",
+      );
+    } finally {
+      console.error = originalError;
+      setCacheDir(realDir);
+      rmSync(emptyDir, { recursive: true, force: true });
+    }
   });
 });

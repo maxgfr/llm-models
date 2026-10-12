@@ -156,22 +156,47 @@ export async function fetchUnifiedData(): Promise<{
   let modelsDevData: ModelsDevResponse | null =
     results[1].status === "fulfilled" ? results[1].value : null;
 
+  const reason = (result: PromiseSettledResult<unknown>) =>
+    result.status === "rejected"
+      ? result.reason instanceof Error
+        ? result.reason.message
+        : String(result.reason)
+      : "";
+
   // Fallback to expired cache if an API failed
   if (!openRouterData) {
     openRouterData = readFallbackCache<OpenRouterResponse>("openrouter");
     if (openRouterData) {
-      console.error("Warning: OpenRouter API unavailable, using expired cache");
+      console.error(
+        `Warning: OpenRouter API unavailable (${reason(results[0])}), using expired cache`,
+      );
     }
   }
   if (!modelsDevData) {
     modelsDevData = readFallbackCache<ModelsDevResponse>("models-dev");
     if (modelsDevData) {
-      console.error("Warning: models.dev API unavailable, using expired cache");
+      console.error(
+        `Warning: models.dev API unavailable (${reason(results[1])}), using expired cache`,
+      );
     }
   }
 
   if (!openRouterData && !modelsDevData) {
-    throw new Error("Both APIs are unavailable and no cached data exists");
+    throw new Error(
+      `Both APIs are unavailable and no cached data exists (OpenRouter: ${reason(results[0])}; models.dev: ${reason(results[1])})`,
+    );
+  }
+
+  // One source down with nothing cached: carry on, but never silently.
+  if (!openRouterData) {
+    console.error(
+      `Warning: OpenRouter API unavailable (${reason(results[0])}), showing models.dev data only`,
+    );
+  }
+  if (!modelsDevData) {
+    console.error(
+      `Warning: models.dev API unavailable (${reason(results[1])}), showing OpenRouter data only`,
+    );
   }
 
   // Index models.dev models by "provider/modelId"

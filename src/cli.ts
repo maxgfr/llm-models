@@ -30,6 +30,7 @@ import { listUseCases, recommendModels } from "./functions/recommend";
 import { findModel, resolveModel } from "./functions/resolve";
 import { filterModels, sortModels } from "./functions/search";
 import { getStats } from "./functions/stats";
+import { setVerbose } from "./log";
 import { CapabilityEnum, ModelFilterSchema, ModelSortFieldSchema } from "./schemas/functions";
 import type { Capabilities, ModelFilter, ModelSortField, UnifiedModel } from "./types";
 
@@ -101,6 +102,7 @@ export function runCommand(): void {
     .option("--verbose", "Show debug info (timing, cache status)")
     .hook("preAction", (_thisCommand, _actionCommand) => {
       const opts = program.opts();
+      setVerbose(opts.verbose === true);
       if (opts.cache === false) {
         setCacheEnabled(false);
       }
