@@ -91,6 +91,19 @@ beforeAll(() => {
     writeFileSync(join(cacheDir, `${key}.json`), JSON.stringify({ timestamp: Date.now(), data }));
   write("openrouter", openRouter);
   write("models-dev", modelsDev);
+  // Browser probe verdicts for the default origin, so `provider --browser` never hits the network.
+  const checked_at = new Date().toISOString();
+  const origin = "https://example.com";
+  write("browser-https_example_com", {
+    openai: { callable: true, origin, evidence: "preflight", checked_at },
+    acme: {
+      callable: false,
+      origin,
+      evidence: "none",
+      reason: "no known base URL",
+      checked_at,
+    },
+  });
 });
 
 afterAll(() => {
@@ -206,6 +219,48 @@ describe("machine formats stay clean", () => {
   it("recommend prints no preamble in CSV", async () => {
     const { stdout } = await run("recommend", "tool-use", "--format", "csv");
     expect(lines(stdout)[0]).toBe("ID,Context,Output,$/M In,$/M Out,Capabilities");
+  });
+});
+
+describe("provider --browser", () => {
+  it("adds a Browser column to the provider list", async () => {
+    const { stdout, code } = await run("provider", "--list", "--browser", "--format", "csv");
+    expect(code).toBe(0);
+    expect(lines(stdout)).toEqual([
+      "Provider,Models,NPM Package,Browser",
+      "acme,25,@ai-sdk/acme,no",
+      "openai,2,@ai-sdk/openai,yes",
+    ]);
+  });
+
+  it("keeps only callable providers with --browser-only", async () => {
+    const { stdout } = await run("provider", "--browser-only", "--format", "csv");
+    expect(lines(stdout)).toEqual([
+      "Provider,Models,NPM Package,Browser",
+      "openai,2,@ai-sdk/openai,yes",
+    ]);
+  });
+
+  it("includes the verdict in JSON", async () => {
+    const { stdout } = await run("provider", "--browser-only", "--json");
+    const [openai] = JSON.parse(stdout);
+    expect(openai.browser).toMatchObject({ callable: true, evidence: "preflight" });
+  });
+
+  it("prints the verdict in the provider view", async () => {
+    const { stdout } = await run("provider", "acme", "--browser");
+    expect(stdout).toContain("Browser: no (from https://example.com: no known base URL)");
+  });
+
+  it("leaves the column out without the flag", async () => {
+    const { stdout } = await run("provider", "--list", "--format", "csv");
+    expect(lines(stdout)[0]).toBe("Provider,Models,NPM Package");
+  });
+
+  it("rejects an origin that is not a URL", async () => {
+    const { stderr, code } = await run("provider", "--browser", "--origin", "example");
+    expect(code).toBe(1);
+    expect(stderr).toContain("Expected an origin");
   });
 });
 

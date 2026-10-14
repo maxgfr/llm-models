@@ -1,28 +1,21 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { setConfigLoader } from "./config-core";
 import { LlmModelsConfigSchema } from "./schemas/functions";
-import type { LlmModelsConfig, WorkloadProfile } from "./types";
+import type { LlmModelsConfig } from "./types";
 
-export type { LlmModelsConfig, WorkloadProfile };
+// Node only: reads `.llm-modelsrc` and ~/.config/llm-models/config.json.
+// Importing this module installs that reader; the browser entry never imports it.
+
+export type { LlmModelsConfig, WorkloadProfile } from "./config-core";
+export { getProfile, listProfiles, loadConfig } from "./config-core";
 
 const CONFIG_DIR = join(homedir(), ".config", "llm-models");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 
-const BUILTIN_PROFILES: Record<string, WorkloadProfile> = {
-  chatbot: { input: "10K", output: "1K" },
-  "code-gen": { input: "5K", output: "10K" },
-  rag: { input: "100K", output: "5K" },
-  summarization: { input: "50K", output: "2K" },
-  translation: { input: "5K", output: "5K" },
-};
-
-let configCache: LlmModelsConfig | null = null;
-
-export function loadConfig(): LlmModelsConfig {
-  if (configCache) return configCache;
-
-  // Check local config first, then global
+/** The first valid config file, local before global; an invalid one is reported and skipped. */
+function readConfigFiles(): LlmModelsConfig {
   const localPath = join(process.cwd(), ".llm-modelsrc");
   const paths = [localPath, CONFIG_PATH];
 
@@ -45,23 +38,13 @@ export function loadConfig(): LlmModelsConfig {
       console.error(`Warning: ignoring config ${p}: ${issues}`);
       continue;
     }
-    configCache = parsed.data;
-    return configCache;
+    return parsed.data;
   }
 
-  configCache = {};
-  return configCache;
+  return {};
 }
 
-export function getProfile(name: string): WorkloadProfile | undefined {
-  const config = loadConfig();
-  return config.profiles?.[name] ?? BUILTIN_PROFILES[name];
-}
-
-export function listProfiles(): Record<string, WorkloadProfile> {
-  const config = loadConfig();
-  return { ...BUILTIN_PROFILES, ...config.profiles };
-}
+setConfigLoader(readConfigFiles);
 
 export function initConfig(): void {
   if (existsSync(CONFIG_PATH)) {
@@ -81,6 +64,5 @@ export function initConfig(): void {
 export function getConfigPath(): string {
   const localPath = join(process.cwd(), ".llm-modelsrc");
   if (existsSync(localPath)) return localPath;
-  if (existsSync(CONFIG_PATH)) return CONFIG_PATH;
   return CONFIG_PATH;
 }

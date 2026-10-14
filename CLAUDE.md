@@ -30,14 +30,18 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 
 ## Project structure
 - `src/` - source code
-  - `index.ts` - entry point (CLI + library export)
+  - `index.ts` - Node entry point (CLI + library export); loads `cache.ts` and `config.ts` for their disk-backed stores
+  - `browser.ts` - browser entry point (package.json `browser` / exports `browser` condition): same API, memory cache, no config file
+  - `lib.ts` - the library API both entries re-export; nothing reachable from it may import a Node builtin (`browser-bundle.test.ts`)
   - `cli.ts` - CLI commands (Commander.js, 17 commands); `createProgram()` builds, `runCommand()` parses
   - `format.ts` - CLI formatting utilities (table, cost, context, CSV, markdown)
   - `types.ts` - Zod-inferred type exports
-  - `cache.ts` - Local API response cache with configurable TTL (~/.cache/llm-models/), atomic best-effort writes
+  - `cache-core.ts` - Cache logic over a pluggable `CacheStore` (memory by default), TTL, enabled flag; no Node APIs
+  - `cache.ts` - Node only: disk `CacheStore` (~/.cache/llm-models/), atomic best-effort writes; installs itself on import
   - `log.ts` - `--verbose` diagnostics (stderr only)
   - `colors.ts` - ANSI color helpers with NO_COLOR/TTY detection
-  - `config.ts` - Config file loading (~/.config/llm-models/, .llm-modelsrc), validated by `LlmModelsConfigSchema`
+  - `config-core.ts` - `loadConfig`/`getProfile`/`listProfiles` over a pluggable loader (none by default); no Node APIs
+  - `config.ts` - Node only: config file loading (~/.config/llm-models/, .llm-modelsrc), validated by `LlmModelsConfigSchema`; installs itself on import
   - `completions.ts` - Shell completions (bash, zsh, fish) generated from the Commander program
   - `mcp.ts` - MCP server (11 tools for AI agent integration); `createMcpServer()` is testable in memory
   - `schemas/openrouter.ts` - Zod schemas for OpenRouter API
@@ -52,13 +56,14 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   - `functions/fields.ts` - readField/formatFields: dotted-path `--field` extraction
   - `functions/search.ts` - filterModels, sortModels, findModels
   - `functions/compare.ts` - compareModels (side-by-side)
-  - `functions/provider.ts` - getProvider, listProviders
+  - `functions/provider.ts` - getProvider, listProviders (`{ browser }` attaches CORS verdicts, cached per origin)
+  - `functions/browser.ts` - probeBrowserSupport (CORS preflight + GET fallback), DEFAULT_BASE_URLS, BROWSER_REQUIRED_HEADERS
   - `functions/cost.ts` - estimateCost, cheapestModels
   - `functions/stats.ts` - getStats (aggregate market statistics)
   - `functions/recommend.ts` - recommendModels, listUseCases (use-case presets)
   - `functions/diff.ts` - diffModels (compare current vs its own snapshot.json, then save it)
   - `functions/query.ts` - QueryBuilder fluent API
-  - `__tests__/` - 24 test files (289 tests: unit, CLI end-to-end on a fixture HOME, in-memory MCP,
+  - `__tests__/` - test files (unit, CLI end-to-end on a fixture HOME, in-memory MCP,
     live API schema validation)
 - `build/` - compiled output (npm package)
 - `dist/` - binary output
@@ -72,6 +77,8 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 - Tests use `describe`/`it` blocks with `bun:test`
 - Tests that mock `fetch` must call `setCacheEnabled(false)` in `beforeAll`
 - Tests that need a real cache use `setCacheDir()` on a temp dir; never touch the real ~/.cache
+- Library modules import `cache-core`/`config-core`, never `cache`/`config` (those pull in node:fs)
+- Browser-callable claims are evidence-based: probe live, or cite the provider's doc next to the table entry
 - Merged models keep the models.dev id; OpenRouter's spelling lives in `openrouter_id`, and lookups
   (`pickBestModel`, `findModel`) match both
 - Conventional commits (semantic-release parses them)

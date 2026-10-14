@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { readCache, writeCache } from "../cache";
+import { readCache, writeCache } from "../cache-core";
 import { debug } from "../log";
 import { OpenRouterModelSchema } from "../schemas/openrouter";
 import type { OpenRouterModel, OpenRouterResponse } from "../types";

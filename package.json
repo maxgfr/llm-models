@@ -6,7 +6,21 @@
   "type": "module",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
-  "description": "Fetch latest LLM models from OpenRouter and models.dev APIs",
+  "browser": "./build/browser.js",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "browser": "./build/browser.js",
+      "default": "./build/index.js"
+    },
+    "./browser": {
+      "types": "./build/browser.d.ts",
+      "default": "./build/browser.js"
+    },
+    "./package.json": "./package.json",
+    "./*": "./*"
+  },
+  "description": "Fetch latest LLM models from OpenRouter and models.dev APIs, in Node.js or the browser",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/maxgfr/llm-models.git"
@@ -36,12 +50,14 @@
     "machine-learning",
     "api",
     "cli",
-    "zod"
+    "zod",
+    "browser",
+    "cors"
   ],
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build src/index.ts --outdir build --target node",
+    "build": "bun build src/index.ts --outdir build --target node && bun build src/browser.ts --outdir build --target browser",
     "build:types": "tsc --emitDeclarationOnly",
     "build:all": "bun run build && bun run build:types",
     "test": "bun test",

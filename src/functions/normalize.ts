@@ -1,4 +1,4 @@
-import { readFallbackCache } from "../cache";
+import { readFallbackCache } from "../cache-core";
 import { fetchModelsDevModels } from "../clients/models-dev";
 import { fetchOpenRouterModels } from "../clients/openrouter";
 import type {

@@ -1,81 +1,12 @@
 #!/usr/bin/env node
 
-export { clearCache, setCacheEnabled } from "./cache";
-export { fetchModelsDevModels } from "./clients/models-dev";
-export { fetchOpenRouterModels } from "./clients/openrouter";
-export { getProfile, listProfiles, loadConfig } from "./config";
-export {
-  cheapestModels,
-  compareModels,
-  diffModels,
-  estimateCost,
-  fetchUnifiedData,
-  fetchUnifiedModels,
-  filterModels,
-  findModel,
-  findModels,
-  formatFields,
-  getProvider,
-  getStats,
-  latestModels,
-  listProviders,
-  listUseCases,
-  mergeModels,
-  parseFieldList,
-  pickBestModel,
-  pickTiers,
-  providersForEndpoint,
-  QueryBuilder,
-  query,
-  readField,
-  recommendModels,
-  resolveModel,
-  sortModels,
-} from "./functions/index";
-export {
-  CapabilitiesSchema,
-  CostEstimateSchema,
-  LlmModelsConfigSchema,
-  ModelComparisonSchema,
-  ModelFilterSchema,
-  ModelSortFieldSchema,
-  NormalizedCostSchema,
-  ProviderInfoSchema,
-  UnifiedModelSchema,
-} from "./schemas/functions";
-export {
-  ModelsDevCostSchema,
-  ModelsDevLimitSchema,
-  ModelsDevModalitiesSchema,
-  ModelsDevModelSchema,
-  ModelsDevProviderSchema,
-  ModelsDevResponseSchema,
-} from "./schemas/models-dev";
-export {
-  OpenRouterArchitectureSchema,
-  OpenRouterDefaultParametersSchema,
-  OpenRouterLinksSchema,
-  OpenRouterModelSchema,
-  OpenRouterPricingSchema,
-  OpenRouterResponseSchema,
-  OpenRouterTopProviderSchema,
-} from "./schemas/openrouter";
-export type {
-  Capabilities,
-  CostEstimate,
-  LlmModelsConfig,
-  ModelComparison,
-  ModelFilter,
-  ModelSortField,
-  ModelsDevModel,
-  ModelsDevProvider,
-  ModelsDevResponse,
-  NormalizedCost,
-  OpenRouterModel,
-  OpenRouterResponse,
-  ProviderInfo,
-  UnifiedModel,
-} from "./types";
+// Node entry point: the library (same API as the browser entry), backed by the
+// disk cache and the config files, plus the CLI when run as a program.
+
+import "./cache";
+import "./config";
+
+export * from "./lib";
 
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";

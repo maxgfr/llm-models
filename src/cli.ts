@@ -27,6 +27,7 @@ import {
   outputFormatted,
   parseTokenCount,
 } from "./format";
+import { DEFAULT_PROBE_ORIGIN } from "./functions/browser";
 import { compareModels } from "./functions/compare";
 import { cheapestModels, estimateCost, projectCost } from "./functions/cost";
 import { diffModels } from "./functions/diff";
@@ -45,7 +46,13 @@ import {
   ModelSortFieldSchema,
   OutputFormatSchema,
 } from "./schemas/functions";
-import type { Capabilities, ModelFilter, ModelSortField, UnifiedModel } from "./types";
+import type {
+  BrowserSupport,
+  Capabilities,
+  ModelFilter,
+  ModelSortField,
+  UnifiedModel,
+} from "./types";
 
 const CAPABILITIES = CapabilityEnum.options;
 const STATUSES = ModelFilterSchema.shape.status.unwrap().options;
@@ -71,6 +78,39 @@ function decimal(value: string): number {
   const parsed = Number.parseFloat(value);
   if (Number.isNaN(parsed)) throw new InvalidArgumentError("Expected a number");
   return parsed;
+}
+
+/** A page origin as typed: "https://app.example.com" (a trailing path is dropped). */
+function origin(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new InvalidArgumentError("Expected an origin such as https://app.example.com");
+  }
+  if (parsed.origin === "null") {
+    throw new InvalidArgumentError("Expected an http(s) origin such as https://app.example.com");
+  }
+  return parsed.origin;
+}
+
+/** The provider list's Browser column. */
+function browserCell(support: BrowserSupport | undefined): string {
+  if (!support) return "-";
+  if (!support.callable) return red("no");
+  return support.required_headers ? green("yes, with header") : green("yes");
+}
+
+/** The provider view's Browser line. */
+function browserDetail(support: BrowserSupport): string {
+  if (!support.callable) {
+    return `${red("no")} ${dim(`(from ${support.origin}: ${support.reason ?? "refused"})`)}`;
+  }
+  const headers = Object.entries(support.required_headers ?? {})
+    .map(([name, value]) => `${name}: ${value}`)
+    .join(", ");
+  const needs = headers ? `, send ${headers}` : "";
+  return `${green("yes")} ${dim(`(from ${support.origin}${needs})`)}`;
 }
 
 function resolveFormat(options: { json?: boolean; format?: OutputFormat }): OutputFormat {
@@ -401,30 +441,55 @@ export function createProgram(): Command {
     .description("Get provider details and models")
     .argument("[id]", "Provider ID (e.g. openai, anthropic)")
     .option("--list", "List all providers with model counts")
+    .option("--browser", "Probe whether a web page can call the provider directly (CORS)")
+    .option(
+      "--browser-only",
+      "List only providers a web page can call directly (implies --browser)",
+    )
+    .option(
+      "--origin <url>",
+      `Page origin the browser probe announces (default: ${DEFAULT_PROBE_ORIGIN})`,
+      origin,
+    )
     .option("--json", "Output raw JSON")
     .addOption(choice("--format <fmt>", "Output format", FORMATS))
     .action(
       async (
         id: string | undefined,
-        options: { list?: boolean; json?: boolean; format?: OutputFormat },
+        options: {
+          list?: boolean;
+          browser?: boolean;
+          browserOnly?: boolean;
+          origin?: string;
+          json?: boolean;
+          format?: OutputFormat;
+        },
       ) => {
         const fmt = resolveFormat(options);
+        const probe = options.browser || options.browserOnly || options.origin !== undefined;
+        const browser = probe ? { origin: options.origin } : undefined;
 
         if (options.list || !id) {
-          const providers = await listProviders();
+          let providers = await listProviders({ browser });
+          if (options.browserOnly) providers = providers.filter((p) => p.browser?.callable);
 
           if (fmt === "json") {
             console.log(JSON.stringify(providers, null, 2));
             return;
           }
 
-          const headers = ["Provider", "Models", "NPM Package"];
-          const rows = providers.map((p) => [p.id, String(p.model_count), p.npm ?? "-"]);
+          const headers = ["Provider", "Models", "NPM Package", ...(probe ? ["Browser"] : [])];
+          const rows = providers.map((p) => [
+            p.id,
+            String(p.model_count),
+            p.npm ?? "-",
+            ...(probe ? [browserCell(p.browser)] : []),
+          ]);
           outputFormatted(fmt, headers, rows, providers);
           return;
         }
 
-        const provider = await getProvider(id);
+        const provider = await getProvider(id, { browser });
 
         if (fmt === "json") {
           console.log(JSON.stringify(provider, null, 2));
@@ -439,6 +504,8 @@ export function createProgram(): Command {
           if (provider.env?.length)
             console.log(`${bold("Env variables:")} ${provider.env.join(", ")}`);
           if (provider.api) console.log(`${bold("API endpoint:")} ${provider.api}`);
+          if (provider.browser)
+            console.log(`${bold("Browser:")} ${browserDetail(provider.browser)}`);
           console.log(`\n${bold("Models")} (${provider.model_count}):`);
         }
 

@@ -1,4 +1,4 @@
-import { readSnapshot, removeCache, writeCache } from "../cache";
+import { readSnapshot, removeCache, writeCache } from "../cache-core";
 import type { UnifiedModel } from "../types";
 import { fetchUnifiedModels } from "./normalize";
 

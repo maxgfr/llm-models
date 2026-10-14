@@ -2,7 +2,7 @@
 
 Fetch latest LLM models from [OpenRouter](https://openrouter.ai) and [models.dev](https://models.dev) APIs.
 
-Validates API responses with [Zod](https://zod.dev) schemas to detect breaking changes. Provides smart wrapper functions for model discovery, comparison, cost estimation, recommendations, statistics, and provider info. Features local caching, MCP server integration, multiple output formats, and a fluent query builder API.
+Validates API responses with [Zod](https://zod.dev) schemas to detect breaking changes. Provides smart wrapper functions for model discovery, comparison, cost estimation, recommendations, statistics, and provider info. Features local caching, MCP server integration, multiple output formats, and a fluent query builder API. The library also runs in the browser, and can tell which providers a web page may call directly (CORS).
 
 ## Installation
 
@@ -254,7 +254,19 @@ llm-models provider --list
 
 # Get details for a specific provider
 llm-models provider openai
+
+# Can a web page call the provider directly? (CORS probe, see below)
+llm-models provider --list --browser
+llm-models provider --browser-only --origin https://app.example.com
+llm-models provider anthropic --browser
+# Browser: yes (from https://example.com, send anthropic-dangerous-direct-browser-access: true)
 ```
+
+`--browser` probes each provider's API the way a browser would before a page calls it (see
+[Browser-callable providers](#browser-callable-providers)) and adds a `Browser` column (`yes`,
+`yes, with header`, `no`), or a `browser` object in JSON. `--browser-only` keeps the callable ones,
+and `--origin` sets the page origin the probe announces (default `https://example.com`). Verdicts
+are cached like API responses; probing every provider takes about 20 seconds.
 
 ### Raw API Commands
 
@@ -403,6 +415,16 @@ than an empty result.
 | `--field <names>` | Output only these fields, tab-separated |
 | `--json` | Raw JSON output |
 
+### Provider Options
+
+| Option | Description |
+|--------|-------------|
+| `--list` | List all providers with model counts |
+| `--browser` | Probe whether a web page can call the provider directly (CORS) |
+| `--browser-only` | List only providers a web page can call directly (implies `--browser`) |
+| `--origin <url>` | Page origin the browser probe announces (default `https://example.com`) |
+| `--json` / `--format <fmt>` | Output format |
+
 ### Cost Options
 
 | Option | Description |
@@ -475,6 +497,9 @@ const comparison = await compareModels(["openai/gpt-4o", "anthropic/claude-sonne
 const openai = await getProvider("openai");
 console.log(openai.npm); // "@ai-sdk/openai"
 
+// ...and whether a web page can call it directly (see "Browser-callable providers")
+const { browser } = await getProvider("openai", { browser: true });
+
 // Estimate costs
 const costs = await estimateCost({
   modelIds: ["openai/gpt-4o"],
@@ -493,8 +518,84 @@ const diff = await diffModels();
 
 // Cache control
 setCacheEnabled(false); // Disable caching
-clearCache();           // Clear cache directory
+clearCache();           // Clear the cache (directory on Node, memory in a browser)
 ```
+
+### Browser-callable providers
+
+```typescript
+import { listProviders, probeBrowserSupport, providerBaseUrl } from "llm-models";
+
+// Every provider, each with a `browser` verdict (probes run 8 at a time)
+const providers = await listProviders({ browser: { origin: "https://app.example.com" } });
+const callable = providers.filter((p) => p.browser?.callable);
+
+// One provider: a models.dev / ProviderInfo entry, or a bare id
+const anthropic = await probeBrowserSupport("anthropic", { origin: "https://app.example.com" });
+// {
+//   callable: true,
+//   required_headers: { "anthropic-dangerous-direct-browser-access": "true" },
+//   origin: "https://app.example.com",
+//   url: "https://api.anthropic.com/v1/messages",
+//   evidence: "preflight",
+//   checked_at: "2026-10-14T12:00:00.000Z"
+// }
+
+// Where to call a provider: its models.dev `api`, else a known default
+providerBaseUrl({ id: "openai" }); // "https://api.openai.com/v1"
+```
+
+`probeBrowserSupport(provider, { origin, fetch, timeoutMs, now })` sends the CORS preflight a browser
+sends before an authenticated JSON `POST` to the provider's chat endpoint
+(`/chat/completions`, Anthropic's `/messages`, Gemini's `:generateContent`, Cohere's `/chat`, picked
+from the provider's AI SDK package). It needs no API key. The provider is `callable` when the
+preflight answers 2xx, `Access-Control-Allow-Origin` is `*` or the origin, and
+`Access-Control-Allow-Headers` covers every header the call sends (`Authorization` or the
+provider's key header, and `Content-Type`). When the preflight is refused, a simple `GET <base>/models`
+records in `reason` whether the API sends CORS headers at all; the verdict stays `false`.
+`evidence` says what the verdict rests on: `preflight`, `get`, or `none` (no known base URL, a
+per-account URL, or a network failure). Inject `fetch` to test or proxy it.
+
+`required_headers` lists headers the page must add. Anthropic answers a page only when it sends
+`anthropic-dangerous-direct-browser-access: true` (what its SDK sends with `dangerouslyAllowBrowser`);
+its preflight allows the header either way, so this one comes from a table, checked against the live
+API. `DEFAULT_BASE_URLS` gives the base URL of the providers models.dev lists without an `api`
+(OpenAI, Anthropic, Google, Mistral, Groq, xAI, DeepInfra, Cerebras, Together AI, Cohere,
+Perplexity), so they can be probed and called too.
+
+What a `callable: true` does and does not mean:
+
+- **The key is exposed.** A page that calls a provider directly holds the user's API key in the
+  browser, where any script on that page, browser extensions and the user can read it. Only do it
+  when the key is the user's own (bring your own key) and they chose to paste it, never with a key
+  of yours.
+- **It is a snapshot.** Providers change their CORS rules; `checked_at` dates the verdict. Re-probe
+  rather than ship a stale list.
+- **It covers the preflight.** Some APIs omit CORS headers on error responses (Cerebras' `401`, for
+  one), so the call works but a page cannot read why it failed.
+- **The origin matters** for APIs that echo an allow-list rather than `*`; probe with your page's
+  real origin.
+- **Run it outside the page.** A browser never lets a page send a preflight or set `Origin`
+  itself: probe from a build step, server or the CLI, and ship the result.
+
+### Browser usage
+
+The package imports cleanly in a browser bundle. Bundlers that honour the `browser` condition
+(Vite, webpack, esbuild, Bun) pick `build/browser.js` for
+`import ... from "llm-models"`; `llm-models/browser` names it explicitly. It has the same exports
+as the Node entry and no Node.js builtin; models.dev and OpenRouter both allow cross-origin
+requests, so the data loads from the page:
+
+```typescript
+import { fetchUnifiedModels, findModel } from "llm-models";
+
+const models = await fetchUnifiedModels(); // fetched from the page, cached in memory
+const gpt = findModel(models, "gpt-4o");
+```
+
+In the browser the cache lives in memory for the life of the page, there is no config file
+(`loadConfig()` returns `{}`, the built-in workload profiles remain), and `diffModels()` compares
+against the previous call in the same page. The CLI and MCP server are Node only.
 
 ### Raw API Access
 
@@ -515,6 +616,7 @@ import {
   OpenRouterResponseSchema,
   ModelsDevResponseSchema,
   LlmModelsConfigSchema, // the config file format
+  BrowserSupportSchema, // a probeBrowserSupport verdict
 } from "llm-models";
 ```
 
@@ -531,6 +633,7 @@ import type {
   NormalizedCost,
   Capabilities,
   ProviderInfo,
+  BrowserSupport,
   ModelFilter,
   ModelSortField,
   CostEstimate,

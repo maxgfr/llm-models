@@ -1,7 +1,51 @@
-import type { ProviderInfo, UnifiedModel } from "../types";
+import { getCacheTtl, readCache, writeCache } from "../cache-core";
+import type { BrowserSupport, ProviderInfo, UnifiedModel } from "../types";
+import { DEFAULT_PROBE_ORIGIN, type ProbeManyOptions, probeBrowserSupportAll } from "./browser";
 import { fetchUnifiedData } from "./normalize";
 
-export async function getProvider(providerId: string): Promise<ProviderInfo> {
+export interface ProviderOptions {
+  /**
+   * Also probe whether a web page can call each provider directly (CORS) and
+   * attach the verdict as `browser`. `true` probes from https://example.com;
+   * pass options to set the origin, a fetch implementation or the concurrency.
+   * Verdicts are cached like API responses, unless a custom fetch is given.
+   */
+  browser?: boolean | ProbeManyOptions;
+}
+
+function browserCacheKey(origin: string): string {
+  return `browser-${origin.replace(/[^a-z0-9]+/gi, "_")}`;
+}
+
+async function withBrowserSupport(
+  providers: ProviderInfo[],
+  browser: true | ProbeManyOptions,
+): Promise<ProviderInfo[]> {
+  const options = browser === true ? {} : browser;
+  const key = browserCacheKey(options.origin ?? DEFAULT_PROBE_ORIGIN);
+  const cacheable = options.fetch === undefined;
+
+  // The file is one map for every provider, so each verdict also ages on its own.
+  const now = Date.now();
+  const fresh: Record<string, BrowserSupport> = {};
+  for (const [id, support] of Object.entries(
+    (cacheable ? readCache<Record<string, BrowserSupport>>(key) : null) ?? {},
+  )) {
+    if (now - Date.parse(support.checked_at) <= getCacheTtl()) fresh[id] = support;
+  }
+
+  const missing = providers.filter((p) => !fresh[p.id]);
+  const probed = missing.length > 0 ? await probeBrowserSupportAll(missing, options) : {};
+  const all = { ...fresh, ...probed };
+  if (cacheable && missing.length > 0) writeCache(key, all);
+
+  return providers.map((p) => ({ ...p, browser: all[p.id] }));
+}
+
+export async function getProvider(
+  providerId: string,
+  options: ProviderOptions = {},
+): Promise<ProviderInfo> {
   const { models: allModels, modelsDevData } = await fetchUnifiedData();
 
   const providerModels = allModels.filter(
@@ -16,7 +60,7 @@ export async function getProvider(providerId: string): Promise<ProviderInfo> {
   const id = providerModels[0].provider;
   const devProvider = modelsDevData[id];
 
-  return {
+  const provider: ProviderInfo = {
     id,
     name: devProvider?.name ?? id,
     model_count: providerModels.length,
@@ -26,9 +70,11 @@ export async function getProvider(providerId: string): Promise<ProviderInfo> {
     api: devProvider?.api,
     models: providerModels,
   };
+  if (!options.browser) return provider;
+  return (await withBrowserSupport([provider], options.browser))[0];
 }
 
-export async function listProviders(): Promise<ProviderInfo[]> {
+export async function listProviders(options: ProviderOptions = {}): Promise<ProviderInfo[]> {
   const { models: allModels, modelsDevData } = await fetchUnifiedData();
 
   const providerMap = new Map<string, UnifiedModel[]>();
@@ -53,5 +99,7 @@ export async function listProviders(): Promise<ProviderInfo[]> {
     });
   }
 
-  return providers.sort((a, b) => b.model_count - a.model_count);
+  providers.sort((a, b) => b.model_count - a.model_count);
+  if (!options.browser) return providers;
+  return withBrowserSupport(providers, options.browser);
 }

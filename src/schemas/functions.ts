@@ -47,6 +47,31 @@ export const UnifiedModelSchema = z.object({
   }),
 });
 
+/**
+ * Whether a web page on `origin` can call the provider's API directly (CORS),
+ * as observed by `probeBrowserSupport`. It says nothing about whether it is wise:
+ * the page then holds the user's API key.
+ */
+export const BrowserSupportSchema = z.object({
+  /** The provider's CORS preflight lets `origin` send an authenticated JSON POST. */
+  callable: z.boolean(),
+  /** Headers the page must also send for the call to be allowed. */
+  required_headers: z.record(z.string(), z.string()).optional(),
+  /** The page origin the probe announced. */
+  origin: z.string(),
+  /** The URL probed (the provider's chat endpoint), when a base URL is known. */
+  url: z.string().optional(),
+  /**
+   * What the verdict rests on: the preflight answer, a simple GET tried after
+   * the preflight was refused, or nothing (no base URL, network failure).
+   */
+  evidence: z.enum(["preflight", "get", "none"]),
+  /** Why the provider is not callable, or what the GET fallback showed. */
+  reason: z.string().optional(),
+  /** ISO timestamp of the probe. */
+  checked_at: z.string(),
+});
+
 export const ProviderInfoSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -56,6 +81,8 @@ export const ProviderInfoSchema = z.object({
   npm: z.string().optional(),
   api: z.string().optional(),
   models: z.array(UnifiedModelSchema),
+  /** Present only when browser support was asked for (`listProviders({ browser: true })`). */
+  browser: BrowserSupportSchema.optional(),
 });
 
 export const CapabilityEnum = z.enum([

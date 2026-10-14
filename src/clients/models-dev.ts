@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { readCache, writeCache } from "../cache";
+import { readCache, writeCache } from "../cache-core";
 import { debug } from "../log";
 import { ModelsDevModelSchema, ModelsDevProviderSchema } from "../schemas/models-dev";
 import type { ModelsDevModel, ModelsDevResponse } from "../types";

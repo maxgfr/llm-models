@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type {
+  BrowserSupportSchema,
   CapabilitiesSchema,
   CostEstimateSchema,
   LlmModelsConfigSchema,
@@ -29,6 +30,7 @@ export type UnifiedModel = z.infer<typeof UnifiedModelSchema>;
 export type NormalizedCost = z.infer<typeof NormalizedCostSchema>;
 export type Capabilities = z.infer<typeof CapabilitiesSchema>;
 export type ProviderInfo = z.infer<typeof ProviderInfoSchema>;
+export type BrowserSupport = z.infer<typeof BrowserSupportSchema>;
 export type ModelFilter = z.infer<typeof ModelFilterSchema>;
 export type ModelSortField = z.infer<typeof ModelSortFieldSchema>;
 export type CostEstimate = z.infer<typeof CostEstimateSchema>;
