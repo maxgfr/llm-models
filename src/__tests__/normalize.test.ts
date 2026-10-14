@@ -150,6 +150,15 @@ describe("normalizeOpenRouterModel", () => {
     expect(result.capabilities.reasoning).toBe(true);
   });
 
+  it("infers reasoning from the reasoning parameter, which most reasoning models bill as output", () => {
+    // e.g. anthropic/claude-haiku-5.5: "reasoning" in supported_parameters, no internal_reasoning price
+    const result = normalizeOpenRouterModel({
+      ...mockModel,
+      supported_parameters: ["temperature", "reasoning", "include_reasoning"],
+    });
+    expect(result.capabilities.reasoning).toBe(true);
+  });
+
   it("does not infer capabilities without evidence", () => {
     const result = normalizeOpenRouterModel(mockModel);
     expect(result.capabilities.tool_call).toBeUndefined();

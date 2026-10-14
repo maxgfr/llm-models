@@ -65,8 +65,12 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
     capabilities: {
       tool_call: model.supported_parameters.includes("tools") ? true : undefined,
       structured_output: model.supported_parameters.includes("response_format") ? true : undefined,
+      // The "reasoning" parameter is the signal: most reasoning models bill their
+      // thinking as output, so only a few carry an internal_reasoning price.
       reasoning:
-        model.pricing.internal_reasoning && Number.parseFloat(model.pricing.internal_reasoning) > 0
+        model.supported_parameters.includes("reasoning") ||
+        (model.pricing.internal_reasoning &&
+          Number.parseFloat(model.pricing.internal_reasoning) > 0)
           ? true
           : undefined,
     },
