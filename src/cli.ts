@@ -74,9 +74,13 @@ function integer(value: string): number {
   return parsed;
 }
 
+/** The whole value as a number: "1,5" is an error, not 1. */
 function decimal(value: string): number {
-  const parsed = Number.parseFloat(value);
-  if (Number.isNaN(parsed)) throw new InvalidArgumentError("Expected a number");
+  const trimmed = value.trim();
+  const parsed = Number(trimmed);
+  if (trimmed === "" || !Number.isFinite(parsed)) {
+    throw new InvalidArgumentError("Expected a number");
+  }
   return parsed;
 }
 

@@ -154,6 +154,15 @@ describe("find output", () => {
     expect(lines(stdout)).toHaveLength(TOTAL + 2);
   });
 
+  it("rejects a cost with trailing characters instead of reading its prefix", async () => {
+    for (const value of ["1,5", "2abc", "1.2.3", ""]) {
+      const { stderr, code } = await run("find", "--max-cost", value);
+      expect(code).toBe(1);
+      expect(stderr).toContain("Expected a number");
+    }
+    expect((await run("find", "--max-cost", "2.5", "-c")).stdout.trim()).toBe("4");
+  });
+
   it("rejects --desc without --sort", async () => {
     const { stderr, code } = await run("find", "--desc");
     expect(code).toBe(1);
