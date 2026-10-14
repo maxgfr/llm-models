@@ -1,4 +1,5 @@
 import type { ModelsDevResponse, UnifiedModel } from "../types";
+import { providerBaseUrl } from "./browser";
 import { fetchUnifiedData } from "./normalize";
 
 export type ResolveMatchedBy = "endpoint" | "provider" | "global";
@@ -212,7 +213,8 @@ function providersNamedByHost(host: string, data: ModelsDevResponse): string[] {
  * models.dev provider ids that serve `endpoint`, best first. Providers whose
  * documented `api` URL lives on the same host come first, those whose api path
  * shares a longer prefix with the endpoint path ranking higher so a coding-plan
- * endpoint beats the generic one. Providers that have no documented `api` but
+ * endpoint beats the generic one; a provider models.dev documents no `api` for
+ * counts with its known default base URL (`DEFAULT_BASE_URLS`). Providers with neither but
  * whose id names the host (api.anthropic.com -> "anthropic") follow, so the
  * vendor's own endpoint never falls through to a reseller.
  */
@@ -225,8 +227,10 @@ export function providersForEndpoint(endpoint: string, data: ModelsDevResponse):
 
   const scored: Array<{ id: string; shared: number }> = [];
   for (const [id, provider] of Object.entries(data)) {
-    if (!provider.api) continue;
-    const providerUrl = parseUrl(provider.api);
+    // models.dev's api, else the vendor's known base URL (api.together.xyz for togetherai).
+    const api = providerBaseUrl({ id, api: provider.api });
+    if (!api) continue;
+    const providerUrl = parseUrl(api);
     if (!providerUrl || normalizeHost(providerUrl.hostname) !== host) continue;
     scored.push({ id, shared: sharedPrefixLength(wantedPath, pathSegments(providerUrl.pathname)) });
   }

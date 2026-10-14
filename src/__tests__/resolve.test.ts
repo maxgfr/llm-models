@@ -127,6 +127,7 @@ const modelsDev = {
   anthropic: { id: "anthropic", name: "Anthropic", models: {} },
   google: { id: "google", name: "Google", models: {} },
   xai: { id: "xai", name: "xAI", models: {} },
+  togetherai: { id: "togetherai", name: "Together AI", models: {} },
   nan: { id: "nan", name: "Nan", models: {} },
   "nano-gpt": { id: "nano-gpt", name: "NanoGPT", api: "https://nano-gpt.com/api/v1", models: {} },
   // biome-ignore lint/suspicious/noTemplateCurlyInString: mirrors the literal placeholder models.dev publishes
@@ -182,6 +183,11 @@ describe("providersForEndpoint", () => {
       providersForEndpoint("https://generativelanguage.googleapis.com/v1beta", modelsDev),
     ).toEqual(["google"]);
     expect(providersForEndpoint("https://api.x.ai/v1", modelsDev)).toEqual(["xai"]);
+  });
+
+  it("knows the default base URL of a provider whose id does not name its host", () => {
+    // models.dev documents no api for togetherai, and "togetherai" is not in api.together.xyz.
+    expect(providersForEndpoint("https://api.together.xyz/v1", modelsDev)).toEqual(["togetherai"]);
   });
 
   it("ranks documented api hosts before host-name matches, without duplicates", () => {
