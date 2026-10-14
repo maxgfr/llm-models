@@ -609,7 +609,7 @@ export function createProgram(): Command {
     .description("Find the cheapest models matching your criteria")
     .addOption(choice("-C, --capability <cap>", "Filter by capability", CAPABILITIES))
     .option("--min-context <n>", "Min context window size", integer)
-    .option("-n, --limit <n>", "Max results", integer, 10)
+    .option("-n, --limit <n>", "Max results; 0 = all", integer, 10)
     .option("--json", "Output raw JSON")
     .addOption(choice("--format <fmt>", "Output format", FORMATS))
     .action(
@@ -911,7 +911,7 @@ export function createProgram(): Command {
     .addArgument(new Argument("[use-case]", "Use case").choices(Object.keys(listUseCases())))
     .option("--max-cost <n>", "Max input cost budget ($/M tokens)", decimal)
     .option("--min-context <n>", "Min context window", integer)
-    .option("-n, --limit <n>", "Max results", integer, 10)
+    .option("-n, --limit <n>", "Max results; 0 = all", integer, 10)
     .option("--list", "List available use cases")
     .option("--json", "Output raw JSON")
     .addOption(choice("--format <fmt>", "Output format", FORMATS))

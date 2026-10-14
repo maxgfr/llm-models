@@ -68,6 +68,7 @@ export async function cheapestModels(options?: {
 
   models = sortModels(models, "cost_input");
 
+  // 0 (or less) means all, as for find and recommend.
   const limit = options?.limit ?? 10;
-  return models.slice(0, limit);
+  return limit > 0 ? models.slice(0, limit) : models;
 }

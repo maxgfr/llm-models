@@ -125,3 +125,12 @@ describe("projectCost", () => {
     expect(projectCost(2, { daily: 0 })).toEqual({ daily_cost_usd: 0, monthly_cost_usd: 0 });
   });
 });
+
+describe("cheapestModels", () => {
+  it("returns every match for limit 0, as find and recommend do", async () => {
+    mockBothAPIs();
+    const { cheapestModels } = await import("../functions/cost");
+    expect(await cheapestModels({ limit: 0 })).toHaveLength(1);
+    expect(await cheapestModels({ limit: 1 })).toHaveLength(1);
+  });
+});
