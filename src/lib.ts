@@ -13,10 +13,12 @@ export type {
 } from "./functions/browser";
 export {
   BROWSER_REQUIRED_HEADERS,
+  browserModelCatalog,
   cheapestModels,
   compareModels,
   DEFAULT_BASE_URLS,
   DEFAULT_PROBE_ORIGIN,
+  describeBrowserModel,
   diffModels,
   estimateCost,
   fetchUnifiedData,
@@ -28,6 +30,7 @@ export {
   getProvider,
   getStats,
   latestModels,
+  listBrowserModels,
   listProviders,
   listUseCases,
   mergeModels,
@@ -41,12 +44,20 @@ export {
   QueryBuilder,
   query,
   readField,
+  recommendBrowserModel,
   recommendModels,
   resolveModel,
   sortModels,
 } from "./functions/index";
 export type { ProviderOptions } from "./functions/provider";
 export {
+  BrowserModelCatalogSchema,
+  BrowserModelNeedSchema,
+  BrowserModelQualitySchema,
+  BrowserModelRecommendationOptionsSchema,
+  BrowserModelRecommendationSchema,
+  BrowserModelRecordSchema,
+  BrowserModelSchema,
   BrowserSupportSchema,
   CapabilitiesSchema,
   CostEstimateSchema,
@@ -76,6 +87,13 @@ export {
   OpenRouterTopProviderSchema,
 } from "./schemas/openrouter";
 export type {
+  BrowserModel,
+  BrowserModelCatalog,
+  BrowserModelNeed,
+  BrowserModelQuality,
+  BrowserModelRecommendation,
+  BrowserModelRecommendationOptions,
+  BrowserModelRecord,
   BrowserSupport,
   Capabilities,
   CostEstimate,

@@ -2,7 +2,7 @@
 
 Fetch latest LLM models from [OpenRouter](https://openrouter.ai) and [models.dev](https://models.dev) APIs.
 
-Validates API responses with [Zod](https://zod.dev) schemas to detect breaking changes. Provides smart wrapper functions for model discovery, comparison, cost estimation, recommendations, statistics, and provider info. Features local caching, MCP server integration, multiple output formats, and a fluent query builder API. The library also runs in the browser, and can tell which providers a web page may call directly (CORS).
+Validates API responses with [Zod](https://zod.dev) schemas to detect breaking changes. Provides smart wrapper functions for model discovery, comparison, cost estimation, recommendations, statistics, and provider info. Features local caching, MCP server integration, multiple output formats, and a fluent query builder API. The library also runs in the browser, can tell which providers a web page may call directly (CORS), and can pick the best model a device can run itself on WebGPU (WebLLM).
 
 ## Installation
 
@@ -219,6 +219,36 @@ llm-models recommend vision -n 5
 ```
 
 Available use cases: `code-gen`, `vision`, `cheap-chatbot`, `reasoning`, `long-context`, `open-source`, `audio`, `tool-use`.
+
+#### Models that run in the browser
+
+List the models WebLLM runs on WebGPU inside a page, and pick the best one a device can hold
+(see [Browser models](#browser-models-webgpu) for where the data comes from and how the pick is
+ranked):
+
+```bash
+# Every prebuilt WebLLM model: family, size, quantization, VRAM, download, context, score
+llm-models browser-models
+llm-models local --family qwen          # `local` is an alias
+
+# The best chat model for 3 GB of GPU memory, with the reason and runner-ups
+llm-models local --recommend --vram 3000
+
+# Constraints: download budget, abilities, no shader-f16, phone-class models only
+llm-models local --recommend --vram 4000 --download 2000 --need multilingual,json
+llm-models local --recommend --vram 4000 --no-shader-f16 --low-resource --json
+```
+
+| Option | Description |
+|--------|-------------|
+| `--recommend` | Pick the best model for `--vram`; exits 1 when nothing fits |
+| `--vram <mb>` | GPU memory budget in MB (with `--recommend`), or a VRAM filter for the list |
+| `--download <mb>` | Largest acceptable weight download in MB |
+| `--need <needs>` | `json`, `multilingual`, `reasoning`, `long_context` (comma-separated or repeated) |
+| `--no-shader-f16` | The WebGPU adapter lacks `shader-f16`: only f32-compute (`q4f32`) models |
+| `--low-resource` | Only models WebLLM marks `low_resource_required` |
+| `--family <name>` | List only this family (qwen, llama, gemma, phi, smollm, mistral…) |
+| `--json` / `--format <fmt>` | Output format |
 
 #### Statistics
 
@@ -597,6 +627,78 @@ In the browser the cache lives in memory for the life of the page, there is no c
 (`loadConfig()` returns `{}`, the built-in workload profiles remain), and `diffModels()` compares
 against the previous call in the same page. The CLI and MCP server are Node only.
 
+### Browser models (WebGPU)
+
+Models a page can run itself, on the device's GPU, with no API key and nothing sent anywhere:
+the prebuilt models of [WebLLM](https://github.com/mlc-ai/web-llm) (`@mlc-ai/web-llm`). The catalog
+ships inside the package, so both calls are synchronous and work offline, in Node and the browser:
+
+```typescript
+import { listBrowserModels, recommendBrowserModel } from "llm-models";
+
+const all = listBrowserModels(); // every WebLLM prebuilt model, described
+
+const pick = recommendBrowserModel({
+  vram_budget_mb: 3000,          // GPU memory the page may use
+  download_budget_mb: 2000,      // optional: largest weight download
+  needs: ["multilingual", "json"], // optional: json, multilingual, reasoning, long_context
+  shader_f16: true,              // optional: false when the adapter lacks shader-f16
+});
+// {
+//   model: { id: "Qwen3.5-2B-q4f16_1-MLC", family: "qwen", series: "Qwen3.5", params_b: 2,
+//            quantization: "q4f16_1", vram_required_mb: 2245.44, download_mb: 1059.3,
+//            context_window: 4096, multilingual: true, structured_output: true, reasoning: true,
+//            quality: { metric: "MMLU-Redux", value: 69.2, source: "…" }, … },
+//   reason: "Qwen3.5 2B (q4f16_1) needs 2245 MB of GPU memory, within the 3000 MB budget; …",
+//   alternatives: [ /* up to 3 runner-ups, one build per model */ ]
+// }
+```
+
+Pass `model.id` to WebLLM's `CreateMLCEngine`. `recommendBrowserModel` returns `null` when nothing
+fits. A second argument ranks another list of models (e.g. a filtered `listBrowserModels()`).
+
+**Where the data comes from.** `src/data/browser-models.json` is generated, never typed:
+`bun run catalog:browser` downloads the `@mlc-ai/web-llm` npm tarball (checked against the
+registry's sha512), reads its `prebuiltAppConfig` (model id, Hugging Face repo, WebGPU library,
+`vram_required_MB`, `low_resource_required`, `required_features`, context override) and
+`functionCallingModelIds`, then each repo's `tensor-cache.json` (weight shards, so the download
+size, and the parameter bytes) and `mlc-chat-config.json` (compiled context). A value it cannot
+fetch is `null`. The library never imports `@mlc-ai/web-llm`; the source package version is in
+`browserModelCatalog().source`. Family, size (from the id, else from the weights) and quantization
+are read from the id.
+
+Each model also tells:
+
+- `structured_output`: WebLLM's JSON mode (`response_format` `json_object`, with or without a JSON
+  schema, or a grammar) is grammar-constrained decoding built into every model library, so every
+  text model has it; `function_calling` is true only for the models WebLLM lists for `tools`.
+- `multilingual`: the model card claims languages beyond English (Qwen, Llama 3.1/3.2, Gemma 3/4,
+  Phi-3.5/4-mini, Ministral 3, Gemma 2 JPN). SmolLM2, OLMo 2, Gemma 2, Phi-3 and the community
+  fine-tunes say English.
+- `reasoning`: reasoning-only models (DeepSeek-R1 distills, Ministral 3 Reasoning) and hybrid
+  ones that think on request (Qwen3, Qwen3.5: WebLLM's `extra_body.enable_thinking`).
+- `released`: the month the vendor announced the series.
+
+**How the pick is ranked.** Only chat models qualify (no base, coder, math, vision or embedding
+model; reasoning-only models only when `reasoning` is needed), and only when WebLLM's
+`vram_required_MB` fits the budget. Then, each rule breaking the ties of the previous one:
+
+1. WebLLM's full 4,096-token context before a variant squeezed to 1k or 2k.
+2. Published quality: the instruct model's **MMLU-Redux** score (non-thinking mode), mostly from
+   the [Qwen3](https://arxiv.org/abs/2505.09388) and [Qwen2.5](https://arxiv.org/abs/2412.15115)
+   technical reports, which ran Llama, Gemma and Phi under the same protocol, and the Qwen3.5 model
+   cards. A model without a comparable score is placed level with the best older, no larger model
+   of its own family (Qwen3.5-4B with Qwen3-4B), so a vendor's new generation never ranks below
+   the one it replaces. Models with no score at all come after every scored one, and the `reason`
+   says so.
+3. Newer generation, then more parameters.
+4. `q4f16` first (WebLLM's smallest build; fp16 compute needs the `shader-f16` WebGPU feature,
+   so pass `shader_f16: false` when the adapter lacks it to get `q4f32` builds).
+
+Scores are vendor-run and read as an ordering, not a truth; every row cites its table in
+`src/functions/browser-models.ts`. On the shipped catalog, 1,500 MB picks Qwen3-0.6B,
+3,000 MB Qwen3.5-2B, 4,096 MB Qwen3.5-4B and 6,000 MB Qwen3-8B.
+
 ### Raw API Access
 
 ```typescript
@@ -617,6 +719,8 @@ import {
   ModelsDevResponseSchema,
   LlmModelsConfigSchema, // the config file format
   BrowserSupportSchema, // a probeBrowserSupport verdict
+  BrowserModelSchema, // a listBrowserModels entry
+  BrowserModelRecommendationSchema, // a recommendBrowserModel result
 } from "llm-models";
 ```
 
@@ -634,6 +738,9 @@ import type {
   Capabilities,
   ProviderInfo,
   BrowserSupport,
+  BrowserModel,
+  BrowserModelRecommendation,
+  BrowserModelRecommendationOptions,
   ModelFilter,
   ModelSortField,
   CostEstimate,
@@ -659,6 +766,9 @@ Use llm-models in CI/CD to check model costs and status:
 
 - **OpenRouter**: https://openrouter.ai/api/v1/models
 - **models.dev**: https://models.dev/api.json
+- **WebLLM prebuilt models** (browser models): the `@mlc-ai/web-llm` npm package's
+  `prebuiltAppConfig` and the models' Hugging Face repos, captured at build time (see
+  [Browser models](#browser-models-webgpu))
 
 The two describe *different endpoints* for the same model id, so a merged entry takes its
 `context_length` and `output_limit` as a pair from one source (models.dev first, since it is

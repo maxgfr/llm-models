@@ -28,6 +28,11 @@ import {
   parseTokenCount,
 } from "./format";
 import { DEFAULT_PROBE_ORIGIN } from "./functions/browser";
+import {
+  browserModelCatalog,
+  listBrowserModels,
+  recommendBrowserModel,
+} from "./functions/browser-models";
 import { compareModels } from "./functions/compare";
 import { cheapestModels, estimateCost, projectCost } from "./functions/cost";
 import { diffModels } from "./functions/diff";
@@ -41,12 +46,15 @@ import { filterModels, sortModels } from "./functions/search";
 import { getStats } from "./functions/stats";
 import { setVerbose } from "./log";
 import {
+  BrowserModelNeedSchema,
   CapabilityEnum,
   ModelFilterSchema,
   ModelSortFieldSchema,
   OutputFormatSchema,
 } from "./schemas/functions";
 import type {
+  BrowserModel,
+  BrowserModelNeed,
   BrowserSupport,
   Capabilities,
   ModelFilter,
@@ -58,6 +66,7 @@ const CAPABILITIES = CapabilityEnum.options;
 const STATUSES = ModelFilterSchema.shape.status.unwrap().options;
 const SORT_FIELDS = ModelSortFieldSchema.options;
 const FORMATS = OutputFormatSchema.options;
+const BROWSER_NEEDS = BrowserModelNeedSchema.options;
 
 // An enum option: a bad value aborts with "error: option '--x' argument 'y' is
 // invalid. Allowed choices are ..." and exit code 1 instead of silently
@@ -96,6 +105,46 @@ function origin(value: string): string {
     throw new InvalidArgumentError("Expected an http(s) origin such as https://app.example.com");
   }
   return parsed.origin;
+}
+
+/** "json,multilingual" → validated needs; repeated --need flags accumulate. */
+function needList(value: string, previous: BrowserModelNeed[] = []): BrowserModelNeed[] {
+  const needs = [...previous];
+  for (const raw of value.split(",")) {
+    const need = raw.trim();
+    if (!need) continue;
+    if (!(BROWSER_NEEDS as readonly string[]).includes(need)) {
+      throw new InvalidArgumentError(`Allowed needs are ${BROWSER_NEEDS.join(", ")}`);
+    }
+    if (!needs.includes(need as BrowserModelNeed)) needs.push(need as BrowserModelNeed);
+  }
+  return needs;
+}
+
+const BROWSER_MODEL_HEADERS = [
+  "ID",
+  "Family",
+  "Params",
+  "Quant",
+  "VRAM MB",
+  "Download MB",
+  "Context",
+  "Low-res",
+  "Score",
+];
+
+function browserModelRow(m: BrowserModel): string[] {
+  return [
+    m.id,
+    m.family,
+    m.params_b != null ? `${m.params_b}B` : "-",
+    m.quantization,
+    String(Math.round(m.vram_required_mb)),
+    m.download_mb != null ? String(Math.round(m.download_mb)) : "-",
+    m.context_window != null ? String(m.context_window) : "-",
+    m.low_resource_required ? "yes" : "no",
+    m.quality ? `${m.quality.metric} ${m.quality.value}` : "-",
+  ];
 }
 
 /** The provider list's Browser column. */
@@ -962,6 +1011,115 @@ export function createProgram(): Command {
         }
 
         outputFormatted(fmt, MODEL_HEADERS, result.models.map(modelRow), result.models);
+      },
+    );
+
+  // --- Browser models command ---
+
+  program
+    .command("browser-models")
+    .alias("local")
+    .description("Models that run inside the browser on WebGPU (WebLLM prebuilt models)")
+    .option("--recommend", "Pick the best model for a GPU memory budget (needs --vram)")
+    .option("--vram <mb>", "GPU memory budget in MB", decimal)
+    .option("--download <mb>", "Largest acceptable weight download in MB", decimal)
+    .option(
+      `--need <needs>`,
+      `Required abilities, comma-separated: ${BROWSER_NEEDS.join(", ")}`,
+      needList,
+    )
+    .option("--no-shader-f16", "The WebGPU adapter lacks shader-f16: f32-compute models only")
+    .option("--low-resource", "Only models WebLLM marks as fit for limited devices")
+    .option("--family <name>", "List only this family (qwen, llama, gemma, phi…)")
+    .option("--json", "Output raw JSON")
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
+    .action(
+      (options: {
+        recommend?: boolean;
+        vram?: number;
+        download?: number;
+        need?: BrowserModelNeed[];
+        shaderF16?: boolean;
+        lowResource?: boolean;
+        family?: string;
+        json?: boolean;
+        format?: OutputFormat;
+      }) => {
+        const fmt = resolveFormat(options);
+        const shaderF16 = options.shaderF16 === false ? false : undefined;
+
+        if (options.recommend) {
+          if (options.vram == null || options.vram <= 0) {
+            throw new Error("--recommend needs --vram <mb>, the GPU memory budget in MB");
+          }
+          const result = recommendBrowserModel({
+            vram_budget_mb: options.vram,
+            download_budget_mb: options.download,
+            needs: options.need,
+            shader_f16: shaderF16,
+            low_resource: options.lowResource,
+          });
+          if (fmt === "json") {
+            console.log(JSON.stringify(result, null, 2));
+            if (!result) process.exitCode = 1;
+            return;
+          }
+          if (!result) {
+            console.error(`No browser model fits ${options.vram} MB with these constraints.`);
+            process.exitCode = 1;
+            return;
+          }
+          if (fmt !== "table") {
+            const picks = [result.model, ...result.alternatives];
+            outputFormatted(fmt, BROWSER_MODEL_HEADERS, picks.map(browserModelRow), result);
+            return;
+          }
+          const m = result.model;
+          console.log(`${bold("Recommended:")} ${green(m.id)}`);
+          console.log(
+            dim(
+              `  ${m.series}, ${m.params_b ?? "?"}B, ${m.quantization}, ${Math.round(m.vram_required_mb)} MB VRAM, ` +
+                `${m.download_mb != null ? `${Math.round(m.download_mb)} MB download` : "download size unknown"}, ` +
+                `${m.context_window ?? "?"}-token context`,
+            ),
+          );
+          console.log(`\n${bold("Why:")} ${result.reason}`);
+          if (result.alternatives.length > 0) {
+            console.log(`\n${bold("Alternatives:")}`);
+            for (const alt of result.alternatives) {
+              const score = alt.quality ? `, ${alt.quality.metric} ${alt.quality.value}` : "";
+              console.log(
+                `  ${cyan(alt.id)} ${dim(`(${Math.round(alt.vram_required_mb)} MB${score})`)}`,
+              );
+            }
+          }
+          return;
+        }
+
+        let models = listBrowserModels();
+        if (options.family) {
+          const family = options.family.toLowerCase();
+          models = models.filter((m) => m.family === family);
+        }
+        if (options.vram != null) {
+          const budget = options.vram;
+          models = models.filter((m) => m.vram_required_mb <= budget);
+        }
+        if (options.download != null) {
+          const budget = options.download;
+          models = models.filter((m) => m.download_mb != null && m.download_mb <= budget);
+        }
+        if (options.lowResource) models = models.filter((m) => m.low_resource_required);
+        if (shaderF16 === false) models = models.filter((m) => m.compute_dtype === "f32");
+        if (fmt === "table") {
+          const { source } = browserModelCatalog();
+          console.log(
+            dim(
+              `${models.length} models from ${source.package}@${source.version} (${source.model_version})\n`,
+            ),
+          );
+        }
+        outputFormatted(fmt, BROWSER_MODEL_HEADERS, models.map(browserModelRow), models);
       },
     );
 

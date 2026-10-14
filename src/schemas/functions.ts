@@ -176,3 +176,118 @@ export const ModelComparisonSchema = z.object({
     ),
   }),
 });
+
+// --- Models that run inside the browser (WebGPU, WebLLM) ---
+
+/**
+ * One prebuilt WebLLM model as `scripts/build-browser-models.ts` extracts it
+ * from @mlc-ai/web-llm's `prebuiltAppConfig` and the model's Hugging Face repo.
+ * Every field is copied, none is typed by hand; `null` means "not published".
+ */
+export const BrowserModelRecordSchema = z.object({
+  /** WebLLM's `model_id`, what `CreateMLCEngine` takes. */
+  model_id: z.string(),
+  /** Hugging Face repo holding the weights. */
+  model: z.string(),
+  /** URL of the compiled WebGPU library (wasm). */
+  model_lib: z.string(),
+  model_type: z.enum(["llm", "embedding", "vlm"]),
+  vram_required_mb: z.number().positive(),
+  /** WebLLM: "whether the model can run on limited devices (e.g. Android phone)". */
+  low_resource_required: z.boolean(),
+  /** Context WebLLM loads the model with (`overrides.context_window_size`). */
+  context_window: z.number().int().positive().nullable(),
+  /** Context the model library was compiled for (`mlc-chat-config.json`). */
+  config_context_window: z.number().int().positive().nullable(),
+  /** WebGPU features the device must expose (e.g. `shader-f16`). */
+  required_features: z.array(z.string()),
+  buffer_size_required_bytes: z.number().nullable(),
+  /** Listed in WebLLM's `functionCallingModelIds` (`tools` in requests). */
+  function_calling: z.boolean(),
+  /** Sum of the weight shards in the repo's tensor-cache.json: the download. */
+  weights_bytes: z.number().nonnegative().nullable(),
+  /** `ParamBytes` / `BitsPerParam` from tensor-cache.json metadata. */
+  param_bytes: z.number().nonnegative().nullable(),
+  bits_per_param: z.number().positive().nullable(),
+});
+
+/** `src/data/browser-models.json`: the extracted catalog and where it came from. */
+export const BrowserModelCatalogSchema = z.object({
+  source: z.object({
+    package: z.string(),
+    version: z.string(),
+    /** WebLLM's `modelVersion`: the prebuilt libraries this npm version loads. */
+    model_version: z.string(),
+    tarball: z.string(),
+    generated_at: z.string(),
+  }),
+  models: z.array(BrowserModelRecordSchema),
+});
+
+export const BrowserModelNeedSchema = z.enum(["json", "multilingual", "reasoning", "long_context"]);
+
+/** A published, cited benchmark score backing a ranking. */
+export const BrowserModelQualitySchema = z.object({
+  metric: z.string(),
+  value: z.number(),
+  source: z.string(),
+});
+
+/** A browser model with what its id, its family and the catalog tell about it. */
+export const BrowserModelSchema = z.object({
+  id: z.string(),
+  /** Vendor line: qwen, llama, gemma, phi, smollm, mistral… */
+  family: z.string(),
+  /** Generation within the family: "Qwen3.5", "Llama-3.2", "gemma-2"… */
+  series: z.string(),
+  /** Release month of the series (YYYY-MM), from the vendor's model card. */
+  released: z.string().nullable(),
+  kind: z.enum(["llm", "embedding", "vlm"]),
+  /** chat = instruction/chat tuned; reasoning = always thinks; base = not instruction tuned. */
+  variant: z.enum(["chat", "reasoning", "base", "coder", "math", "vision", "embedding"]),
+  /** Billions of parameters ("E2B" counts the effective 2B). */
+  params_b: z.number().positive().nullable(),
+  /** "id" when the size is in the model id, "weights" when estimated from ParamBytes. */
+  params_source: z.enum(["id", "weights"]).nullable(),
+  /** MLC quantization code: q4f16_1 = 4-bit weights, fp16 compute. */
+  quantization: z.string(),
+  weight_bits: z.number().int().positive(),
+  compute_dtype: z.enum(["f16", "f32"]),
+  vram_required_mb: z.number().positive(),
+  low_resource_required: z.boolean(),
+  context_window: z.number().int().positive().nullable(),
+  max_context_window: z.number().int().positive().nullable(),
+  /** Weight shards to download, in MB (1e6 bytes); null when the repo publishes no manifest. */
+  download_mb: z.number().nonnegative().nullable(),
+  hf_repo: z.string(),
+  model_lib: z.string(),
+  required_features: z.array(z.string()),
+  /** JSON mode / JSON-schema output via WebLLM's grammar-constrained decoding. */
+  structured_output: z.boolean(),
+  function_calling: z.boolean(),
+  /** Can think step by step (reasoning-only models, or hybrid thinking per the model card). */
+  reasoning: z.boolean(),
+  /** The model card claims support for languages beyond English. */
+  multilingual: z.boolean(),
+  quality: BrowserModelQualitySchema.nullable(),
+});
+
+export const BrowserModelRecommendationOptionsSchema = z.object({
+  /** GPU memory the page may use, in MB (compared to WebLLM's vram_required_MB). */
+  vram_budget_mb: z.number().positive(),
+  /** Largest acceptable weight download, in MB. Models of unknown size are then skipped. */
+  download_budget_mb: z.number().positive().optional(),
+  needs: z.array(BrowserModelNeedSchema).optional(),
+  /** Whether the WebGPU adapter exposes `shader-f16`; false keeps only f32-compute models. */
+  shader_f16: z.boolean().optional(),
+  /** Only models WebLLM marks `low_resource_required` (phones, small GPUs). */
+  low_resource: z.boolean().optional(),
+  /** How many runner-up models to return (default 3). */
+  alternatives: z.number().int().nonnegative().optional(),
+});
+
+export const BrowserModelRecommendationSchema = z.object({
+  model: BrowserModelSchema,
+  reason: z.string(),
+  alternatives: z.array(BrowserModelSchema),
+});

@@ -1,5 +1,12 @@
 import type { z } from "zod";
 import type {
+  BrowserModelCatalogSchema,
+  BrowserModelNeedSchema,
+  BrowserModelQualitySchema,
+  BrowserModelRecommendationOptionsSchema,
+  BrowserModelRecommendationSchema,
+  BrowserModelRecordSchema,
+  BrowserModelSchema,
   BrowserSupportSchema,
   CapabilitiesSchema,
   CostEstimateSchema,
@@ -38,3 +45,12 @@ export type ModelComparison = z.infer<typeof ModelComparisonSchema>;
 export type OutputFormat = z.infer<typeof OutputFormatSchema>;
 export type WorkloadProfile = z.infer<typeof WorkloadProfileSchema>;
 export type LlmModelsConfig = z.infer<typeof LlmModelsConfigSchema>;
+export type BrowserModelRecord = z.infer<typeof BrowserModelRecordSchema>;
+export type BrowserModelCatalog = z.infer<typeof BrowserModelCatalogSchema>;
+export type BrowserModelNeed = z.infer<typeof BrowserModelNeedSchema>;
+export type BrowserModelQuality = z.infer<typeof BrowserModelQualitySchema>;
+export type BrowserModel = z.infer<typeof BrowserModelSchema>;
+export type BrowserModelRecommendationOptions = z.input<
+  typeof BrowserModelRecommendationOptionsSchema
+>;
+export type BrowserModelRecommendation = z.infer<typeof BrowserModelRecommendationSchema>;

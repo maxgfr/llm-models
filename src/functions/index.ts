@@ -6,6 +6,13 @@ export {
   probeBrowserSupportAll,
   providerBaseUrl,
 } from "./browser";
+export {
+  baseId,
+  browserModelCatalog,
+  describeBrowserModel,
+  listBrowserModels,
+  recommendBrowserModel,
+} from "./browser-models";
 export { compareModels } from "./compare";
 export { cheapestModels, estimateCost } from "./cost";
 export { diffModels } from "./diff";
