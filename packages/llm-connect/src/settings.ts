@@ -14,11 +14,17 @@ export interface LlmSettings {
   /** Model name on the custom endpoint. */
   customModel?: string;
   headers?: Record<string, string>;
+  /** Code of the language answers are written in, e.g. "fr" (see `RESPONSE_LANGUAGES`). */
+  language?: string;
 }
 
-/** Whether settings can call a model: an API key, or a custom endpoint (local servers need no key). */
+/**
+ * Whether settings can call a model: a custom endpoint with a model name (local
+ * servers need no key), or a provider key.
+ */
 export function isConfigured(settings: Partial<LlmSettings> | null | undefined): boolean {
-  return !!(settings?.apiKey?.trim() || settings?.customEndpoint?.trim());
+  if (settings?.customEndpoint?.trim()) return !!settings.customModel?.trim();
+  return !!settings?.apiKey?.trim();
 }
 
 /** The form a settings dialog edits. The two key slots survive toggling the custom endpoint. */
@@ -35,6 +41,8 @@ export interface LlmDraft {
   customModel: string;
   /** Keep the key on this device rather than for the session only. */
   rememberKey: boolean;
+  /** Code of the language answers are written in. */
+  language: string;
 }
 
 /** The key of the active slot. */
@@ -54,16 +62,43 @@ export function canTest(draft: LlmDraft): boolean {
   return draft.custom ? !!draft.customEndpoint.trim() : !!draft.apiKey.trim();
 }
 
-/** The endpoint as an http(s) URL without trailing slash, or null when it is not one. */
-export function validateEndpoint(url: string): string | null {
-  const trimmed = url.trim();
+/** Why an endpoint is refused: not an http(s) URL, or plain http to another machine. */
+export type EndpointProblem = "invalid-endpoint" | "insecure-endpoint";
+
+/** Whether a host name is this machine: localhost, 127.0.0.0/8 or [::1]. */
+export function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "[::1]" ||
+    /^127(?:\.\d{1,3}){3}$/.test(host)
+  );
+}
+
+/**
+ * What is wrong with an endpoint, or null when it can be called: https, or
+ * http on this machine only, so that a key never crosses the network in clear.
+ */
+export function endpointProblem(url: string): EndpointProblem | null {
+  let parsed: URL;
   try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    parsed = new URL(url.trim());
   } catch {
-    return null;
+    return "invalid-endpoint";
   }
-  return trimmed.replace(/\/+$/, "");
+  if (parsed.protocol === "https:") return null;
+  if (parsed.protocol !== "http:") return "invalid-endpoint";
+  return isLoopbackHost(parsed.hostname) ? null : "insecure-endpoint";
+}
+
+/**
+ * The endpoint without trailing slash, or null when it is not an https URL or
+ * an http URL on this machine (see {@link endpointProblem}).
+ */
+export function validateEndpoint(url: string): string | null {
+  if (endpointProblem(url)) return null;
+  return url.trim().replace(/\/+$/, "");
 }
 
 export interface EndpointPreset {

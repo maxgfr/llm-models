@@ -18,23 +18,26 @@ Two npm packages live here, built on the [models.dev](https://models.dev) and
 ## How they fit together
 
 A web app that lets users plug in their own LLM needs a list of providers and models that stays
-current, and the code to turn a user's choice into a working model. The list is built once, at build
-time; the browser only downloads a small JSON file.
+current, and the code to turn a user's choice into a working model. The list is built in the
+browser when the settings open, with a JSON file written at build time as fallback: no daily commit.
 
 ```text
- build time / daily CI                         in the browser
- ─────────────────────                         ──────────────
- models.dev + OpenRouter                       public/models.json
-          │                                           │
-          ▼                                           ▼
- llm-models catalog ──► public/models.json ──► llm-connect store ──► settings dialog
-   · only providers the app can call             · provider + recommended model
-   · recommended model per provider              · API key or local endpoint
-   · no deprecated model                         · test, save
-                                                         │
-                                                         ▼
-                                                 loadModel(settings) ──► AI SDK
-                                                 (generateText, streamText…)
+ in the browser, when settings open            fallback, written at build time
+ ──────────────────────────────────            ───────────────────────────────
+ models.dev + OpenRouter                       llm-models catalog ──► public/models.json
+          │                                                                │
+          ▼                                                                │
+ liveCatalog() (llm-models, lazy) ──── fails? ◄────────────────────────────┘
+   · only providers the app can call
+   · recommended model per provider
+          │
+          ▼
+ llm-connect store ──► settings dialog
+   · provider + recommended model, API key or local endpoint
+   · test, save (key encrypted, secureStorage)
+          │
+          ▼
+ loadModel(settings) ──► AI SDK (generateText, streamText…)
 ```
 
 Used in production by [db-schema-viewer](https://github.com/maxgfr/db-schema-viewer) and
@@ -71,14 +74,13 @@ npm install llm-connect ai @ai-sdk/openai @ai-sdk/anthropic
 ```
 
 ```ts
-import { createLlmSettingsStore, loadModel, webStorage } from "llm-connect";
+import { createLlmSettingsStore, liveCatalog, loadModel, secureStorage } from "llm-connect";
 import { generateText } from "ai";
 
-// The settings dialog's state: catalog, provider, model, key, test, save
+// The settings dialog's state: catalog, provider, model, key, language, test, save
 const store = createLlmSettingsStore({
-  catalogUrl: "/models.json",
-  storage: webStorage({ prefsKey: "my-app-ai", apiKeyKey: "my-app-ai-key" }),
-  recommended: ["openai", "anthropic"],
+  catalog: liveCatalog({ fallbackUrl: "/models.json" }),
+  storage: secureStorage({ prefsKey: "my-app-ai", dbName: "my-app-secrets" }), // key encrypted
 });
 
 // Later, anywhere in the app

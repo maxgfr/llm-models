@@ -106,6 +106,7 @@
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.2.7",
     "ai": "^6.0.308",
+    "fake-indexeddb": "^6.2.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "zod": "^4.4.3"

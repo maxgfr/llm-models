@@ -10,8 +10,10 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
 - **Five providers built in**: OpenAI, Anthropic (and Anthropic-compatible APIs), Google, Mistral,
   and every provider of the generic `@ai-sdk/openai-compatible` SDK (DeepSeek, Z.ai, Groq…).
   Each SDK loads only when used.
-- **The catalog comes from [llm-models](https://github.com/maxgfr/llm-models/tree/main/packages/llm-models)**: `llm-models catalog` writes the provider
-  and model list at build time, with a recommended model per provider.
+- **The catalog comes from [llm-models](https://github.com/maxgfr/llm-models/tree/main/packages/llm-models)**, built live in the browser
+  (`liveCatalog`) with a static `models.json` as fallback, and a recommended model per provider.
+- **The key never sits in clear text**: `secureStorage` encrypts it with AES-GCM under a
+  non-extractable key, and a custom endpoint must be https (plain http only on this machine).
 
 ## Install
 
@@ -22,7 +24,8 @@ npm install llm-connect llm-models ai @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/g
 `ai` (v6) and the `@ai-sdk/*` packages are optional peers: install the ones your users can pick.
 `react` (18+) is only needed for `llm-connect/react`.
 
-Build the catalog once, at build time or from a scheduled job:
+The store builds the catalog in the browser when settings open (see
+[The catalog](#the-catalog)). Write the fallback at build time:
 
 ```bash
 npx llm-models catalog --npm callable --require openai,anthropic,google,mistral --out public/models.json
@@ -46,6 +49,7 @@ const { text } = await generateText({ model, prompt: "Hello" });
 | `providerId`, `providerName`, `providerNpm`, `providerApi` | The catalog provider: its SDK package and base URL |
 | `customEndpoint`, `customModel` | An OpenAI-compatible server (Ollama, LM Studio, vLLM…); wins over the provider |
 | `headers` | Extra request headers |
+| `language` | Code of the language answers are written in (`"fr"`) |
 
 `createModel(settings)` does the same synchronously, for providers you registered yourself:
 
@@ -77,13 +81,15 @@ What the built-in providers take care of:
 import { testConnection } from "llm-connect";
 
 const result = await testConnection(settings, { mode: "models" });
-if (!result.ok) console.log(result.reason); // "auth" | "cors" | "http" | "timeout" | "config"
+if (!result.ok) console.log(result.reason); // "auth" | "cors" | "http" | "timeout" | "config" | "insecure"
 ```
 
 - `models` (default): `GET {base}/models` with the provider's own auth headers (`x-api-key` for
   Anthropic, `x-goog-api-key` for Google, a bearer token otherwise). 5 s for a custom endpoint, 10 s
   for a provider. Returns the model ids a server lists.
 - `generate`: a short generation through the AI SDK, exactly as the app will call the model.
+
+A custom endpoint in plain http to another machine is not called at all (`insecure`).
 
 `listEndpointModels(endpoint, apiKey?)` lists the models of an OpenAI-compatible server.
 
@@ -95,22 +101,32 @@ two key slots (the provider's and the custom endpoint's, so toggling keeps both)
 presets, connection test, validation and storage.
 
 ```ts
-import { createLlmSettingsStore, ENDPOINT_PRESETS, webStorage } from "llm-connect";
+import { createLlmSettingsStore, liveCatalog, secureStorage } from "llm-connect";
 
 const store = createLlmSettingsStore({
-  catalogUrl: "/models.json",
-  storage: webStorage({ prefsKey: "my-app-ai", apiKeyKey: "my-app-ai-key" }),
-  recommended: ["openai", "anthropic", "google", "mistral"],
-  testMode: "models",
+  catalog: liveCatalog({ fallbackUrl: "/models.json" }),
+  storage: secureStorage({ prefsKey: "my-app-ai", dbName: "my-app-secrets" }),
 });
 
 await store.load(); // saved settings → draft
-store.open(); // a dialog opens: drop unsaved edits, download the catalog
+store.open(); // a dialog opens: drop unsaved edits, load the catalog
 store.selectProvider("anthropic"); // and its recommended model
 store.setApiKey("sk-ant-…");
+store.setLanguage("fr");
 await store.test();
-const result = await store.save({ language: "fr" }); // your own fields are kept too
+const result = await store.save({ theme: "dark" }); // your own fields are kept too
+if (!result.ok) console.log(result.reason); // "incomplete" | "invalid-endpoint" | "insecure-endpoint"
 ```
+
+Options:
+
+| Option | Default | |
+|--------|---------|-|
+| `catalog` | required | A URL (`"/models.json"`) or a loader such as `liveCatalog(…)`; `catalogUrl` is a deprecated alias |
+| `storage` | required | `secureStorage(…)`, `webStorage(…)` or your own `SettingsStorage` |
+| `recommended` | `DEFAULT_RECOMMENDED` | Provider ids listed first: OpenAI, Anthropic, Google, Mistral |
+| `testMode` | `"auto"` | `auto`: the model list of a custom endpoint, a real generation for a provider; or `models` / `generate` |
+| `defaults` | | `providerId`, `model`, `rememberKey` (false), `language` (the browser's) |
 
 State (`store.getState()`): `catalog`, `catalogStatus` (`idle | loading | error | ready`),
 `catalogError`, `saved`, `draft`, `search`, `testing`, `testResult`, and derived `provider`,
@@ -119,26 +135,66 @@ State (`store.getState()`): `catalog`, `catalogStatus` (`idle | loading | error 
 
 Actions: `load`, `reset(settings)` (for settings the app already holds), `open`, `retryCatalog`, `selectProvider`, `selectModel`, `setApiKey`, `setSearch`,
 `toggleCustom`, `applyPreset(ENDPOINT_PRESETS.ollama)`, `setEndpoint`, `setCustomModel`,
-`setRememberKey`, `settings`, `test`, `save`, `clear`.
+`setRememberKey`, `setLanguage`, `settings`, `test`, `save`, `clear` (also resets the language).
+
+### The catalog
+
+`liveCatalog({ fallbackUrl, npm, required })` returns a loader that imports `llm-models` on first
+call (so Zod and the API clients stay out of the main bundle), fetches models.dev and OpenRouter,
+and keeps the providers whose SDK llm-connect calls (`CALLABLE_NPM`). If that fails (offline, an
+API down, a `required` provider missing), it downloads `fallbackUrl`. Every caller shares one
+request; a failure is forgotten, so retrying works. The page's `connect-src` must allow
+`https://models.dev` and `https://openrouter.ai`.
 
 ### Storage
 
-`webStorage` keeps the preferences in `localStorage` and the key in `sessionStorage` (forgotten
-when the tab closes), or in `localStorage` when the user ticks "remember". Every access is guarded:
-a blocked storage only means settings that last for the page. Any other scheme fits the
-`SettingsStorage` interface (`load`, optional `loadDraft`, `save`, `clear`), for instance a key
-encrypted in IndexedDB.
+`secureStorage({ prefsKey, dbName, sessionKey? })` (recommended):
 
-`isConfigured(settings)` tells whether settings can call a model (a key, or a custom endpoint).
+- preferences, without the key, in `localStorage` (JSON under `prefsKey`);
+- the key encrypted with AES-GCM 256 under a non-extractable `CryptoKey` kept in IndexedDB
+  (`dbName`), with a fresh IV on every save. A remembered key's ciphertext goes to IndexedDB;
+  otherwise to `sessionStorage`, so it survives a reload and goes away with the tab;
+- without IndexedDB or WebCrypto (some private modes), the key lasts for the page, in memory;
+- `clear()` removes the preferences, the ciphertext and the `CryptoKey`.
+
+A dump of cookies, `localStorage`, `sessionStorage` and IndexedDB never shows the key. Script
+running in the page (an XSS) can still have the browser decrypt it: a strict
+Content-Security-Policy is what protects against that.
+
+`webStorage({ prefsKey, apiKeyKey })` keeps the key in clear text, in `sessionStorage` or in
+`localStorage` when remembered; it stays for compatibility. Any other scheme fits the
+`SettingsStorage` interface (`load`, optional `loadDraft`, `save`, `clear`).
+
+`isConfigured(settings)` tells whether settings can call a model: a provider key, or a custom
+endpoint **with a model name** (local servers need no key).
+
+### Security
+
+- `endpointProblem(url)` / `validateEndpoint(url)` accept https anywhere and http only on this
+  machine (`localhost`, `127.0.0.0/8`, `[::1]`), so a key never crosses the network in clear.
+  `save()` answers `insecure-endpoint` and `testConnection` does not call such an endpoint.
+- A matching CSP: `connect-src 'self' https: http://localhost:* http://127.0.0.1:*`.
+
+### Response language
+
+`RESPONSE_LANGUAGES` lists 16 languages as `{ code, name, label }` (`fr`, `French`, `Français`).
+Settings store the code; `languageName(codeOrName)` gives the English name for a prompt (it also
+reads the names older settings stored), `toLanguageCode(value)` migrates them, and
+`browserLanguage()` is the default.
+
+```ts
+const system = `Answer in ${languageName(settings.language)}.`;
+```
 
 ## React
 
 ```tsx
 import { useEffect } from "react";
+import { liveCatalog } from "llm-connect";
 import { useLlmStore } from "llm-connect/react";
 
 function Settings({ storage }) {
-  const { state, store } = useLlmStore({ catalogUrl: "/models.json", storage, recommended: ["openai"] });
+  const { state, store } = useLlmStore({ catalog: liveCatalog({ fallbackUrl: "/models.json" }), storage });
   useEffect(() => {
     store.load().then(() => store.open());
   }, [store]);
@@ -171,10 +227,10 @@ unsubscribe), so `$store` is its state:
 
 ```svelte
 <script>
-  import { createLlmSettingsStore, webStorage } from "llm-connect";
+  import { createLlmSettingsStore, secureStorage } from "llm-connect";
   const store = createLlmSettingsStore({
-    catalogUrl: "/models.json",
-    storage: webStorage({ prefsKey: "ai", apiKeyKey: "ai-key" }),
+    catalog: "/models.json",
+    storage: secureStorage({ prefsKey: "ai", dbName: "ai-secrets" }),
   });
   store.load().then(() => store.open());
 </script>
