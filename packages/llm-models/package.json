@@ -17,6 +17,10 @@
       "types": "./build/browser.d.ts",
       "default": "./build/browser.js"
     },
+    "./catalog": {
+      "types": "./build/catalog.d.ts",
+      "default": "./build/catalog.js"
+    },
     "./package.json": "./package.json",
     "./*": "./*"
   },
@@ -60,7 +64,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build src/index.ts --outdir build --target node && bun build src/browser.ts --outdir build --target browser",
+    "build": "bun build src/index.ts --outdir build --target node && bun build src/browser.ts --outdir build --target browser && bun build src/catalog.ts --outdir build --target browser",
     "build:types": "tsc --emitDeclarationOnly",
     "build:all": "bun run build && bun run build:types",
     "test": "bun test",

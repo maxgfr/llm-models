@@ -43,7 +43,9 @@ From `packages/llm-models`:
   - `index.ts` - Node entry point (CLI + library export); loads `cache.ts` and `config.ts` for their disk-backed stores
   - `browser.ts` - browser entry point (package.json `browser` / exports `browser` condition): same API, memory cache, no config file
   - `lib.ts` - the library API both entries re-export; nothing reachable from it may import a Node builtin (`browser-bundle.test.ts`)
-  - `cli.ts` - CLI commands (Commander.js, 18 commands); `createProgram()` builds, `runCommand()` parses
+  - `catalog.ts` - entry `llm-models/catalog`: slim catalog types (`SlimCatalog`…), `defaultModelOf`,
+    `filterCatalogModels`, `CALLABLE_NPM`. Plain TypeScript, no Zod and no other import: app bundles load it
+  - `cli.ts` - CLI commands (Commander.js, 19 commands); `createProgram()` builds, `runCommand()` parses
   - `format.ts` - CLI formatting utilities (table, cost, context, CSV, markdown)
   - `types.ts` - Zod-inferred type exports
   - `cache-core.ts` - Cache logic over a pluggable `CacheStore` (memory by default), TTL, enabled flag; no Node APIs
@@ -74,6 +76,7 @@ From `packages/llm-models`:
     never edit by hand, never import @mlc-ai/web-llm at runtime
   - `functions/browser.ts` - probeBrowserSupport (CORS preflight + GET fallback), DEFAULT_BASE_URLS, BROWSER_REQUIRED_HEADERS
   - `functions/cost.ts` - estimateCost, cheapestModels
+  - `functions/catalog.ts` - slimCatalog/buildSlimCatalog: the catalog `llm-models catalog` writes for web apps
   - `functions/stats.ts` - getStats (aggregate market statistics)
   - `functions/recommend.ts` - recommendModels, listUseCases (use-case presets)
   - `functions/diff.ts` - diffModels (compare current vs its own snapshot.json, then save it)
@@ -100,7 +103,8 @@ From `packages/llm-models`:
   (`pickBestModel`, `findModel`) match both
 - Conventional commits (semantic-release parses them)
 - Types inferred from Zod schemas, never manually duplicated
-- All new domain types defined as Zod schemas in `schemas/functions.ts`
+- All new domain types defined as Zod schemas in `schemas/functions.ts`, except the slim catalog
+  types in `catalog.ts`, which must stay Zod-free for app bundles
 - ANSI regex patterns use `biome-ignore` comment for control character rule
 - README.md must be updated whenever a command, option, or library export is added or changed
 - `context_length` and `output_limit` must always come from the SAME source when merging: the two

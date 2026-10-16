@@ -298,6 +298,32 @@ llm-models provider anthropic --browser
 and `--origin` sets the page origin the probe announces (default `https://example.com`). Verdicts
 are cached like API responses; probing every provider takes about 20 seconds.
 
+#### Slim catalog for a web app
+
+Build the provider/model list a settings form ships (e.g. `public/models.json`), once, at build
+time or from a scheduled job:
+
+```bash
+llm-models catalog --npm callable --require openai,anthropic,google,mistral --out public/models.json
+llm-models catalog --npm @ai-sdk/openai,@ai-sdk/openai-compatible   # JSON on stdout
+```
+
+Each provider carries `id`, `name`, `npm` (the AI SDK package), `api` (base URL; documented
+defaults are filled for openai, anthropic, google, mistral…) and `defaultModel` (the balanced pick
+of `latest`), and each model only `id`, `name`, `tool_call` and `reasoning`. Deprecated models are
+left out, as are providers using the generic `@ai-sdk/openai-compatible` SDK without a URL.
+
+| Option | Effect |
+|--------|--------|
+| `--npm <packages>` | Keep providers called through these SDKs; `callable` stands for the five [llm-connect](https://github.com/maxgfr/llm-models/tree/main/packages/llm-connect) calls |
+| `--require <ids>` | Exit 1 unless these providers end up in the catalog |
+| `--keep-deprecated` | Keep deprecated models |
+| `--no-default-model` | Leave `defaultModel` out |
+| `--no-default-api` | Do not fill a missing `api` |
+| `-o, --out <file>` | Write the file, only when its content changes, instead of printing |
+
+The client side reads it with [`llm-models/catalog`](#slim-catalog-entry).
+
 ### Raw API Commands
 
 #### OpenRouter
@@ -626,6 +652,24 @@ const gpt = findModel(models, "gpt-4o");
 In the browser the cache lives in memory for the life of the page, there is no config file
 (`loadConfig()` returns `{}`, the built-in workload profiles remain), and `diffModels()` compares
 against the previous call in the same page. The CLI and MCP server are Node only.
+
+### Slim catalog entry
+
+`llm-models/catalog` holds the types of the slim catalog and the helpers its client needs, with no
+Zod and nothing else from the library, so it weighs under 1 KB in an app bundle:
+
+```typescript
+import { defaultModelOf, filterCatalogModels, type SlimCatalog } from "llm-models/catalog";
+
+const catalog: SlimCatalog = await (await fetch("/models.json")).json();
+const anthropic = catalog.anthropic;
+defaultModelOf(anthropic); // its defaultModel when listed, else its first model
+filterCatalogModels(anthropic, "sonnet"); // models whose name or id matches
+```
+
+`CALLABLE_NPM` lists the SDK packages [llm-connect](https://github.com/maxgfr/llm-models/tree/main/packages/llm-connect) can call. On the Node side,
+`buildSlimCatalog(options)` fetches both sources and returns what `llm-models catalog` writes;
+`slimCatalog({ models, modelsDevData }, options)` builds it from data you already fetched.
 
 ### Browser models (WebGPU)
 

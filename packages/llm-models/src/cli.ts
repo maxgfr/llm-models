@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { Argument, Command, InvalidArgumentError, Option } from "commander";
 import pkg from "../package.json";
 import {
@@ -9,6 +11,7 @@ import {
   setCacheEnabled,
   setCacheTtl,
 } from "./cache";
+import { CALLABLE_NPM } from "./catalog";
 import { fetchModelsDevModels } from "./clients/models-dev";
 import { fetchOpenRouterModels } from "./clients/openrouter";
 import { bold, cyan, dim, green, red, yellow } from "./colors";
@@ -33,6 +36,7 @@ import {
   listBrowserModels,
   recommendBrowserModel,
 } from "./functions/browser-models";
+import { buildSlimCatalog } from "./functions/catalog";
 import { compareModels } from "./functions/compare";
 import { cheapestModels, estimateCost, projectCost } from "./functions/cost";
 import { diffModels } from "./functions/diff";
@@ -105,6 +109,16 @@ function origin(value: string): string {
     throw new InvalidArgumentError("Expected an http(s) origin such as https://app.example.com");
   }
   return parsed.origin;
+}
+
+/** "a,b" → ["a", "b"]; repeated flags accumulate. */
+function commaList(value: string, previous: string[] = []): string[] {
+  const items = [...previous];
+  for (const raw of value.split(",")) {
+    const item = raw.trim();
+    if (item && !items.includes(item)) items.push(item);
+  }
+  return items;
 }
 
 /** "json,multilingual" → validated needs; repeated --need flags accumulate. */
@@ -1011,6 +1025,76 @@ export function createProgram(): Command {
         }
 
         outputFormatted(fmt, MODEL_HEADERS, result.models.map(modelRow), result.models);
+      },
+    );
+
+  // --- Slim catalog command ---
+
+  program
+    .command("catalog")
+    .description("Build the slim provider/model catalog a web app ships (e.g. public/models.json)")
+    .option(
+      "--npm <packages>",
+      `Keep providers called through these AI SDK packages, comma-separated, or "callable" for ${CALLABLE_NPM.join(", ")}`,
+      commaList,
+    )
+    .option(
+      "--require <providers>",
+      "Fail unless these provider ids end up in the catalog",
+      commaList,
+    )
+    .option("--keep-deprecated", "Keep deprecated models")
+    .option("--no-default-model", "Do not attach each provider's recommended model")
+    .option("--no-default-api", "Do not fill a missing api from documented base URLs")
+    .option(
+      "-o, --out <file>",
+      "Write to this file (only when the content changes) instead of stdout",
+    )
+    .action(
+      async (options: {
+        npm?: string[];
+        require?: string[];
+        keepDeprecated?: boolean;
+        defaultModel: boolean;
+        defaultApi: boolean;
+        out?: string;
+      }) => {
+        const npm = options.npm?.flatMap((item) =>
+          item === "callable" ? [...CALLABLE_NPM] : [item],
+        );
+        const catalog = await buildSlimCatalog({
+          npm,
+          required: options.require,
+          dropDeprecated: !options.keepDeprecated,
+          defaultModel: options.defaultModel,
+          fillDefaultApi: options.defaultApi,
+        });
+        const json = JSON.stringify(catalog);
+        if (!options.out) {
+          console.log(json);
+          return;
+        }
+
+        let previous: string | null = null;
+        try {
+          previous = readFileSync(options.out, "utf8");
+        } catch {
+          // No previous catalog
+        }
+        const quiet = program.opts().quiet === true;
+        if (previous === json) {
+          if (!quiet) console.error(`Unchanged: ${options.out}`);
+          return;
+        }
+        mkdirSync(dirname(options.out), { recursive: true });
+        writeFileSync(options.out, json);
+        if (!quiet) {
+          const providers = Object.values(catalog);
+          const models = providers.reduce((n, p) => n + Object.keys(p.models).length, 0);
+          console.error(
+            `Wrote ${options.out}: ${providers.length} providers, ${models} models, ${(json.length / 1024).toFixed(0)} KiB`,
+          );
+        }
       },
     );
 

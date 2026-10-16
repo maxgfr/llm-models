@@ -13,6 +13,8 @@ export {
   listBrowserModels,
   recommendBrowserModel,
 } from "./browser-models";
+export type { SlimCatalogOptions } from "./catalog";
+export { buildSlimCatalog, slimCatalog } from "./catalog";
 export { compareModels } from "./compare";
 export { cheapestModels, estimateCost } from "./cost";
 export { diffModels } from "./diff";
