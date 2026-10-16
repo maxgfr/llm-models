@@ -108,6 +108,8 @@ Conventions:
   relative imports carry their `.js` extension
 - `llm-models` is a `workspace:^` dependency; the release's `prepareCmd` pins it to the released
   range before `npm publish`, after `@semantic-release/git` committed `package.json`
+- npm must never reinstall the workspace (`NPM_CONFIG_WORKSPACES_UPDATE=false` in `publish.yml`):
+  it rejects the `workspace:` protocol and the bun-installed tree
 - Tests: `bun test` in the package; React hooks under happy-dom (`react.test.ts`)
 
 ## Code conventions

@@ -18,6 +18,9 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NPM_CONFIG_PROVENANCE: true
+      # npm version/publish run inside a bun workspace: never let npm reinstall
+      # it (it rejects llm-connect's workspace:^ dependency on llm-models)
+      NPM_CONFIG_WORKSPACES_UPDATE: false
     outputs:
       new_release_published: ${{ steps.check_release.outputs.new_release }}
       new_release_version: ${{ steps.version_after.outputs.version }}
