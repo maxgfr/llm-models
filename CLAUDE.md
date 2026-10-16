@@ -17,18 +17,28 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 - semantic-release for versioning
 - bun build --compile for binary builds
 
+## Workspace
+A bun workspace (`"workspaces": ["packages/*"]`, one `bun.lock` at the root) holding the npm packages:
+- `packages/llm-models` - the `llm-models` CLI and library (tags `v*`, binaries, Homebrew)
+
+Each package releases on its own: semantic-release runs from the package folder (`.releaserc.json`
+there), and `semantic-release-monorepo` only counts the commits that touch that folder. `action.yml`
+stays at the repository root (`uses: maxgfr/llm-models@v1`).
+
 ## Commands
+From the root (each delegates to every package with `bun run --filter "./packages/*"`):
 - `bun install` - install dependencies
-- `bun run build:all` - build library + type declarations
-- `bun test` - run tests (includes live API schema validation)
-- `bun run lint` - run Biome linter
-- `bun run lint:fix` - auto-fix lint issues
-- `bunx tsc --noEmit` - type-check (CI runs it; `tsconfig` excludes tests)
+- `bun run build:all` - build every package + type declarations
+- `bun run test` - run tests (includes live API schema validation); `bun test` alone skips per-package setup
+- `bun run lint` / `bun run lint:fix` - Biome (one `biome.json` at the root)
+- `bun run typecheck` - `tsc --noEmit` per package (CI runs it after `build:all`; `tsconfig` excludes tests)
+
+From `packages/llm-models`:
 - `bun run dev` - watch mode
 - `bun run build:binary:macos-arm64` - build macOS ARM binary
-- `bun run release` - semantic-release
+- `bun run release` - semantic-release (CI only)
 
-## Project structure
+## Project structure (`packages/llm-models`)
 - `src/` - source code
   - `index.ts` - Node entry point (CLI + library export); loads `cache.ts` and `config.ts` for their disk-backed stores
   - `browser.ts` - browser entry point (package.json `browser` / exports `browser` condition): same API, memory cache, no config file
@@ -72,7 +82,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
     live API schema validation)
 - `build/` - compiled output (npm package)
 - `dist/` - binary output
-- `action.yml` - GitHub Action for CI/CD integration
+- `../../action.yml` - GitHub Action for CI/CD integration (repository root)
 - `.github/workflows/` - CI/CD (build, test, lint, publish, monitor-apis)
 
 ## Code conventions
