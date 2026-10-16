@@ -379,6 +379,22 @@ describe("mergeModels", () => {
     expect(merged.api_id).toBe("claude-opus-4-5");
   });
 
+  it("keeps OpenRouter's capability flags models.dev leaves unset, and lets models.dev's stated ones win", () => {
+    const merged = mergeModels(
+      {
+        ...openrouter,
+        capabilities: { tool_call: true, structured_output: true, reasoning: true },
+      },
+      {
+        ...modelsDev,
+        capabilities: { tool_call: true, structured_output: undefined, reasoning: false },
+      },
+    );
+    expect(merged.capabilities.structured_output).toBe(true);
+    expect(merged.capabilities.reasoning).toBe(false);
+    expect(merged.capabilities.tool_call).toBe(true);
+  });
+
   it("lets models.dev win on release date and status", () => {
     const merged = mergeModels(
       { ...openrouter, release_date: "2025-01-01", status: "deprecated" },

@@ -163,9 +163,13 @@ export function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): 
     provider: modelsDev.provider,
     openrouter_id: openrouter.openrouter_id ?? openrouter.id,
     api_id: modelsDev.api_id,
+    // models.dev omits flags it does not know (structured_output is optional there): spread as is, that
+    // undefined erased OpenRouter's flag. What models.dev states, true or false, still wins.
     capabilities: {
       ...openrouter.capabilities,
-      ...modelsDev.capabilities,
+      ...Object.fromEntries(
+        Object.entries(modelsDev.capabilities).filter(([, value]) => value !== undefined),
+      ),
     },
     release_date: modelsDev.release_date ?? openrouter.release_date,
     status: modelsDev.status ?? openrouter.status,
