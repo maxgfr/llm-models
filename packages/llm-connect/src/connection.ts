@@ -47,7 +47,8 @@ function trimBase(url: string): string {
 }
 
 /** Auth headers of a provider's own API: Anthropic and Google do not use bearer tokens. */
-function authHeaders(npm: string | undefined, apiKey: string): Record<string, string> {
+function authHeaders(npm: string | undefined, key: string): Record<string, string> {
+  const apiKey = key.trim();
   if (!apiKey) return {};
   if (npm === "@ai-sdk/anthropic")
     return {

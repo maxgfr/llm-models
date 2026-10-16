@@ -59,6 +59,9 @@ registerProvider("openai", fromSDK(createOpenAI));
 registerProvider("my-llm", (config) => myLanguageModel(config.apiKey, config.model));
 ```
 
+The registry is shared by every copy of llm-connect loaded in the page, so a library and the app
+that resolve different installs still see the same providers.
+
 What the built-in providers take care of:
 
 - A custom endpoint goes through the OpenAI SDK with Chat Completions; the official OpenAI URL
@@ -114,7 +117,7 @@ State (`store.getState()`): `catalog`, `catalogStatus` (`idle | loading | error 
 `providers` (`recommended` / `others`), `isRecommendedProvider`, `models` (filtered by `search`),
 `recommendedModel`, `apiKey` (active slot), `canSave`, `canTest`.
 
-Actions: `load`, `open`, `retryCatalog`, `selectProvider`, `selectModel`, `setApiKey`, `setSearch`,
+Actions: `load`, `reset(settings)` (for settings the app already holds), `open`, `retryCatalog`, `selectProvider`, `selectModel`, `setApiKey`, `setSearch`,
 `toggleCustom`, `applyPreset(ENDPOINT_PRESETS.ollama)`, `setEndpoint`, `setCustomModel`,
 `setRememberKey`, `settings`, `test`, `save`, `clear`.
 

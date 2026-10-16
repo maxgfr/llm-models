@@ -78,6 +78,8 @@ export interface LlmSettingsStore<E extends object = object> {
   subscribe(listener: (state: LlmSettingsState<E>) => void): () => void;
   /** Read the saved settings and fill the draft with them, unless it was edited since `open()`. */
   load(): Promise<StoredSettings<E> | null>;
+  /** Take these settings as the saved ones and reset the draft to them (settings held by the app). */
+  reset(saved: StoredSettings<E> | null): void;
   /** A dialog opens: drop unsaved edits and download the catalog if needed. */
   open(): void;
   retryCatalog(): void;
@@ -252,6 +254,11 @@ export function createLlmSettingsStore<E extends object = object>(
       if (edited) set({ saved });
       else set({ saved, draft: draftFrom(saved), search: "", testResult: null });
       return saved;
+    },
+
+    reset(saved) {
+      edited = false;
+      set({ saved, draft: draftFrom(saved), search: "", testResult: null });
     },
 
     open() {

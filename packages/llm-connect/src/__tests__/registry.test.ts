@@ -68,6 +68,13 @@ describe("provider registry", () => {
     });
   });
 
+  it("shares one registry between copies of the module", async () => {
+    registerProvider("shared", (config) => mockLanguageModel(config.model));
+    // A second copy of llm-connect, as when two packages resolve different installs
+    const copy = await import(`../registry.js?copy=${Date.now()}`);
+    expect(copy.hasProvider("shared")).toBe(true);
+  });
+
   describe("registerProviders", () => {
     it("registers multiple providers at once", () => {
       registerProviders({

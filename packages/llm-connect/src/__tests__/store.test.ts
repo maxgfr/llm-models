@@ -306,6 +306,20 @@ describe("createLlmSettingsStore", () => {
     expect(store.getState().draft).toMatchObject({ apiKey: "", model: "gpt-5" });
   });
 
+  it("resets to settings held by the app", () => {
+    const { store } = makeStore();
+    store.setApiKey("typed");
+    store.reset({ apiKey: "sk", model: "gpt-5", providerId: "openai", rememberKey: true });
+    expect(store.getState().draft).toMatchObject({
+      apiKey: "sk",
+      model: "gpt-5",
+      rememberKey: true,
+    });
+    expect(store.getState().saved?.apiKey).toBe("sk");
+    store.reset(null);
+    expect(store.getState().draft.apiKey).toBe("");
+  });
+
   it("keeps the saved provider's metadata while the catalog is unavailable", async () => {
     const memory = memoryStorage({
       apiKey: "sk",

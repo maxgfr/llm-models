@@ -11,7 +11,13 @@ export interface ProviderConfig {
 /** A function that creates a LanguageModel from configuration. */
 export type ProviderFactory = (config: ProviderConfig) => LanguageModel;
 
-const registry = new Map<string, ProviderFactory>();
+// One registry per page, even when a project installs llm-connect twice (a
+// library and the app resolving different copies): providers registered by
+// one copy must be found by the other.
+const REGISTRY_KEY = Symbol.for("llm-connect.registry");
+const scope = globalThis as { [REGISTRY_KEY]?: Map<string, ProviderFactory> };
+scope[REGISTRY_KEY] ??= new Map<string, ProviderFactory>();
+const registry = scope[REGISTRY_KEY];
 
 /** npm package names → the short names providers are registered under. */
 const ALIASES: Record<string, string> = {
