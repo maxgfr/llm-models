@@ -42,7 +42,8 @@ export async function diffModels(): Promise<ModelDiff> {
   const saved = readBaseline(SNAPSHOT_KEY);
   const legacy = saved ? null : readBaseline(LEGACY_SNAPSHOT_KEY);
   const snapshot = saved ?? legacy;
-  writeCache(SNAPSHOT_KEY, current);
+  // Stamped with the time this diff reports, which the next one returns as timestamp_previous
+  writeCache(SNAPSHOT_KEY, current, now);
   if (legacy) removeCache(LEGACY_SNAPSHOT_KEY);
 
   if (!snapshot) {

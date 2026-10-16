@@ -90,10 +90,10 @@ export function readCache<T>(key: string, ttlMs = cacheTtl): T | null {
 }
 
 /** Best effort: a store that cannot write must never fail the command that fetched the data. */
-export function writeCache<T>(key: string, data: T): void {
+export function writeCache<T>(key: string, data: T, timestamp = Date.now()): void {
   if (!cacheEnabled) return;
   try {
-    store.write(key, { timestamp: Date.now(), data });
+    store.write(key, { timestamp, data });
   } catch (err) {
     debug(`cache ${key}: not written (${err instanceof Error ? err.message : String(err)})`);
   }
