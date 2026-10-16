@@ -282,6 +282,30 @@ describe("createLlmSettingsStore", () => {
     expect(store.getState().draft.customModel).toBe("qwen3");
   });
 
+  it("does not let a late load overwrite what the user typed after open", async () => {
+    let answer: (value: StoredSettings | null) => void = () => {};
+    const store = createLlmSettingsStore({
+      catalogUrl: "/models.json",
+      storage: {
+        load: () => new Promise((resolve) => (answer = resolve)),
+        save: async () => {},
+        clear: async () => {},
+      },
+      fetch: catalogFetch().fetch,
+    });
+    store.open();
+    const loading = store.load();
+    store.setApiKey("typed");
+    answer({ apiKey: "", model: "gpt-5", providerId: "openai" });
+    await loading;
+    expect(store.getState().draft.apiKey).toBe("typed");
+    expect(store.getState().saved?.model).toBe("gpt-5");
+
+    // A new open starts from what was saved
+    store.open();
+    expect(store.getState().draft).toMatchObject({ apiKey: "", model: "gpt-5" });
+  });
+
   it("keeps the saved provider's metadata while the catalog is unavailable", async () => {
     const memory = memoryStorage({
       apiKey: "sk",

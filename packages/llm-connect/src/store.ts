@@ -76,7 +76,7 @@ export interface LlmSettingsStore<E extends object = object> {
   getState(): LlmSettingsState<E>;
   /** Calls `listener` now and on every change (the Svelte store contract); returns the unsubscribe. */
   subscribe(listener: (state: LlmSettingsState<E>) => void): () => void;
-  /** Read the saved settings, reset the draft to them. */
+  /** Read the saved settings and fill the draft with them, unless it was edited since `open()`. */
   load(): Promise<StoredSettings<E> | null>;
   /** A dialog opens: drop unsaved edits and download the catalog if needed. */
   open(): void;
@@ -173,6 +173,8 @@ export function createLlmSettingsStore<E extends object = object>(
     testResult: null,
   });
   const listeners = new Set<(state: LlmSettingsState<E>) => void>();
+  // Whether the user changed the draft since it was last reset
+  let edited = false;
 
   function set(patch: Partial<Core>): void {
     const next: Core = { ...state, ...patch };
@@ -186,6 +188,7 @@ export function createLlmSettingsStore<E extends object = object>(
   }
 
   function editDraft(patch: Partial<LlmDraft>): void {
+    edited = true;
     set({ draft: { ...state.draft, ...patch }, testResult: null });
   }
 
@@ -245,11 +248,14 @@ export function createLlmSettingsStore<E extends object = object>(
 
     async load() {
       const saved = await (options.storage.loadDraft ?? options.storage.load)();
-      set({ saved, draft: draftFrom(saved), search: "", testResult: null });
+      // Storage can answer after the user started typing: keep what they typed
+      if (edited) set({ saved });
+      else set({ saved, draft: draftFrom(saved), search: "", testResult: null });
       return saved;
     },
 
     open() {
+      edited = false;
       set({ draft: draftFrom(state.saved), search: "", testing: false, testResult: null });
       fetchCatalog();
     },
@@ -259,6 +265,7 @@ export function createLlmSettingsStore<E extends object = object>(
     selectProvider(id) {
       // A model of the previous provider would be sent to the new one
       const model = defaultModelOf(state.catalog?.[id]) ?? "";
+      edited = true;
       set({ draft: { ...state.draft, providerId: id, model }, search: "", testResult: null });
     },
 
