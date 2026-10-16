@@ -20,6 +20,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 ## Workspace
 A bun workspace (`"workspaces": ["packages/*"]`, one `bun.lock` at the root) holding the npm packages:
 - `packages/llm-models` - the `llm-models` CLI and library (tags `v*`, binaries, Homebrew)
+- `packages/llm-connect` - `llm-connect`, the client side of the slim catalog (tags `llm-connect-v*`)
 
 Each package releases on its own: semantic-release runs from the package folder (`.releaserc.json`
 there), and `semantic-release-monorepo` only counts the commits that touch that folder. `action.yml`
@@ -87,6 +88,27 @@ From `packages/llm-models`:
 - `dist/` - binary output
 - `../../action.yml` - GitHub Action for CI/CD integration (repository root)
 - `.github/workflows/` - CI/CD (build, test, lint, publish, monitor-apis)
+
+## llm-connect (`packages/llm-connect`)
+Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v6, `@ai-sdk/*` v3,
+`@ai-sdk/openai-compatible` v2, all optional peers) and `llm-models/catalog`.
+- `src/registry.ts` - provider registry (`registerProvider`, `fromSDK`, npm aliases → short names)
+- `src/model.ts` - `createModel` (sync, registered providers) / `loadModel` (imports a built-in provider on demand)
+- `src/providers/*.ts` - one module per built-in SDK (`factory`, `register()`), plus `all.ts`; entry `llm-connect/providers/*`
+- `src/connection.ts` - `testConnection` (`models` | `generate`), `listEndpointModels`; never throws on a failed connection
+- `src/settings.ts` - `LlmSettings`, `LlmDraft`, `isConfigured`, `canSave`, `validateEndpoint`, `ENDPOINT_PRESETS`
+- `src/storage.ts` - `SettingsStorage` interface and `webStorage` (prefs in localStorage, key in sessionStorage unless remembered)
+- `src/catalog-client.ts` - `loadCatalog` (one shared request per URL, forgotten on failure), `splitProviders`, `providerMeta`
+- `src/store.ts` - `createLlmSettingsStore`: framework-free state + actions, Svelte store contract
+- `src/react.ts` - entry `llm-connect/react`: `useLlmSettings`, `useLlmStore`
+
+Conventions:
+- No eager SDK import outside `providers/`: `ai` and each `@ai-sdk/*` load through dynamic imports
+- Built with `tsc` (one ESM file per module, no bundling) so each SDK stays a separate import;
+  relative imports carry their `.js` extension
+- `llm-models` is a `workspace:^` dependency; the release's `prepareCmd` pins it to the released
+  range before `npm publish`, after `@semantic-release/git` committed `package.json`
+- Tests: `bun test` in the package; React hooks under happy-dom (`react.test.ts`)
 
 ## Code conventions
 - Strict TypeScript (`strict: true`)

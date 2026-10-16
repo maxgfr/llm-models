@@ -5,6 +5,7 @@ Monorepo of two npm packages built on the [models.dev](https://models.dev) and [
 | Package | What it does |
 |---------|--------------|
 | [`llm-models`](packages/llm-models) | CLI, library, MCP server and GitHub Action to find, compare and price LLM models, and to build the slim catalog a web app ships. |
+| [`llm-connect`](packages/llm-connect) | Bring-your-own-key LLM settings for web apps: provider registry, model creation and connection test for the AI SDK, a framework-free settings store, and a React adapter. |
 
 ## GitHub Action
 

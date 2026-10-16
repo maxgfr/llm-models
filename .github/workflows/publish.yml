@@ -74,6 +74,17 @@ jobs:
             echo "ℹ️ No new version released"
           fi
 
+      # The first llm-connect version was published by hand: npm's trusted
+      # publishing only attaches to a package that already exists.
+      - name: Release llm-connect
+        working-directory: packages/llm-connect
+        run: |
+          if npm view llm-connect version >/dev/null 2>&1; then
+            bun run release
+          else
+            echo "::notice::llm-connect is not on npm yet; publish its first version by hand"
+          fi
+
   build-binaries:
     needs: release
     if: needs.release.outputs.new_release_published == 'true'
