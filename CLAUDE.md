@@ -96,9 +96,11 @@ Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v6, `@a
 - `src/model.ts` - `createModel` (sync, registered providers) / `loadModel` (imports a built-in provider on demand)
 - `src/providers/*.ts` - one module per built-in SDK (`factory`, `register()`), plus `all.ts`; entry `llm-connect/providers/*`
 - `src/connection.ts` - `testConnection` (`models` | `generate`), `listEndpointModels`; never throws on a failed connection
-- `src/settings.ts` - `LlmSettings`, `LlmDraft`, `isConfigured`, `canSave`, `validateEndpoint`, `ENDPOINT_PRESETS`
-- `src/storage.ts` - `SettingsStorage` interface and `webStorage` (prefs in localStorage, key in sessionStorage unless remembered)
-- `src/catalog-client.ts` - `loadCatalog` (one shared request per URL, forgotten on failure), `splitProviders`, `providerMeta`
+- `src/settings.ts` - `LlmSettings`, `LlmDraft`, `isConfigured` (custom endpoint needs a model), `canSave`, `endpointProblem` / `validateEndpoint` (https, or http on loopback only), `ENDPOINT_PRESETS`
+- `src/language.ts` - `RESPONSE_LANGUAGES` (16, stored as codes), `languageName`, `toLanguageCode`, `browserLanguage`
+- `src/storage.ts` - `SettingsStorage` interface and `webStorage` (key in clear: compatibility only)
+- `src/secure-storage.ts` - `secureStorage`: prefs in localStorage, key AES-GCM encrypted under a non-extractable CryptoKey in IndexedDB (ciphertext in IndexedDB when remembered, sessionStorage otherwise)
+- `src/catalog-client.ts` - `liveCatalog` (lazy `llm-models/browser` build, static fallback), `loadCatalog` (one shared request per URL, forgotten on failure), `splitProviders`, `providerMeta`, `DEFAULT_RECOMMENDED`
 - `src/store.ts` - `createLlmSettingsStore`: framework-free state + actions, Svelte store contract
 - `src/react.ts` - entry `llm-connect/react`: `useLlmSettings`, `useLlmStore`
 
@@ -110,7 +112,7 @@ Conventions:
   range before `npm publish`, after `@semantic-release/git` committed `package.json`
 - npm must never reinstall the workspace (`NPM_CONFIG_WORKSPACES_UPDATE=false` in `publish.yml`):
   it rejects the `workspace:` protocol and the bun-installed tree
-- Tests: `bun test` in the package; React hooks under happy-dom (`react.test.ts`)
+- Tests: `bun test` in the package; React hooks under happy-dom (`react.test.ts`), IndexedDB from `fake-indexeddb`
 
 ## Code conventions
 - Strict TypeScript (`strict: true`)
