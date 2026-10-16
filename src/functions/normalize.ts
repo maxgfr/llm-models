@@ -39,6 +39,9 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
   return {
     id: model.id,
     openrouter_id: model.id,
+    // OpenRouter serves every model it lists, but only its own ("openrouter/auto") are OpenRouter's to call as a
+    // provider; the others belong to their vendor's list, whose API may not know this id.
+    api_id: provider === "openrouter" ? model.id : undefined,
     name: model.name,
     provider,
     context_length: model.context_length,
@@ -91,6 +94,8 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
 export function normalizeModelsDevModel(model: ModelsDevModel, providerId: string): UnifiedModel {
   return {
     id: `${providerId}/${model.id}`,
+    // models.dev keys each model by the id its provider's API accepts.
+    api_id: model.id,
     name: model.name,
     provider: providerId,
     context_length: model.limit.context,
@@ -151,12 +156,13 @@ export function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): 
 
   return {
     ...openrouter,
-    // models.dev's id is the one the provider's own API accepts
-    // ("claude-opus-4-5", not OpenRouter's "claude-opus-4.5"); OpenRouter's
-    // stays reachable as openrouter_id.
+    // models.dev's id names the model the way the provider's own API does
+    // ("anthropic/claude-opus-4-5", not OpenRouter's "claude-opus-4.5"; the
+    // bare id is api_id); OpenRouter's stays reachable as openrouter_id.
     id: modelsDev.id,
     provider: modelsDev.provider,
     openrouter_id: openrouter.openrouter_id ?? openrouter.id,
+    api_id: modelsDev.api_id,
     capabilities: {
       ...openrouter.capabilities,
       ...modelsDev.capabilities,

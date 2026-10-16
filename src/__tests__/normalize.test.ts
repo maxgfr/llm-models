@@ -83,6 +83,19 @@ describe("normalizeOpenRouterModel", () => {
     expect(result.provider).toBe("openai");
   });
 
+  it("gives no api_id for a vendor's model: the vendor's API may not know OpenRouter's id", () => {
+    expect(normalizeOpenRouterModel(mockModel).api_id).toBeUndefined();
+    expect(
+      normalizeOpenRouterModel({ ...mockModel, id: "openai/gpt-4o:batch" }).api_id,
+    ).toBeUndefined();
+  });
+
+  it("uses OpenRouter's own id as api_id for OpenRouter's own models", () => {
+    expect(normalizeOpenRouterModel({ ...mockModel, id: "openrouter/auto" }).api_id).toBe(
+      "openrouter/auto",
+    );
+  });
+
   it("converts pricing to per-million", () => {
     const result = normalizeOpenRouterModel(mockModel);
     expect(result.cost?.input).toBeCloseTo(2.5);
@@ -215,6 +228,16 @@ describe("normalizeModelsDevModel", () => {
     expect(result.provider).toBe("openai");
   });
 
+  it("keeps the provider's own id as api_id", () => {
+    expect(normalizeModelsDevModel(mockModel, "openai").api_id).toBe("gpt-4o");
+    const routed = normalizeModelsDevModel(
+      { ...mockModel, id: "anthropic/claude-opus-4.5" },
+      "openrouter",
+    );
+    expect(routed.id).toBe("openrouter/anthropic/claude-opus-4.5");
+    expect(routed.api_id).toBe("anthropic/claude-opus-4.5");
+  });
+
   it("maps capabilities", () => {
     const result = normalizeModelsDevModel(mockModel, "openai");
     expect(result.capabilities.reasoning).toBe(false);
@@ -337,6 +360,23 @@ describe("mergeModels", () => {
     expect(merged.id).toBe("anthropic/claude-opus-4-5");
     expect(merged.provider).toBe("anthropic");
     expect(merged.openrouter_id).toBe("anthropic/claude-opus-4.5");
+  });
+
+  it("takes api_id from models.dev", () => {
+    const merged = mergeModels(
+      {
+        ...openrouter,
+        id: "anthropic/claude-opus-4.5",
+        openrouter_id: "anthropic/claude-opus-4.5",
+      },
+      {
+        ...modelsDev,
+        id: "anthropic/claude-opus-4-5",
+        api_id: "claude-opus-4-5",
+        provider: "anthropic",
+      },
+    );
+    expect(merged.api_id).toBe("claude-opus-4-5");
   });
 
   it("lets models.dev win on release date and status", () => {

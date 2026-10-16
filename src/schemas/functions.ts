@@ -23,6 +23,12 @@ export const UnifiedModelSchema = z.object({
   id: z.string(),
   /** OpenRouter's id for this model, when OpenRouter lists it (e.g. "anthropic/claude-opus-4.5"). */
   openrouter_id: z.string().optional(),
+  /**
+   * The id to send to the provider's own API, without the provider prefix ("claude-opus-4-5"). Absent when the
+   * provider does not serve the model itself: an OpenRouter-only entry ("anthropic/claude-opus-4.5:batch") listed
+   * under the vendor that made it.
+   */
+  api_id: z.string().optional(),
   name: z.string(),
   provider: z.string(),
   context_length: z.number(),

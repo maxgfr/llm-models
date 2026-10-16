@@ -777,9 +777,14 @@ the endpoint you actually call.
 
 The two APIs sometimes spell the same model differently (OpenRouter's `anthropic/claude-opus-4.5`
 is models.dev's `anthropic/claude-opus-4-5`). Ids that differ only by case or `.` versus `-` are
-merged when the pairing is one-to-one. The merged model keeps the **models.dev id**, the id the
-provider's own API accepts, and OpenRouter's id is kept in `openrouter_id`, which every model
-OpenRouter lists carries. Models only OpenRouter lists are dated from its `created` timestamp
+merged when the pairing is one-to-one. The merged model keeps the **models.dev id**, and OpenRouter's
+id is kept in `openrouter_id`, which every model OpenRouter lists carries.
+
+Unified ids carry the provider as a prefix (`anthropic/claude-opus-4-5`). To call the provider's own
+API, send **`api_id`** instead: the id without the prefix (`claude-opus-4-5`; on models.dev's
+`openrouter` provider, `anthropic/claude-opus-4.5`). A model listed under a vendor only because
+OpenRouter serves it (`anthropic/claude-opus-4.5:batch`) has no `api_id`: the vendor's API does not
+know it. OpenRouter's own models (`openrouter/auto`) use their OpenRouter id. Models only OpenRouter lists are dated from its `created` timestamp
 (`release_date`, UTC), and those with an `expiration_date` are marked `deprecated`. On a merged
 model, models.dev's date and status win.
 
