@@ -274,3 +274,63 @@ describe("fetchUnifiedData with one API down", () => {
     }
   });
 });
+
+describe("fetchUnifiedData model pairing", () => {
+  it("pairs OpenRouter's own models with models.dev's openrouter entries, one model and one api_id each", async () => {
+    globalThis.fetch = mock((url: string) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.includes("openrouter")
+              ? {
+                  data: [
+                    {
+                      ...validOpenRouterModel,
+                      id: "openrouter/auto",
+                      canonical_slug: "openrouter/auto",
+                    },
+                    { ...validOpenRouterModel, id: "acme/good", canonical_slug: "acme/good" },
+                    {
+                      ...validOpenRouterModel,
+                      id: "acme/good:batch",
+                      canonical_slug: "acme/good:batch",
+                    },
+                  ],
+                }
+              : {
+                  acme: provider({ good: validModelsDevModel }),
+                  openrouter: {
+                    ...provider({
+                      "openrouter/auto": {
+                        ...validModelsDevModel,
+                        id: "openrouter/auto",
+                        name: "Auto",
+                      },
+                      "acme/good": { ...validModelsDevModel, id: "acme/good" },
+                    }),
+                    id: "openrouter",
+                  },
+                },
+          ),
+          { status: 200 },
+        ),
+      ),
+    ) as unknown as typeof fetch;
+
+    const { models } = await fetchUnifiedData();
+    const byId = new Map(models.map((m) => [m.id, m]));
+    expect(
+      models
+        .filter((m) => m.provider === "openrouter")
+        .map((m) => m.api_id)
+        .sort(),
+    ).toEqual(["acme/good", "openrouter/auto"]);
+    expect(byId.get("openrouter/openrouter/auto")?.sources).toEqual({
+      openrouter: true,
+      models_dev: true,
+    });
+    expect(byId.has("openrouter/auto")).toBe(false);
+    expect(byId.get("acme/good")?.api_id).toBe("good");
+    expect(byId.get("acme/good:batch")?.api_id).toBeUndefined();
+  });
+});
