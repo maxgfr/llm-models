@@ -73,9 +73,23 @@ function statusFailure(status: number, message?: string): ConnectionResult {
   };
 }
 
+/** A signal aborting with the first of `signals`; AbortSignal.any where the browser has it. */
+export function anySignal(signals: AbortSignal[]): AbortSignal {
+  if (typeof AbortSignal.any === "function") return AbortSignal.any(signals);
+  const controller = new AbortController();
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      break;
+    }
+    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+  }
+  return controller.signal;
+}
+
 function timeoutSignal(signal: AbortSignal | undefined, timeoutMs: number | undefined) {
   const timeout = timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined;
-  if (signal && timeout) return AbortSignal.any([signal, timeout]);
+  if (signal && timeout) return anySignal([signal, timeout]);
   return signal ?? timeout;
 }
 

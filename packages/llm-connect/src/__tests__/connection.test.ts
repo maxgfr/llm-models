@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import type { LanguageModel } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
-import { listEndpointModels, testConnection } from "../connection.js";
+import { anySignal, listEndpointModels, testConnection } from "../connection.js";
 import { clearProviders, registerProvider } from "../registry.js";
 
 (globalThis as { AI_SDK_LOG_WARNINGS?: boolean }).AI_SDK_LOG_WARNINGS = false;
@@ -169,6 +169,37 @@ describe("testConnection, models mode", () => {
     );
     controller.abort();
     await expect(pending).rejects.toThrow();
+  });
+});
+
+describe("anySignal without AbortSignal.any (Chrome < 116, Safari < 17.4)", () => {
+  const any = AbortSignal.any;
+  beforeEach(() => {
+    (AbortSignal as { any?: unknown }).any = undefined;
+  });
+  afterEach(() => {
+    AbortSignal.any = any;
+  });
+
+  it("aborts with the first signal's reason", () => {
+    const a = new AbortController();
+    const b = new AbortController();
+    const signal = anySignal([a.signal, b.signal]);
+    expect(signal.aborted).toBe(false);
+    b.abort(new Error("second"));
+    expect(signal.aborted).toBe(true);
+    expect((signal.reason as Error).message).toBe("second");
+    expect(anySignal([AbortSignal.abort("done"), a.signal]).reason).toBe("done");
+  });
+
+  it("still times out a test the caller can cancel", async () => {
+    const controller = new AbortController();
+    expect(
+      await testConnection(
+        { apiKey: "", model: "", customEndpoint: "http://localhost:11434/v1" },
+        { fetch: fakeFetch(hang), signal: controller.signal, timeoutMs: 20 },
+      ),
+    ).toEqual({ ok: false, reason: "timeout" });
   });
 });
 
