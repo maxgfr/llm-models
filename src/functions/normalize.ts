@@ -39,6 +39,9 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
   return {
     id: model.id,
     openrouter_id: model.id,
+    // OpenRouter serves every model it lists, but only its own ("openrouter/auto") are OpenRouter's to call as a
+    // provider; the others belong to their vendor's list, whose API may not know this id.
+    api_id: provider === "openrouter" ? model.id : undefined,
     name: model.name,
     provider,
     context_length: model.context_length,
@@ -91,6 +94,8 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
 export function normalizeModelsDevModel(model: ModelsDevModel, providerId: string): UnifiedModel {
   return {
     id: `${providerId}/${model.id}`,
+    // models.dev keys each model by the id its provider's API accepts.
+    api_id: model.id,
     name: model.name,
     provider: providerId,
     context_length: model.limit.context,
@@ -151,12 +156,13 @@ export function mergeModels(openrouter: UnifiedModel, modelsDev: UnifiedModel): 
 
   return {
     ...openrouter,
-    // models.dev's id is the one the provider's own API accepts
-    // ("claude-opus-4-5", not OpenRouter's "claude-opus-4.5"); OpenRouter's
-    // stays reachable as openrouter_id.
+    // models.dev's id names the model the way the provider's own API does
+    // ("anthropic/claude-opus-4-5", not OpenRouter's "claude-opus-4.5"; the
+    // bare id is api_id); OpenRouter's stays reachable as openrouter_id.
     id: modelsDev.id,
     provider: modelsDev.provider,
     openrouter_id: openrouter.openrouter_id ?? openrouter.id,
+    api_id: modelsDev.api_id,
     capabilities: {
       ...openrouter.capabilities,
       ...modelsDev.capabilities,
@@ -281,15 +287,22 @@ export async function fetchUnifiedData(): Promise<{
 
   if (openRouterData) {
     const openRouterModels = openRouterData.data.map(normalizeOpenRouterModel);
-    const openRouterIds = new Set(openRouterModels.map((m) => m.id));
+    // OpenRouter's own models ("openrouter/auto") are models.dev's "openrouter" provider entries, keyed there by
+    // their OpenRouter id: "openrouter/openrouter/auto". Every other OpenRouter id pairs with the vendor's entry.
+    const exactId = (m: UnifiedModel) =>
+      m.provider === "openrouter" && modelsDevMap.has(`openrouter/${m.id}`)
+        ? `openrouter/${m.id}`
+        : m.id;
+    const exactIds = new Set(openRouterModels.map(exactId));
     // Exact ids pair first; only what is left on both sides is tried loosely.
     const looseMatches = pairLooseIds(
-      openRouterModels.filter((m) => !modelsDevMap.has(m.id)),
-      [...modelsDevMap.values()].filter((m) => !openRouterIds.has(m.id)),
+      openRouterModels.filter((m) => !modelsDevMap.has(exactId(m))),
+      [...modelsDevMap.values()].filter((m) => !exactIds.has(m.id)),
     );
 
     for (const normalized of openRouterModels) {
-      const modelsDevMatch = modelsDevMap.get(normalized.id) ?? looseMatches.get(normalized.id);
+      const modelsDevMatch =
+        modelsDevMap.get(exactId(normalized)) ?? looseMatches.get(normalized.id);
 
       if (modelsDevMatch) {
         const merged = mergeModels(normalized, modelsDevMatch);
