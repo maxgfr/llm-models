@@ -345,3 +345,43 @@ describe("config file", () => {
     }
   });
 });
+
+describe("catalog", () => {
+  it("prints the slim catalog of the callable providers", async () => {
+    const { stdout, code } = await run("catalog", "--npm", "callable");
+    expect(code).toBe(0);
+    const catalog = JSON.parse(stdout);
+    // acme ships its own SDK, which a web app cannot call through llm-connect
+    expect(Object.keys(catalog)).toEqual(["openai"]);
+    expect(catalog.openai).toEqual({
+      id: "openai",
+      name: "OpenAI",
+      npm: "@ai-sdk/openai",
+      api: "https://api.openai.com/v1",
+      defaultModel: "gpt-4o-mini",
+      models: {
+        "gpt-4o": { id: "gpt-4o", name: "gpt-4o", tool_call: true },
+        "gpt-4o-mini": { id: "gpt-4o-mini", name: "gpt-4o-mini", tool_call: true },
+      },
+    });
+  });
+
+  it("writes the file only when its content changes", async () => {
+    const out = join(home, "public", "models.json");
+    const first = await run("catalog", "--npm", "@ai-sdk/openai,@ai-sdk/acme", "--out", out);
+    expect(first.code).toBe(0);
+    expect(first.stdout).toBe("");
+    expect(first.stderr).toContain("2 providers, 27 models");
+    expect(Object.keys(JSON.parse(await Bun.file(out).text()))).toEqual(["acme", "openai"]);
+
+    const second = await run("catalog", "--npm", "@ai-sdk/openai,@ai-sdk/acme", "--out", out);
+    expect(second.code).toBe(0);
+    expect(second.stderr).toContain("Unchanged");
+  });
+
+  it("fails when a required provider is missing", async () => {
+    const { stderr, code } = await run("catalog", "--npm", "callable", "--require", "openai,acme");
+    expect(code).toBe(1);
+    expect(stderr).toContain("missing required providers: acme");
+  });
+});

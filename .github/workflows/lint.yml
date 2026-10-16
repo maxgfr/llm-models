@@ -16,5 +16,8 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Lint
         run: bun run lint
+      # llm-connect type-checks against llm-models' built declarations
+      - name: Build packages
+        run: bun run build:all
       - name: Type-check
-        run: bunx tsc --noEmit
+        run: bun run typecheck

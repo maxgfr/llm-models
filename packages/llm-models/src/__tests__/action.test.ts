@@ -30,7 +30,8 @@ function enabled(condition: string | undefined, context: Record<string, string>)
   return match[2] === "==" ? value === match[3] : value !== match[3];
 }
 
-const action = Bun.YAML.parse(await Bun.file(join(ROOT, "action.yml")).text()) as {
+// action.yml sits at the repository root, two levels above the package.
+const action = Bun.YAML.parse(await Bun.file(join(ROOT, "../../action.yml")).text()) as {
   runs: { steps: Step[] };
 };
 

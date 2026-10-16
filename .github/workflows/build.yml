@@ -14,9 +14,10 @@ jobs:
           bun-version: latest
       - name: Install
         run: bun install --frozen-lockfile
-      - name: Build library
+      - name: Build packages
         run: bun run build:all
       - name: Test binary compilation
+        working-directory: packages/llm-models
         run: |
           bun run build:binary:linux-x64
           if [ ! -f dist/llm-models-linux-x64 ]; then

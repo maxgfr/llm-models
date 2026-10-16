@@ -3,6 +3,8 @@
 // touch the file system at load: browser-bundle.test.ts enforces it.
 
 export { clearCache, setCacheEnabled } from "./cache-core";
+export type { SlimCatalog, SlimModel, SlimProvider } from "./catalog";
+export { CALLABLE_NPM, defaultModelOf, filterCatalogModels } from "./catalog";
 export { fetchModelsDevModels } from "./clients/models-dev";
 export { fetchOpenRouterModels } from "./clients/openrouter";
 export { getProfile, listProfiles, loadConfig } from "./config-core";
@@ -11,9 +13,11 @@ export type {
   BrowserProbeTarget,
   ProbeManyOptions,
 } from "./functions/browser";
+export type { SlimCatalogOptions } from "./functions/catalog";
 export {
   BROWSER_REQUIRED_HEADERS,
   browserModelCatalog,
+  buildSlimCatalog,
   cheapestModels,
   compareModels,
   DEFAULT_BASE_URLS,
@@ -47,6 +51,7 @@ export {
   recommendBrowserModel,
   recommendModels,
   resolveModel,
+  slimCatalog,
   sortModels,
 } from "./functions/index";
 export type { ProviderOptions } from "./functions/provider";

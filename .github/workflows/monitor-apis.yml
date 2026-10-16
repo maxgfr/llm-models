@@ -27,6 +27,7 @@ jobs:
       - name: Run schema validation tests
         id: schema_test
         continue-on-error: true
+        working-directory: packages/llm-models
         run: |
           bun test src/__tests__/openrouter-schema.test.ts src/__tests__/models-dev-schema.test.ts 2>&1 | tee test-output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
@@ -37,7 +38,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const output = fs.readFileSync('test-output.txt', 'utf8');
+            const output = fs.readFileSync('packages/llm-models/test-output.txt', 'utf8');
             const title = `API Schema Change Detected - ${new Date().toISOString().split('T')[0]}`;
             const label = 'api-schema-change';
 
@@ -48,7 +49,7 @@ jobs:
               state: 'open',
             });
 
-            const body = `## API Schema Validation Failed\n\nThe daily schema check detected changes in one or more upstream APIs.\n\n### Test Output\n\`\`\`\n${output.slice(-3000)}\n\`\`\`\n\n### Next Steps\n1. Review the API changes\n2. Update Zod schemas in \`src/schemas/\` to match\n3. Run \`bun test\` to verify\n4. Close this issue when fixed\n\n_Detected by automated monitoring on ${new Date().toISOString()}_`;
+            const body = `## API Schema Validation Failed\n\nThe daily schema check detected changes in one or more upstream APIs.\n\n### Test Output\n\`\`\`\n${output.slice(-3000)}\n\`\`\`\n\n### Next Steps\n1. Review the API changes\n2. Update Zod schemas in \`packages/llm-models/src/schemas/\` to match\n3. Run \`bun test\` to verify\n4. Close this issue when fixed\n\n_Detected by automated monitoring on ${new Date().toISOString()}_`;
 
             if (existing.data.length > 0) {
               await github.rest.issues.createComment({

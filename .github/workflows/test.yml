@@ -14,5 +14,8 @@ jobs:
           bun-version: latest
       - name: Install
         run: bun install --frozen-lockfile
+      # llm-connect imports llm-models through its published entry points
+      - name: Build packages
+        run: bun run build:all
       - name: Test
-        run: bun test
+        run: bun run test

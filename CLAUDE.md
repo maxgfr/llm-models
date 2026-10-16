@@ -17,23 +17,36 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
 - semantic-release for versioning
 - bun build --compile for binary builds
 
+## Workspace
+A bun workspace (`"workspaces": ["packages/*"]`, one `bun.lock` at the root) holding the npm packages:
+- `packages/llm-models` - the `llm-models` CLI and library (tags `v*`, binaries, Homebrew)
+- `packages/llm-connect` - `llm-connect`, the client side of the slim catalog (tags `llm-connect-v*`)
+
+Each package releases on its own: semantic-release runs from the package folder (`.releaserc.json`
+there), and `semantic-release-monorepo` only counts the commits that touch that folder. `action.yml`
+stays at the repository root (`uses: maxgfr/llm-models@v1`).
+
 ## Commands
+From the root (each delegates to every package with `bun run --filter "./packages/*"`):
 - `bun install` - install dependencies
-- `bun run build:all` - build library + type declarations
-- `bun test` - run tests (includes live API schema validation)
-- `bun run lint` - run Biome linter
-- `bun run lint:fix` - auto-fix lint issues
-- `bunx tsc --noEmit` - type-check (CI runs it; `tsconfig` excludes tests)
+- `bun run build:all` - build every package + type declarations
+- `bun run test` - run tests (includes live API schema validation); `bun test` alone skips per-package setup
+- `bun run lint` / `bun run lint:fix` - Biome (one `biome.json` at the root)
+- `bun run typecheck` - `tsc --noEmit` per package (CI runs it after `build:all`; `tsconfig` excludes tests)
+
+From `packages/llm-models`:
 - `bun run dev` - watch mode
 - `bun run build:binary:macos-arm64` - build macOS ARM binary
-- `bun run release` - semantic-release
+- `bun run release` - semantic-release (CI only)
 
-## Project structure
+## Project structure (`packages/llm-models`)
 - `src/` - source code
   - `index.ts` - Node entry point (CLI + library export); loads `cache.ts` and `config.ts` for their disk-backed stores
   - `browser.ts` - browser entry point (package.json `browser` / exports `browser` condition): same API, memory cache, no config file
   - `lib.ts` - the library API both entries re-export; nothing reachable from it may import a Node builtin (`browser-bundle.test.ts`)
-  - `cli.ts` - CLI commands (Commander.js, 18 commands); `createProgram()` builds, `runCommand()` parses
+  - `catalog.ts` - entry `llm-models/catalog`: slim catalog types (`SlimCatalog`…), `defaultModelOf`,
+    `filterCatalogModels`, `CALLABLE_NPM`. Plain TypeScript, no Zod and no other import: app bundles load it
+  - `cli.ts` - CLI commands (Commander.js, 19 commands); `createProgram()` builds, `runCommand()` parses
   - `format.ts` - CLI formatting utilities (table, cost, context, CSV, markdown)
   - `types.ts` - Zod-inferred type exports
   - `cache-core.ts` - Cache logic over a pluggable `CacheStore` (memory by default), TTL, enabled flag; no Node APIs
@@ -64,6 +77,7 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
     never edit by hand, never import @mlc-ai/web-llm at runtime
   - `functions/browser.ts` - probeBrowserSupport (CORS preflight + GET fallback), DEFAULT_BASE_URLS, BROWSER_REQUIRED_HEADERS
   - `functions/cost.ts` - estimateCost, cheapestModels
+  - `functions/catalog.ts` - slimCatalog/buildSlimCatalog: the catalog `llm-models catalog` writes for web apps
   - `functions/stats.ts` - getStats (aggregate market statistics)
   - `functions/recommend.ts` - recommendModels, listUseCases (use-case presets)
   - `functions/diff.ts` - diffModels (compare current vs its own snapshot.json, then save it)
@@ -72,8 +86,29 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
     live API schema validation)
 - `build/` - compiled output (npm package)
 - `dist/` - binary output
-- `action.yml` - GitHub Action for CI/CD integration
+- `../../action.yml` - GitHub Action for CI/CD integration (repository root)
 - `.github/workflows/` - CI/CD (build, test, lint, publish, monitor-apis)
+
+## llm-connect (`packages/llm-connect`)
+Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v6, `@ai-sdk/*` v3,
+`@ai-sdk/openai-compatible` v2, all optional peers) and `llm-models/catalog`.
+- `src/registry.ts` - provider registry (`registerProvider`, `fromSDK`, npm aliases → short names)
+- `src/model.ts` - `createModel` (sync, registered providers) / `loadModel` (imports a built-in provider on demand)
+- `src/providers/*.ts` - one module per built-in SDK (`factory`, `register()`), plus `all.ts`; entry `llm-connect/providers/*`
+- `src/connection.ts` - `testConnection` (`models` | `generate`), `listEndpointModels`; never throws on a failed connection
+- `src/settings.ts` - `LlmSettings`, `LlmDraft`, `isConfigured`, `canSave`, `validateEndpoint`, `ENDPOINT_PRESETS`
+- `src/storage.ts` - `SettingsStorage` interface and `webStorage` (prefs in localStorage, key in sessionStorage unless remembered)
+- `src/catalog-client.ts` - `loadCatalog` (one shared request per URL, forgotten on failure), `splitProviders`, `providerMeta`
+- `src/store.ts` - `createLlmSettingsStore`: framework-free state + actions, Svelte store contract
+- `src/react.ts` - entry `llm-connect/react`: `useLlmSettings`, `useLlmStore`
+
+Conventions:
+- No eager SDK import outside `providers/`: `ai` and each `@ai-sdk/*` load through dynamic imports
+- Built with `tsc` (one ESM file per module, no bundling) so each SDK stays a separate import;
+  relative imports carry their `.js` extension
+- `llm-models` is a `workspace:^` dependency; the release's `prepareCmd` pins it to the released
+  range before `npm publish`, after `@semantic-release/git` committed `package.json`
+- Tests: `bun test` in the package; React hooks under happy-dom (`react.test.ts`)
 
 ## Code conventions
 - Strict TypeScript (`strict: true`)
@@ -90,7 +125,8 @@ a fluent query builder API. Distributed via npm, Homebrew, and standalone binari
   (`pickBestModel`, `findModel`) match both
 - Conventional commits (semantic-release parses them)
 - Types inferred from Zod schemas, never manually duplicated
-- All new domain types defined as Zod schemas in `schemas/functions.ts`
+- All new domain types defined as Zod schemas in `schemas/functions.ts`, except the slim catalog
+  types in `catalog.ts`, which must stay Zod-free for app bundles
 - ANSI regex patterns use `biome-ignore` comment for control character rule
 - README.md must be updated whenever a command, option, or library export is added or changed
 - `context_length` and `output_limit` must always come from the SAME source when merging: the two

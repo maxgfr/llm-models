@@ -40,6 +40,14 @@ describe("browser entry", () => {
     expect(await nodeBuiltinsIn("index.ts")).toContain("node:fs");
   });
 
+  it("bundles the catalog entry without any Node.js builtin or Zod", async () => {
+    expect(await nodeBuiltinsIn("catalog.ts")).toEqual([]);
+    const build = await Bun.build({ entrypoints: [join(SRC, "catalog.ts")], target: "browser" });
+    const code = await build.outputs[0].text();
+    expect(code).not.toContain("zod");
+    expect(code.length).toBeLessThan(2000);
+  });
+
   it("exports the same API as the Node entry", async () => {
     const browser = await import("../browser");
     const node = await import("../index");
