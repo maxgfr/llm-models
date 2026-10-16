@@ -5,8 +5,12 @@
 export type { SlimCatalog, SlimModel, SlimProvider } from "llm-models/catalog";
 export { CALLABLE_NPM, defaultModelOf, filterCatalogModels } from "llm-models/catalog";
 export {
+  type CatalogSource,
   clearCatalogCache,
   DEFAULT_PROVIDER_META,
+  DEFAULT_RECOMMENDED,
+  type LiveCatalogOptions,
+  liveCatalog,
   loadCatalog,
   type ProviderMeta,
   providerMeta,
@@ -20,6 +24,14 @@ export {
   type TestConnectionOptions,
   testConnection,
 } from "./connection.js";
+export {
+  browserLanguage,
+  DEFAULT_LANGUAGE,
+  languageName,
+  RESPONSE_LANGUAGES,
+  type ResponseLanguage,
+  toLanguageCode,
+} from "./language.js";
 export { createModel, loadModel, providerNameOf } from "./model.js";
 export {
   clearProviders,
@@ -34,13 +46,17 @@ export {
   requireProvider,
   resolveAlias,
 } from "./registry.js";
+export { type SecureStorageOptions, secureStorage } from "./secure-storage.js";
 export {
   activeKey,
   canSave,
   canTest,
   ENDPOINT_PRESETS,
   type EndpointPreset,
+  type EndpointProblem,
+  endpointProblem,
   isConfigured,
+  isLoopbackHost,
   type LlmDraft,
   type LlmSettings,
   validateEndpoint,

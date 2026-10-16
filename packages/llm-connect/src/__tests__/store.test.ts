@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "bun:test";
+import { MockLanguageModelV3 } from "ai/test";
 import type { SlimCatalog } from "llm-models/catalog";
 import { clearCatalogCache } from "../catalog-client.js";
+import { clearProviders, registerProvider } from "../registry.js";
 import { ENDPOINT_PRESETS } from "../settings.js";
 import type { SettingsStorage, StoredSettings } from "../storage.js";
 import { createLlmSettingsStore, type LlmStoreOptions } from "../store.js";
@@ -380,5 +382,90 @@ describe("createLlmSettingsStore", () => {
       customApiKey: "",
       customEndpoint: "",
     });
+  });
+
+  it("takes a catalog loader, or a URL under the deprecated catalogUrl", async () => {
+    const store = createLlmSettingsStore({
+      catalog: async () => catalog,
+      storage: memoryStorage().storage,
+    });
+    store.open();
+    await settled(store);
+    expect(store.getState().catalogStatus).toBe("ready");
+    // OpenAI, Anthropic, Google, Mistral by default: two of them in this catalog
+    expect(store.getState().providers.recommended.map((p) => p.id)).toEqual([
+      "openai",
+      "anthropic",
+    ]);
+    expect(() => createLlmSettingsStore({ storage: memoryStorage().storage })).toThrow("catalog");
+  });
+
+  it("edits, saves and clears the response language", async () => {
+    const { store, saves } = makeStore({ defaults: { language: "French" } });
+    expect(store.getState().draft.language).toBe("fr");
+    store.setLanguage("German");
+    expect(store.getState().draft.language).toBe("de");
+    store.setApiKey("sk");
+    store.selectModel("gpt-5");
+    expect((await store.save()).ok).toBe(true);
+    expect(saves[0].settings).toMatchObject({ language: "de" });
+
+    // Older settings stored the name
+    store.reset({ apiKey: "sk", model: "gpt-5", language: "Japanese" });
+    expect(store.getState().draft.language).toBe("ja");
+
+    await store.clear();
+    expect(store.getState().draft.language).toBe("fr");
+  });
+
+  it("refuses to save plain http to another machine", async () => {
+    const { store, saves } = makeStore();
+    store.toggleCustom(true);
+    store.setCustomModel("llama3.2");
+    store.setEndpoint("http://192.168.1.10/v1");
+    expect(await store.save()).toEqual({ ok: false, reason: "insecure-endpoint" });
+    store.setEndpoint("https://192.168.1.10/v1");
+    expect((await store.save()).ok).toBe(true);
+    expect(saves).toHaveLength(1);
+  });
+
+  it("tests a provider with a real generation by default, and never calls an insecure endpoint", async () => {
+    clearProviders();
+    const prompts: unknown[] = [];
+    registerProvider("openai", () => {
+      return new MockLanguageModelV3({
+        doGenerate: async (options) => {
+          prompts.push(options.prompt);
+          return {
+            content: [{ type: "text", text: "OK" }],
+            finishReason: { unified: "stop", raw: "stop" },
+            usage: {
+              inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+              outputTokens: { total: 1, text: 1, reasoning: 0 },
+            },
+            warnings: [],
+          };
+        },
+      });
+    });
+    const calls: string[] = [];
+    const store = createLlmSettingsStore({
+      catalog: async () => catalog,
+      storage: memoryStorage().storage,
+      fetch: (async (input: RequestInfo | URL) => {
+        calls.push(String(input));
+        return new Response("{}");
+      }) as typeof fetch,
+    });
+    store.setApiKey("sk");
+    expect(await store.test()).toEqual({ ok: true });
+    expect(prompts).toHaveLength(1);
+    expect(calls).toEqual([]);
+
+    store.toggleCustom(true);
+    store.setEndpoint("http://192.168.1.10/v1");
+    expect(await store.test()).toMatchObject({ ok: false, reason: "insecure" });
+    expect(calls).toEqual([]);
+    clearProviders();
   });
 });

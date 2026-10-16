@@ -6,18 +6,22 @@ import {
   type SlimProvider,
 } from "llm-models/catalog";
 import {
+  type CatalogSource,
   DEFAULT_PROVIDER_META,
+  DEFAULT_RECOMMENDED,
   loadCatalog,
   type ProviderMeta,
   providerMeta,
   splitProviders,
 } from "./catalog-client.js";
 import { type ConnectionResult, testConnection } from "./connection.js";
+import { browserLanguage, toLanguageCode } from "./language.js";
 import {
   activeKey,
   canSave,
   canTest,
   type EndpointPreset,
+  endpointProblem,
   type LlmDraft,
   type LlmSettings,
   validateEndpoint,
@@ -27,15 +31,23 @@ import type { SettingsStorage, StoredSettings } from "./storage.js";
 export type CatalogStatus = "idle" | "loading" | "error" | "ready";
 
 export interface LlmStoreOptions<E extends object = object> {
-  /** URL of the catalog `llm-models catalog` wrote, e.g. "/models.json". */
-  catalogUrl: string;
+  /**
+   * The catalog: the URL of one `llm-models catalog` wrote ("/models.json"), or
+   * a loader such as `liveCatalog({ fallbackUrl: "/models.json" })`.
+   */
+  catalog?: CatalogSource;
+  /** @deprecated Use `catalog`. */
+  catalogUrl?: string;
   storage: SettingsStorage<E>;
-  /** Provider ids listed first, in this order. */
+  /** Provider ids listed first, in this order. Default OpenAI, Anthropic, Google, Mistral. */
   recommended?: readonly string[];
-  /** How `test()` checks the settings (see `testConnection`). Default "models". */
-  testMode?: "models" | "generate";
-  /** Draft values before anything is saved. */
-  defaults?: Partial<Pick<LlmDraft, "providerId" | "model" | "rememberKey">>;
+  /**
+   * How `test()` checks the settings (see `testConnection`). Default "auto":
+   * the model list of a custom endpoint, a one-line generation for a provider.
+   */
+  testMode?: "auto" | "models" | "generate";
+  /** Draft values before anything is saved. The language defaults to the browser's. */
+  defaults?: Partial<Pick<LlmDraft, "providerId" | "model" | "rememberKey" | "language">>;
   fetch?: typeof fetch;
 }
 
@@ -70,7 +82,7 @@ export interface LlmSettingsState<E extends object = object> {
 
 export type SaveResult<E extends object = object> =
   | { ok: true; settings: StoredSettings<E> }
-  | { ok: false; reason: "incomplete" | "invalid-endpoint" };
+  | { ok: false; reason: "incomplete" | "invalid-endpoint" | "insecure-endpoint" };
 
 export interface LlmSettingsStore<E extends object = object> {
   getState(): LlmSettingsState<E>;
@@ -95,12 +107,14 @@ export interface LlmSettingsStore<E extends object = object> {
   setEndpoint(url: string): void;
   setCustomModel(model: string): void;
   setRememberKey(remember: boolean): void;
+  /** Set the language answers are written in (a code, or a name as older settings stored it). */
+  setLanguage(language: string): void;
   /** The settings the draft would save. */
   settings(): LlmSettings;
   test(options?: { signal?: AbortSignal }): Promise<ConnectionResult>;
   /** Validate and store the draft, with the app's own fields. */
   save(extra?: Partial<E>): Promise<SaveResult<E>>;
-  /** Forget the saved settings and the draft's key and endpoint. */
+  /** Forget the saved settings and the draft's key, endpoint and language. */
   clear(): Promise<void>;
 }
 
@@ -113,12 +127,18 @@ export interface LlmSettingsStore<E extends object = object> {
 export function createLlmSettingsStore<E extends object = object>(
   options: LlmStoreOptions<E>,
 ): LlmSettingsStore<E> {
-  const recommendedIds = options.recommended ?? [];
+  const recommendedIds = options.recommended ?? DEFAULT_RECOMMENDED;
+  const source = options.catalog ?? options.catalogUrl;
+  if (!source) throw new Error("createLlmSettingsStore: `catalog` is required");
+  const catalogSource: CatalogSource = source;
   const defaults = {
     providerId: options.defaults?.providerId ?? recommendedIds[0] ?? "openai",
     model: options.defaults?.model ?? "",
     rememberKey: options.defaults?.rememberKey ?? false,
   };
+  // Read when needed rather than now: the store can be created during server rendering
+  const defaultLanguage = () =>
+    options.defaults?.language ? toLanguageCode(options.defaults.language) : browserLanguage();
 
   function draftFrom(saved: StoredSettings<E> | null): LlmDraft {
     const custom = !!saved?.customEndpoint;
@@ -132,6 +152,7 @@ export function createLlmSettingsStore<E extends object = object>(
       customEndpoint: saved?.customEndpoint ?? "",
       customModel: saved?.customModel ?? "",
       rememberKey: saved?.rememberKey ?? defaults.rememberKey,
+      language: saved?.language ? toLanguageCode(saved.language) : defaultLanguage(),
     };
   }
 
@@ -197,7 +218,11 @@ export function createLlmSettingsStore<E extends object = object>(
   function fetchCatalog(): void {
     if (state.catalogStatus === "loading" || state.catalogStatus === "ready") return;
     set({ catalogStatus: "loading", catalogError: null });
-    loadCatalog(options.catalogUrl, options.fetch).then(
+    const request =
+      typeof catalogSource === "string"
+        ? loadCatalog(catalogSource, options.fetch)
+        : catalogSource();
+    request.then(
       (catalog) => set({ catalog, catalogStatus: "ready", catalogError: null }),
       (error: unknown) =>
         set({
@@ -228,6 +253,7 @@ export function createLlmSettingsStore<E extends object = object>(
       apiKey: activeKey(draft),
       model: draft.model,
       ...meta(),
+      language: draft.language,
       ...(draft.custom
         ? {
             customEndpoint: validateEndpoint(draft.customEndpoint) ?? draft.customEndpoint.trim(),
@@ -298,14 +324,16 @@ export function createLlmSettingsStore<E extends object = object>(
     setEndpoint: (customEndpoint) => editDraft({ customEndpoint }),
     setCustomModel: (customModel) => editDraft({ customModel }),
     setRememberKey: (rememberKey) => editDraft({ rememberKey }),
+    setLanguage: (language) => editDraft({ language: toLanguageCode(language) }),
 
     settings,
 
     async test(testOptions = {}) {
       set({ testing: true, testResult: null });
       try {
+        const testMode = options.testMode ?? "auto";
         const result = await testConnection(settings(), {
-          mode: options.testMode ?? "models",
+          mode: testMode === "auto" ? (state.draft.custom ? "models" : "generate") : testMode,
           signal: testOptions.signal,
           fetch: options.fetch,
         });
@@ -320,8 +348,8 @@ export function createLlmSettingsStore<E extends object = object>(
     async save(extra) {
       const { draft } = state;
       if (!canSave(draft)) return { ok: false, reason: "incomplete" };
-      if (draft.custom && !validateEndpoint(draft.customEndpoint))
-        return { ok: false, reason: "invalid-endpoint" };
+      const problem = draft.custom ? endpointProblem(draft.customEndpoint) : null;
+      if (problem) return { ok: false, reason: problem };
       const saved = { ...settings(), ...extra } as LlmSettings & E;
       await options.storage.save(saved, { rememberKey: draft.rememberKey });
       const stored = { ...saved, rememberKey: draft.rememberKey } as StoredSettings<E>;
@@ -340,6 +368,7 @@ export function createLlmSettingsStore<E extends object = object>(
           customApiKey: "",
           customEndpoint: "",
           customModel: "",
+          language: defaultLanguage(),
         },
         testResult: null,
       });

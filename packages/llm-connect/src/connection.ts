@@ -1,8 +1,12 @@
 import { loadModel } from "./model.js";
-import type { LlmSettings } from "./settings.js";
+import { endpointProblem, type LlmSettings } from "./settings.js";
 
-/** Why a connection failed: the key was refused, the browser blocked the call, another status, or no answer in time. */
-export type ConnectionFailureReason = "auth" | "cors" | "http" | "timeout" | "config";
+/**
+ * Why a connection failed: the key was refused, the browser blocked the call,
+ * another status, no answer in time, incomplete settings, or a custom endpoint
+ * in plain http to another machine (not called, so the key never leaves in clear).
+ */
+export type ConnectionFailureReason = "auth" | "cors" | "http" | "timeout" | "config" | "insecure";
 
 export type ConnectionResult =
   | {
@@ -184,6 +188,16 @@ export async function testConnection(
   settings: LlmSettings,
   options: TestConnectionOptions = {},
 ): Promise<ConnectionResult> {
+  if (settings.customEndpoint) {
+    const problem = endpointProblem(settings.customEndpoint);
+    if (problem === "insecure-endpoint")
+      return {
+        ok: false,
+        reason: "insecure",
+        message: "Plain http is only allowed to this machine: use https",
+      };
+    if (problem) return { ok: false, reason: "config", message: "Invalid endpoint URL" };
+  }
   if (options.mode === "generate") return generate(settings, options);
 
   if (settings.customEndpoint) {
