@@ -1035,7 +1035,7 @@ export function createProgram(): Command {
     .description("Build the slim provider/model catalog a web app ships (e.g. public/models.json)")
     .option(
       "--npm <packages>",
-      `Keep providers called through these AI SDK packages, comma-separated, or "callable" for ${CALLABLE_NPM.join(", ")}`,
+      `Keep providers called through these AI SDK packages, comma-separated, or "callable" for ${CALLABLE_NPM.join(", ")} (OpenAI-compatible providers of other SDKs included)`,
       commaList,
     )
     .option(

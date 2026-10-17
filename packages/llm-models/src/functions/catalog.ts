@@ -5,7 +5,11 @@ import { pickTiers } from "./latest";
 import { fetchUnifiedData } from "./normalize";
 
 export interface SlimCatalogOptions {
-  /** Keep only providers called through these AI SDK packages (all of them when omitted). */
+  /**
+   * Keep only providers called through these AI SDK packages (all of them when
+   * omitted). With `@ai-sdk/openai-compatible` in the list, the providers of
+   * {@link OPENAI_COMPATIBLE_SDKS} whose own SDK is not listed are kept through it.
+   */
   npm?: readonly string[];
   /** Provider ids that must end up in the catalog with models; throws otherwise. */
   required?: readonly string[];
@@ -25,6 +29,80 @@ export interface SlimCatalogOptions {
 interface CatalogSource {
   models: UnifiedModel[];
   modelsDevData: ModelsDevResponse;
+}
+
+const OPENAI_COMPATIBLE_NPM = "@ai-sdk/openai-compatible";
+
+/**
+ * Providers that models.dev maps to a dedicated AI SDK package (`sdk`) although
+ * their API also accepts OpenAI Chat Completions requests at `api`. When a
+ * catalog keeps `@ai-sdk/openai-compatible` but not `sdk`, the provider is
+ * listed through the generic SDK at that base URL. Each `api` answered a CORS
+ * preflight for an authenticated JSON POST to `<api>/chat/completions` from
+ * https://maxgfr.github.io on 2026-10-17; the comment cites the provider's
+ * documentation of that endpoint.
+ */
+export const OPENAI_COMPATIBLE_SDKS: Readonly<
+  Record<string, { readonly sdk: string; readonly api: string }>
+> = {
+  // https://inference-docs.cerebras.ai/api-reference/chat-completions
+  cerebras: { sdk: "@ai-sdk/cerebras", api: "https://api.cerebras.ai/v1" },
+  // https://docs.cohere.com/docs/compatibility-api (not the native /v2 API)
+  cohere: { sdk: "@ai-sdk/cohere", api: "https://api.cohere.ai/compatibility/v1" },
+  // https://deepinfra.com/docs/openai_api
+  deepinfra: { sdk: "@ai-sdk/deepinfra", api: "https://api.deepinfra.com/v1/openai" },
+  // https://console.groq.com/docs/openai
+  groq: { sdk: "@ai-sdk/groq", api: "https://api.groq.com/openai/v1" },
+  // https://openrouter.ai/docs/api-reference/overview
+  openrouter: { sdk: "@openrouter/ai-sdk-provider", api: "https://openrouter.ai/api/v1" },
+  // https://docs.perplexity.ai/guides/chat-completions-guide
+  perplexity: { sdk: "@ai-sdk/perplexity", api: "https://api.perplexity.ai" },
+  // https://docs.together.ai/docs/openai-api-compatibility
+  togetherai: { sdk: "@ai-sdk/togetherai", api: "https://api.together.xyz/v1" },
+  // https://docs.x.ai/docs/api-reference
+  xai: { sdk: "@ai-sdk/xai", api: "https://api.x.ai/v1" },
+};
+
+const PRIVATE_IPV4 = [/^127\./, /^10\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./];
+
+/**
+ * Whether a web page can call this base URL as listed: https, no placeholder
+ * left to fill (`{…}`, `${…}`, `<…>`), and a public host, not a loopback or
+ * private address (localhost, 127.0.0.0/8, ::1, 10/8, 172.16/12, 192.168/16,
+ * *.local). Local servers belong to a client's custom-endpoint presets.
+ */
+export function isUsableBaseUrl(api: string): boolean {
+  if (/[{<]/.test(api)) return false;
+  let url: URL;
+  try {
+    url = new URL(api);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
+  if (host === "[::1]") return false;
+  return !(/^\d+\.\d+\.\d+\.\d+$/.test(host) && PRIVATE_IPV4.some((range) => range.test(host)));
+}
+
+/**
+ * The SDK package and base URL the catalog lists a provider with: its own,
+ * or the generic SDK when only that one is allowed and its API is known to be
+ * OpenAI-compatible ({@link OPENAI_COMPATIBLE_SDKS}). Null when no allowed SDK calls it.
+ */
+function callableThrough(
+  id: string,
+  npm: string,
+  api: string | undefined,
+  allowedNpm: ReadonlySet<string> | null,
+): { npm: string; api: string | undefined } | null {
+  if (!allowedNpm || allowedNpm.has(npm)) return { npm, api };
+  const compatible = OPENAI_COMPATIBLE_SDKS[id];
+  if (compatible && compatible.sdk === npm && allowedNpm.has(OPENAI_COMPATIBLE_NPM)) {
+    return { npm: OPENAI_COMPATIBLE_NPM, api: compatible.api };
+  }
+  return null;
 }
 
 /** Text in, text out (when known), and not an embedding model. */
@@ -71,7 +149,8 @@ function recommendedModel(
 /**
  * The slim catalog of the providers a web app can call: id, name, SDK package,
  * base URL, recommended model and, per model, only what a settings form shows.
- * Keys are sorted so that two runs on the same data write the same file.
+ * A provider whose base URL a page cannot call as listed is left out
+ * ({@link isUsableBaseUrl}). Keys are sorted so that two runs on the same data write the same file.
  */
 export function slimCatalog(source: CatalogSource, options: SlimCatalogOptions = {}): SlimCatalog {
   const {
@@ -94,11 +173,18 @@ export function slimCatalog(source: CatalogSource, options: SlimCatalogOptions =
   const catalog: SlimCatalog = {};
   for (const id of Object.keys(source.modelsDevData).sort()) {
     const provider = source.modelsDevData[id];
-    const npm = provider.npm;
-    if (!npm || (allowedNpm && !allowedNpm.has(npm))) continue;
-    const api = provider.api || (fillDefaultApi ? DEFAULT_BASE_URLS[id] : undefined);
+    if (!provider.npm) continue;
+    const through = callableThrough(
+      id,
+      provider.npm,
+      provider.api || (fillDefaultApi ? DEFAULT_BASE_URLS[id] : undefined),
+      allowedNpm,
+    );
+    if (!through) continue;
+    const { npm, api } = through;
     // The generic SDK has no default URL: without one the provider cannot be called.
-    if (npm === "@ai-sdk/openai-compatible" && !api) continue;
+    if (npm === OPENAI_COMPATIBLE_NPM && !api) continue;
+    if (api && !isUsableBaseUrl(api)) continue;
 
     const models: Record<string, SlimModel> = {};
     for (const key of Object.keys(provider.models).sort()) {
