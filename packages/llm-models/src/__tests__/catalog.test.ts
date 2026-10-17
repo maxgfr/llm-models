@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { CALLABLE_NPM, defaultModelOf, filterCatalogModels, type SlimProvider } from "../catalog";
-import { slimCatalog } from "../functions/catalog";
+import { OPENAI_COMPATIBLE_SDKS, slimCatalog } from "../functions/catalog";
 import { normalizeModelsDevModel } from "../functions/normalize";
 import type { ModelsDevModel, ModelsDevProvider, ModelsDevResponse, UnifiedModel } from "../types";
 
@@ -53,7 +53,15 @@ const modelsDevData: ModelsDevResponse = {
   // Generic SDK without a URL: cannot be called
   nourl: devProvider("nourl", "@ai-sdk/openai-compatible", [devModel("x-1")]),
   // An SDK the client does not ship
+  venice: devProvider("venice", "venice-ai-sdk-provider", [devModel("venice-1")]),
+  // Dedicated SDKs whose API is also OpenAI-compatible
   groq: devProvider("groq", "@ai-sdk/groq", [devModel("llama-4")]),
+  cohere: devProvider(
+    "cohere",
+    "@ai-sdk/cohere",
+    [devModel("command-a")],
+    "https://api.cohere.com/v2",
+  ),
   // Only deprecated models left
   old: devProvider("old", "@ai-sdk/openai", [devModel("old-1", { status: "deprecated" })]),
 };
@@ -67,13 +75,76 @@ const source = { models, modelsDevData };
 describe("slimCatalog", () => {
   it("keeps only the providers called through the listed SDKs", () => {
     const catalog = slimCatalog(source, { npm: CALLABLE_NPM });
-    expect(Object.keys(catalog)).toEqual(["anthropic", "openai", "zai"]);
+    expect(Object.keys(catalog)).toEqual(["anthropic", "cohere", "groq", "openai", "zai"]);
+    expect(catalog.venice).toBeUndefined();
   });
 
   it("keeps every SDK when no npm list is given, but never a generic provider without a URL", () => {
     const catalog = slimCatalog(source);
-    expect(Object.keys(catalog)).toEqual(["anthropic", "groq", "openai", "zai"]);
+    expect(Object.keys(catalog)).toEqual([
+      "anthropic",
+      "cohere",
+      "groq",
+      "openai",
+      "venice",
+      "zai",
+    ]);
     expect(catalog.nourl).toBeUndefined();
+    expect(catalog.groq.npm).toBe("@ai-sdk/groq");
+  });
+
+  it("keeps OpenAI-compatible providers of other SDKs through the generic one", () => {
+    const catalog = slimCatalog(source, { npm: CALLABLE_NPM });
+    expect(catalog.groq).toEqual({
+      id: "groq",
+      name: "groq name",
+      npm: "@ai-sdk/openai-compatible",
+      api: "https://api.groq.com/openai/v1",
+      defaultModel: "llama-4",
+      models: { "llama-4": { id: "llama-4", name: "LLAMA-4", tool_call: true } },
+    });
+    // The compatibility endpoint replaces the native API models.dev lists
+    expect(catalog.cohere.npm).toBe("@ai-sdk/openai-compatible");
+    expect(catalog.cohere.api).toBe("https://api.cohere.ai/compatibility/v1");
+    // Even without the documented defaults: the generic SDK needs the URL
+    const bare = slimCatalog(source, { npm: CALLABLE_NPM, fillDefaultApi: false });
+    expect(bare.groq.api).toBe("https://api.groq.com/openai/v1");
+  });
+
+  it("keeps a provider on its own SDK when that SDK is listed", () => {
+    const catalog = slimCatalog(source, { npm: [...CALLABLE_NPM, "@ai-sdk/groq"] });
+    expect(catalog.groq.npm).toBe("@ai-sdk/groq");
+    expect(catalog.groq.api).toBe("https://api.groq.com/openai/v1");
+    expect(catalog.cohere.npm).toBe("@ai-sdk/openai-compatible");
+  });
+
+  it("lists no OpenAI-compatible provider when the generic SDK is not allowed", () => {
+    const catalog = slimCatalog(source, { npm: ["@ai-sdk/openai", "@ai-sdk/anthropic"] });
+    expect(Object.keys(catalog)).toEqual(["anthropic", "openai"]);
+  });
+
+  it("does not remap a provider whose models.dev SDK differs from the table's", () => {
+    const data: ModelsDevResponse = {
+      groq: devProvider("groq", "@acme/groq", [devModel("llama-4")]),
+    };
+    expect(slimCatalog({ models: [], modelsDevData: data }, { npm: CALLABLE_NPM })).toEqual({});
+  });
+
+  it("maps every OpenAI-compatible SDK to an https base URL", () => {
+    expect(Object.keys(OPENAI_COMPATIBLE_SDKS).sort()).toEqual([
+      "cerebras",
+      "cohere",
+      "deepinfra",
+      "groq",
+      "openrouter",
+      "perplexity",
+      "togetherai",
+      "xai",
+    ]);
+    for (const { sdk, api } of Object.values(OPENAI_COMPATIBLE_SDKS)) {
+      expect(sdk).not.toBe("@ai-sdk/openai-compatible");
+      expect(api).toMatch(/^https:\/\/[^/]+(\/[^/]+)*$/);
+    }
   });
 
   it("keeps only models a chat can use, unless told otherwise", () => {
@@ -146,8 +217,8 @@ describe("slimCatalog", () => {
   it("throws when a required provider is missing", () => {
     expect(() => slimCatalog(source, { npm: CALLABLE_NPM, required: ["openai"] })).not.toThrow();
     expect(() =>
-      slimCatalog(source, { npm: CALLABLE_NPM, required: ["openai", "groq", "old"] }),
-    ).toThrow("Catalog is missing required providers: groq, old");
+      slimCatalog(source, { npm: CALLABLE_NPM, required: ["openai", "venice", "old"] }),
+    ).toThrow("Catalog is missing required providers: venice, old");
   });
 
   it("writes the same JSON whatever the input order", () => {

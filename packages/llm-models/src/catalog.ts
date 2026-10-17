@@ -27,7 +27,11 @@ export interface SlimProvider {
 /** Providers keyed by models.dev id. */
 export type SlimCatalog = Record<string, SlimProvider>;
 
-/** The AI SDK packages llm-connect can call; other providers stay out of an app's catalog. */
+/**
+ * The AI SDK packages llm-connect can call; other providers stay out of an app's
+ * catalog, except those whose API is OpenAI-compatible: `slimCatalog` lists them
+ * through `@ai-sdk/openai-compatible` (`OPENAI_COMPATIBLE_SDKS` in `functions/catalog.ts`).
+ */
 export const CALLABLE_NPM: readonly string[] = [
   "@ai-sdk/anthropic",
   "@ai-sdk/google",
