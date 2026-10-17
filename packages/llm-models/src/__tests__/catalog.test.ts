@@ -76,6 +76,23 @@ describe("slimCatalog", () => {
     expect(catalog.nourl).toBeUndefined();
   });
 
+  it("keeps only models a chat can use, unless told otherwise", () => {
+    const data: ModelsDevResponse = {
+      google: devProvider("google", "@ai-sdk/google", [
+        devModel("gemini-3-pro"),
+        devModel("veo-3", { modalities: { input: ["text", "image"], output: ["video"] } }),
+        devModel("gemini-tts", { modalities: { input: ["text"], output: ["audio"] } }),
+        devModel("live-translate", { modalities: { input: ["audio"], output: ["audio", "text"] } }),
+        devModel("text-embedding-005"),
+        devModel("gemini-embed", { family: "gemini-embedding" }),
+      ]),
+    };
+    const chat = slimCatalog({ models: [], modelsDevData: data });
+    expect(Object.keys(chat.google!.models)).toEqual(["gemini-3-pro"]);
+    const all = slimCatalog({ models: [], modelsDevData: data }, { chatOnly: false });
+    expect(Object.keys(all.google!.models)).toHaveLength(6);
+  });
+
   it("drops deprecated models, and a provider left without any", () => {
     const catalog = slimCatalog(source, { npm: CALLABLE_NPM });
     expect(Object.keys(catalog.openai.models)).toEqual(["gpt-5", "gpt-5-mini"]);
