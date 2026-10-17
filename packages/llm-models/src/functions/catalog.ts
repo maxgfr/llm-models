@@ -1,5 +1,5 @@
 import type { SlimCatalog, SlimModel, SlimProvider } from "../catalog";
-import type { ModelsDevResponse, UnifiedModel } from "../types";
+import type { ModelsDevModel, ModelsDevResponse, UnifiedModel } from "../types";
 import { DEFAULT_BASE_URLS } from "./browser";
 import { pickTiers } from "./latest";
 import { fetchUnifiedData } from "./normalize";
@@ -11,6 +11,11 @@ export interface SlimCatalogOptions {
   required?: readonly string[];
   /** Leave deprecated models out. Default true. */
   dropDeprecated?: boolean;
+  /**
+   * Keep only models a chat can use: text in and text out when models.dev
+   * lists their modalities, and no embedding model. Default true.
+   */
+  chatOnly?: boolean;
   /** Attach each provider's recommended model as `defaultModel`. Default true. */
   defaultModel?: boolean;
   /** Fill a missing `api` from the documented base URL of well-known providers. Default true. */
@@ -20,6 +25,14 @@ export interface SlimCatalogOptions {
 interface CatalogSource {
   models: UnifiedModel[];
   modelsDevData: ModelsDevResponse;
+}
+
+/** Text in, text out (when known), and not an embedding model. */
+function isChatModel(model: ModelsDevModel, key: string): boolean {
+  const { input, output } = model.modalities ?? {};
+  if (output && !output.includes("text")) return false;
+  if (input && !input.includes("text")) return false;
+  return !/embed/i.test(model.id || key) && !/embed/i.test(model.family ?? "");
 }
 
 /** Maps a pick such as "openai/gpt-x" back to a key of the provider's `models`. */
@@ -65,6 +78,7 @@ export function slimCatalog(source: CatalogSource, options: SlimCatalogOptions =
     npm: allowed,
     required = [],
     dropDeprecated = true,
+    chatOnly = true,
     defaultModel = true,
     fillDefaultApi = true,
   } = options;
@@ -90,6 +104,7 @@ export function slimCatalog(source: CatalogSource, options: SlimCatalogOptions =
     for (const key of Object.keys(provider.models).sort()) {
       const model = provider.models[key];
       if (dropDeprecated && model.status === "deprecated") continue;
+      if (chatOnly && !isChatModel(model, key)) continue;
       models[key] = {
         id: model.id || key,
         name: model.name || key,
