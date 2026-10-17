@@ -63,6 +63,29 @@ export const OPENAI_COMPATIBLE_SDKS: Readonly<
   xai: { sdk: "@ai-sdk/xai", api: "https://api.x.ai/v1" },
 };
 
+const PRIVATE_IPV4 = [/^127\./, /^10\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./];
+
+/**
+ * Whether a web page can call this base URL as listed: https, no placeholder
+ * left to fill (`{…}`, `${…}`, `<…>`), and a public host, not a loopback or
+ * private address (localhost, 127.0.0.0/8, ::1, 10/8, 172.16/12, 192.168/16,
+ * *.local). Local servers belong to a client's custom-endpoint presets.
+ */
+export function isUsableBaseUrl(api: string): boolean {
+  if (/[{<]/.test(api)) return false;
+  let url: URL;
+  try {
+    url = new URL(api);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
+  if (host === "[::1]") return false;
+  return !(/^\d+\.\d+\.\d+\.\d+$/.test(host) && PRIVATE_IPV4.some((range) => range.test(host)));
+}
+
 /**
  * The SDK package and base URL the catalog lists a provider with: its own,
  * or the generic SDK when only that one is allowed and its API is known to be
@@ -126,7 +149,8 @@ function recommendedModel(
 /**
  * The slim catalog of the providers a web app can call: id, name, SDK package,
  * base URL, recommended model and, per model, only what a settings form shows.
- * Keys are sorted so that two runs on the same data write the same file.
+ * A provider whose base URL a page cannot call as listed is left out
+ * ({@link isUsableBaseUrl}). Keys are sorted so that two runs on the same data write the same file.
  */
 export function slimCatalog(source: CatalogSource, options: SlimCatalogOptions = {}): SlimCatalog {
   const {
@@ -160,6 +184,7 @@ export function slimCatalog(source: CatalogSource, options: SlimCatalogOptions =
     const { npm, api } = through;
     // The generic SDK has no default URL: without one the provider cannot be called.
     if (npm === OPENAI_COMPATIBLE_NPM && !api) continue;
+    if (api && !isUsableBaseUrl(api)) continue;
 
     const models: Record<string, SlimModel> = {};
     for (const key of Object.keys(provider.models).sort()) {

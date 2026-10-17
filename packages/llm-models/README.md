@@ -311,7 +311,10 @@ llm-models catalog --npm @ai-sdk/openai,@ai-sdk/openai-compatible   # JSON on st
 Each provider carries `id`, `name`, `npm` (the AI SDK package), `api` (base URL; documented
 defaults are filled for openai, anthropic, google, mistral…) and `defaultModel` (the balanced pick
 of `latest`), and each model only `id`, `name`, `tool_call` and `reasoning`. Deprecated models are
-left out, as are providers using the generic `@ai-sdk/openai-compatible` SDK without a URL.
+left out, as are providers using the generic `@ai-sdk/openai-compatible` SDK without a URL, and
+providers whose base URL a page cannot call as listed: templated (`{`, `${`, `<`), plain `http`, or
+a loopback or private host (localhost, 127.0.0.0/8, ::1, 10/8, 172.16/12, 192.168/16, `*.local`).
+Local servers such as LM Studio belong to a client's custom-endpoint presets.
 
 When `--npm` lists `@ai-sdk/openai-compatible` (as `callable` does) but not a provider's own SDK,
 providers whose API is OpenAI-compatible are kept through the generic SDK, with that endpoint as

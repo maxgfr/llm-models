@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { CALLABLE_NPM, defaultModelOf, filterCatalogModels, type SlimProvider } from "../catalog";
-import { OPENAI_COMPATIBLE_SDKS, slimCatalog } from "../functions/catalog";
+import { isUsableBaseUrl, OPENAI_COMPATIBLE_SDKS, slimCatalog } from "../functions/catalog";
 import { normalizeModelsDevModel } from "../functions/normalize";
 import type { ModelsDevModel, ModelsDevProvider, ModelsDevResponse, UnifiedModel } from "../types";
 
@@ -238,6 +238,64 @@ describe("slimCatalog", () => {
       ),
     );
     expect(b).toBe(a);
+  });
+});
+
+describe("unusable base URLs", () => {
+  const unusable: Record<string, string> = {
+    cloudflare: "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+    databricks: "https://${DATABRICKS_HOST}/ai-gateway/mlflow/v1",
+    neon: "${NEON_AI_GATEWAY_BASE_URL}/v1",
+    braces: "https://api.example.com/{region}/v1",
+    angle: "https://<account>.example.com/v1",
+    plainhttp: "http://api.example.com/v1",
+    lmstudio: "http://127.0.0.1:1234/v1",
+    privatemode: "http://localhost:8080/v1",
+    httpslocalhost: "https://localhost:8443/v1",
+    loopback: "https://127.0.0.2/v1",
+    ipv6: "https://[::1]:8080/v1",
+    ten: "https://10.1.2.3/v1",
+    lan172: "https://172.20.0.5/v1",
+    lan192: "https://192.168.1.10/v1",
+    mdns: "https://gpu-box.local/v1",
+    garbage: "not a url",
+  };
+  const usable: Record<string, string> = {
+    zai: "https://api.z.ai/api/paas/v4",
+    public172: "https://172.32.0.1/v1",
+    public10host: "https://10x.example.com/v1",
+    publicip: "https://8.8.8.8/v1",
+  };
+
+  it("accepts only https URLs on a public host with nothing left to fill", () => {
+    for (const api of Object.values(unusable))
+      expect([api, isUsableBaseUrl(api)]).toEqual([api, false]);
+    for (const api of Object.values(usable))
+      expect([api, isUsableBaseUrl(api)]).toEqual([api, true]);
+  });
+
+  it("leaves providers with an unusable base URL out of the catalog", () => {
+    const data: ModelsDevResponse = Object.fromEntries(
+      Object.entries({ ...unusable, ...usable }).map(([id, api]) => [
+        id,
+        devProvider(id, "@ai-sdk/openai-compatible", [devModel(`${id}-1`)], api),
+      ]),
+    );
+    const sorted = Object.keys(usable).sort();
+    expect(
+      Object.keys(slimCatalog({ models: [], modelsDevData: data }, { npm: CALLABLE_NPM })),
+    ).toEqual(sorted);
+    expect(Object.keys(slimCatalog({ models: [], modelsDevData: data }))).toEqual(sorted);
+  });
+
+  it("judges the URL of any SDK, and keeps a native SDK without one", () => {
+    const data: ModelsDevResponse = {
+      local: devProvider("local", "@ai-sdk/openai", [devModel("l-1")], "http://localhost:11434/v1"),
+      native: devProvider("native", "@ai-sdk/anthropic", [devModel("n-1")]),
+    };
+    expect(
+      Object.keys(slimCatalog({ models: [], modelsDevData: data }, { fillDefaultApi: false })),
+    ).toEqual(["native"]);
   });
 });
 
