@@ -1,4 +1,5 @@
 import { CALLABLE_NPM, type SlimCatalog, type SlimProvider } from "llm-models/catalog";
+import { CATALOG_CACHE_NAME, CATALOG_CACHE_TTL_MS, cachedFetch } from "./http-cache.js";
 import type { LlmSettings } from "./settings.js";
 
 /** Providers a settings form lists first: the four whose SDK is native. */
@@ -40,19 +41,31 @@ export interface LiveCatalogOptions {
   npm?: readonly string[];
   /** Provider ids the live catalog must list; the fallback is used otherwise. */
   required?: readonly string[];
-  /** fetch for the fallback. */
+  /** fetch for the fallback and for the live build's API requests. */
   fetch?: typeof fetch;
+  /**
+   * Cache Storage name the live build keeps the API responses in, so the next
+   * page load reuses them; `false` keeps them in memory only (llm-models' cache).
+   * Default `"llm-connect-catalog"`. Without Cache Storage (no browser, an
+   * insecure context), the in-memory cache is used.
+   */
+  cacheName?: string | false;
+  /** Milliseconds a cached response is used before it is revalidated. Default 1 hour. */
+  cacheTtlMs?: number;
+  /** Cache Storage to use. Default `globalThis.caches`. */
+  cacheStorage?: CacheStorage;
   /** Builds the catalog; default `buildSlimCatalog` from `llm-models/browser`, imported on first call. */
-  build?: (options: {
-    npm: readonly string[];
-    required?: readonly string[];
-  }) => Promise<SlimCatalog>;
+  build?: (options: BuildOptions) => Promise<SlimCatalog>;
 }
 
-async function buildFromLlmModels(options: {
+interface BuildOptions {
   npm: readonly string[];
   required?: readonly string[];
-}): Promise<SlimCatalog> {
+  /** fetch for the API requests, with the persistent cache in front. */
+  fetch: typeof fetch;
+}
+
+async function buildFromLlmModels(options: BuildOptions): Promise<SlimCatalog> {
   // Imported on demand: Zod and the API clients only load when settings open
   const { buildSlimCatalog } = await import("llm-models/browser");
   return buildSlimCatalog(options);
@@ -64,14 +77,37 @@ async function buildFromLlmModels(options: {
  * daily `models.json` commit. When that fails (offline, an API down, a
  * required provider missing), it downloads `fallbackUrl` instead. Callers share
  * one request; a failed one is forgotten, so the next call retries.
+ *
+ * The API responses are kept in Cache Storage, keyed by URL: for `cacheTtlMs`
+ * the next page load builds from them without a request, then they are
+ * revalidated (ETag), and an expired copy still serves when the network fails.
  */
 export function liveCatalog(options: LiveCatalogOptions = {}): () => Promise<SlimCatalog> {
-  const { fallbackUrl, npm = CALLABLE_NPM, required, build = buildFromLlmModels } = options;
+  const {
+    fallbackUrl,
+    npm = CALLABLE_NPM,
+    required,
+    build = buildFromLlmModels,
+    cacheName = CATALOG_CACHE_NAME,
+    cacheTtlMs = CATALOG_CACHE_TTL_MS,
+  } = options;
+  // Resolved on each call, so a fetch replaced after this loader was made is used
+  const network = ((input: RequestInfo | URL, init?: RequestInit) =>
+    (options.fetch ?? globalThis.fetch)(input, init)) as typeof fetch;
+  const fetchApi =
+    cacheName === false
+      ? network
+      : cachedFetch({
+          cacheName,
+          ttlMs: cacheTtlMs,
+          fetch: network,
+          ...(options.cacheStorage ? { caches: options.cacheStorage } : {}),
+        });
   let request: Promise<SlimCatalog> | null = null;
 
   async function load(): Promise<SlimCatalog> {
     try {
-      const catalog = await build({ npm, ...(required ? { required } : {}) });
+      const catalog = await build({ npm, ...(required ? { required } : {}), fetch: fetchApi });
       if (Object.keys(catalog).length === 0) throw new Error("Empty catalog");
       return catalog;
     } catch (error) {

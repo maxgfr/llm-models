@@ -100,7 +100,8 @@ Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v7, `@a
 - `src/language.ts` - `RESPONSE_LANGUAGES` (16, stored as codes), `languageName`, `toLanguageCode`, `browserLanguage`
 - `src/storage.ts` - `SettingsStorage` interface and `webStorage` (key in clear: compatibility only)
 - `src/secure-storage.ts` - `secureStorage`: prefs in localStorage, key AES-GCM encrypted under a non-extractable CryptoKey in IndexedDB (ciphertext in IndexedDB when remembered, sessionStorage otherwise)
-- `src/catalog-client.ts` - `liveCatalog` (lazy `llm-models/browser` build, static fallback), `loadCatalog` (one shared request per URL, forgotten on failure), `splitProviders`, `providerMeta`, `DEFAULT_RECOMMENDED`
+- `src/catalog-client.ts` - `liveCatalog` (lazy `llm-models/browser` build through `cachedFetch`, static fallback), `loadCatalog` (one shared request per URL, forgotten on failure), `splitProviders`, `providerMeta`, `DEFAULT_RECOMMENDED`
+- `src/http-cache.ts` - `cachedFetch`: GET responses in Cache Storage keyed by URL (1 h TTL, ETag revalidation on the page's origin, stale copy on network failure); plain fetch without Cache Storage; no Node APIs
 - `src/store.ts` - `createLlmSettingsStore`: framework-free state + actions, Svelte store contract
 - `src/react.ts` - entry `llm-connect/react`: `useLlmSettings`, `useLlmStore`
 
@@ -112,7 +113,7 @@ Conventions:
   range before `npm publish`, after `@semantic-release/git` committed `package.json`
 - npm must never reinstall the workspace (`NPM_CONFIG_WORKSPACES_UPDATE=false` in `publish.yml`):
   it rejects the `workspace:` protocol and the bun-installed tree
-- Tests: `bun test` in the package; React hooks under happy-dom (`react.test.ts`), IndexedDB from `fake-indexeddb`
+- Tests: `bun test` in the package; React hooks under happy-dom (`react.test.ts`), IndexedDB from `fake-indexeddb`, Cache Storage from `__tests__/fake-cache-storage.ts`
 
 ## Code conventions
 - Strict TypeScript (`strict: true`)

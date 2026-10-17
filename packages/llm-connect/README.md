@@ -153,6 +153,20 @@ API down, a `required` provider missing), it downloads `fallbackUrl`. Every call
 request; a failure is forgotten, so retrying works. The page's `connect-src` must allow
 `https://models.dev` and `https://openrouter.ai`.
 
+The two API responses (models.dev's is about 5.7 MB) are kept in Cache Storage, keyed by URL, so
+the next page load or PWA launch does not download them again:
+
+- for `cacheTtlMs` (1 hour, as in llm-models) a stored response is used without a request;
+- after that it is revalidated: with `If-None-Match` and its ETag on the page's own origin (a 304
+  keeps it), and through the browser's HTTP cache across origins, where a manual `If-None-Match`
+  would need a CORS preflight that models.dev and OpenRouter refuse;
+- when the network fails or an API errors, the stored response is used however old it is.
+
+`cacheName` (default `"llm-connect-catalog"`) names the cache, `false` turns it off, and
+`cacheStorage` replaces `globalThis.caches`. Without Cache Storage (outside a browser, or in an
+insecure context) the responses stay in llm-models' in-memory cache, as before. `fetch` is used for
+these requests and for `fallbackUrl`.
+
 ### Storage
 
 `secureStorage({ prefsKey, dbName, sessionKey? })` (recommended):
