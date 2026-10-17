@@ -278,6 +278,82 @@ describe("testConnection, generate mode", () => {
   });
 });
 
+describe("testConnection, auto mode", () => {
+  let generations = 0;
+  beforeEach(() => {
+    generations = 0;
+    registerProvider(
+      "openai",
+      () =>
+        new MockLanguageModelV4({
+          doGenerate: async () => {
+            generations++;
+            return {
+              content: [{ type: "text", text: "OK" }],
+              finishReason: { unified: "stop", raw: "stop" },
+              usage: {
+                inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+                outputTokens: { total: 1, text: 1, reasoning: 0 },
+              },
+              warnings: [],
+            };
+          },
+        }) as unknown as LanguageModel,
+    );
+  });
+
+  const settings = {
+    apiKey: "k",
+    model: "gpt-5",
+    providerNpm: "@ai-sdk/openai",
+    providerApi: "https://api.openai.com/v1",
+  };
+
+  it("never generates by default, even when the server has no model list", async () => {
+    const fetch = fakeFetch(() => json({}, 404));
+    expect(await testConnection(settings, { fetch })).toEqual({
+      ok: false,
+      reason: "http",
+      status: 404,
+    });
+    expect(generations).toBe(0);
+  });
+
+  it("stops at the model list when the server gives one", async () => {
+    const fetch = fakeFetch(() => json({ data: [{ id: "gpt-5" }] }));
+    expect(await testConnection(settings, { mode: "auto", fetch })).toEqual({
+      ok: true,
+      modelCount: 1,
+      models: ["gpt-5"],
+    });
+    expect(generations).toBe(0);
+  });
+
+  it("keeps a refused key or a server error as the verdict", async () => {
+    expect(
+      await testConnection(settings, { mode: "auto", fetch: fakeFetch(() => json({}, 401)) }),
+    ).toEqual({ ok: false, reason: "auth", status: 401 });
+    expect(
+      await testConnection(settings, { mode: "auto", fetch: fakeFetch(() => json({}, 500)) }),
+    ).toEqual({ ok: false, reason: "http", status: 500 });
+    expect(generations).toBe(0);
+  });
+
+  it("generates when the server has no model list to give", async () => {
+    for (const status of [404, 405, 501]) {
+      expect(
+        await testConnection(settings, { mode: "auto", fetch: fakeFetch(() => json({}, status)) }),
+      ).toEqual({ ok: true });
+    }
+    const blocked = fakeFetch(() => Promise.reject(new TypeError("Failed to fetch")));
+    expect(await testConnection(settings, { mode: "auto", fetch: blocked })).toEqual({ ok: true });
+    const { providerApi: _, ...noUrl } = settings;
+    expect(await testConnection(noUrl, { mode: "auto", fetch: blocked })).toEqual({ ok: true });
+    expect(generations).toBe(5);
+    expect(calls).toHaveLength(4);
+  });
+});
+
 afterEach(() => {
   calls = [];
 });

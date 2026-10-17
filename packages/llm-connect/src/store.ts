@@ -42,8 +42,10 @@ export interface LlmStoreOptions<E extends object = object> {
   /** Provider ids listed first, in this order. Default OpenAI, Anthropic, Google, Mistral. */
   recommended?: readonly string[];
   /**
-   * How `test()` checks the settings (see `testConnection`). Default "auto":
-   * the model list of a custom endpoint, a one-line generation for a provider.
+   * How `test()` checks the settings (see `testConnection`). Default "models":
+   * the model list, which costs nothing. "generate" runs a one-line generation
+   * (a few tokens of the user's quota); "auto" lists first and generates only
+   * when the server has no model list to give.
    */
   testMode?: "auto" | "models" | "generate";
   /** Draft values before anything is saved. The language defaults to the browser's. */
@@ -331,9 +333,8 @@ export function createLlmSettingsStore<E extends object = object>(
     async test(testOptions = {}) {
       set({ testing: true, testResult: null });
       try {
-        const testMode = options.testMode ?? "auto";
         const result = await testConnection(settings(), {
-          mode: testMode === "auto" ? (state.draft.custom ? "models" : "generate") : testMode,
+          mode: options.testMode ?? "models",
           signal: testOptions.signal,
           fetch: options.fetch,
         });

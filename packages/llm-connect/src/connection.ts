@@ -11,7 +11,7 @@ export type ConnectionFailureReason = "auth" | "cors" | "http" | "timeout" | "co
 export type ConnectionResult =
   | {
       ok: true;
-      /** Models the server lists (`models` mode, when it answers with a list). */
+      /** Models the server lists (`models` and `auto` modes, when it answers with a list). */
       modelCount?: number;
       /** Their ids. */
       models?: string[];
@@ -26,13 +26,17 @@ export type ConnectionResult =
 
 export interface TestConnectionOptions {
   /**
-   * `models` (default): `GET {base}/models` with the provider's auth headers. Cheap, but some
+   * `models` (default): `GET {base}/models` with the provider's auth headers. Free, but some
    * providers refuse it from a browser while generation works.
-   * `generate`: a one-line generation through the AI SDK, as the app will call it.
+   * `generate`: a one-line generation through the AI SDK, as the app will call it. It spends
+   * a few tokens of the user's quota, so it only runs when asked for.
+   * `auto`: `models` first; the generation only when the server has no model list to give
+   * (404, 405, 501, the request blocked by the browser, or no API URL). Choosing it opts in
+   * to that cost.
    */
-  mode?: "models" | "generate";
+  mode?: "models" | "generate" | "auto";
   signal?: AbortSignal;
-  /** Milliseconds; defaults to 5 s for a custom endpoint and 10 s for a provider in `models` mode, none in `generate` mode. */
+  /** Milliseconds; defaults to 5 s for a custom endpoint and 10 s for a provider when listing models, none for a generation. */
   timeoutMs?: number;
   fetch?: typeof fetch;
 }
@@ -180,9 +184,45 @@ async function generate(
   }
 }
 
+/** Statuses that say the server has no model list, rather than refusing the key. */
+const NO_LIST_STATUSES = new Set([404, 405, 501]);
+
+/** Whether a failed listing leaves the connection unknown, so `auto` may try a generation. */
+function listingUnavailable(result: ConnectionResult): boolean {
+  if (result.ok) return false;
+  if (result.reason === "cors") return true;
+  return (
+    result.reason === "http" && result.status !== undefined && NO_LIST_STATUSES.has(result.status)
+  );
+}
+
+/** The model list the settings point to, or null when there is no URL to list. */
+async function listModels(
+  settings: LlmSettings,
+  options: TestConnectionOptions,
+): Promise<ConnectionResult | null> {
+  if (settings.customEndpoint) {
+    return listEndpointModels(settings.customEndpoint, settings.apiKey, {
+      signal: options.signal,
+      fetch: options.fetch,
+      timeoutMs: options.timeoutMs ?? ENDPOINT_TIMEOUT_MS,
+    });
+  }
+  const base = trimBase(settings.providerApi ?? "");
+  if (!base) return null;
+  return getModels(`${base}/models`, authHeaders(settings.providerNpm, settings.apiKey), {
+    signal: options.signal,
+    fetch: options.fetch,
+    timeoutMs: options.timeoutMs ?? PROVIDER_TIMEOUT_MS,
+  });
+}
+
 /**
  * Check that the settings reach a model. Never throws on a failed connection
  * (only when `signal` aborts): the result says why it failed.
+ *
+ * Free by default: it lists the models and never runs a generation unless
+ * `mode` is `generate`, or `auto` and the server has no model list to give.
  */
 export async function testConnection(
   settings: LlmSettings,
@@ -200,19 +240,8 @@ export async function testConnection(
   }
   if (options.mode === "generate") return generate(settings, options);
 
-  if (settings.customEndpoint) {
-    return listEndpointModels(settings.customEndpoint, settings.apiKey, {
-      signal: options.signal,
-      fetch: options.fetch,
-      timeoutMs: options.timeoutMs ?? ENDPOINT_TIMEOUT_MS,
-    });
-  }
-
-  const base = trimBase(settings.providerApi ?? "");
-  if (!base) return { ok: false, reason: "config", message: "No API URL for this provider" };
-  return getModels(`${base}/models`, authHeaders(settings.providerNpm, settings.apiKey), {
-    signal: options.signal,
-    fetch: options.fetch,
-    timeoutMs: options.timeoutMs ?? PROVIDER_TIMEOUT_MS,
-  });
+  const listed = await listModels(settings, options);
+  if (options.mode === "auto" && (!listed || listingUnavailable(listed)))
+    return generate(settings, options);
+  return listed ?? { ok: false, reason: "config", message: "No API URL for this provider" };
 }

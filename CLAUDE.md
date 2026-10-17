@@ -95,7 +95,7 @@ Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v7, `@a
 - `src/registry.ts` - provider registry (`registerProvider`, `fromSDK`, npm aliases → short names)
 - `src/model.ts` - `createModel` (sync, registered providers) / `loadModel` (imports a built-in provider on demand)
 - `src/providers/*.ts` - one module per built-in SDK (`factory`, `register()`), plus `all.ts`; entry `llm-connect/providers/*`
-- `src/connection.ts` - `testConnection` (`models` | `generate`), `listEndpointModels`; never throws on a failed connection
+- `src/connection.ts` - `testConnection` (`models` by default, free; `generate`; `auto`: models, then a generation only when there is no list), `listEndpointModels`; never throws on a failed connection
 - `src/settings.ts` - `LlmSettings`, `LlmDraft`, `isConfigured` (custom endpoint needs a model), `canSave`, `endpointProblem` / `validateEndpoint` (https, or http on loopback only), `ENDPOINT_PRESETS`
 - `src/language.ts` - `RESPONSE_LANGUAGES` (16, stored as codes), `languageName`, `toLanguageCode`, `browserLanguage`
 - `src/storage.ts` - `SettingsStorage` interface and `webStorage` (key in clear: compatibility only)

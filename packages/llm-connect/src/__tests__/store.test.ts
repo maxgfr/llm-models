@@ -429,7 +429,7 @@ describe("createLlmSettingsStore", () => {
     expect(saves).toHaveLength(1);
   });
 
-  it("tests a provider with a real generation by default, and never calls an insecure endpoint", async () => {
+  it("tests a provider through its model list by default, without spending tokens", async () => {
     clearProviders();
     const prompts: unknown[] = [];
     registerProvider("openai", () => {
@@ -448,24 +448,75 @@ describe("createLlmSettingsStore", () => {
         },
       });
     });
-    const calls: string[] = [];
+    const calls: { url: string; authorization: string | null }[] = [];
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({
+        url: String(input),
+        authorization: new Headers(init?.headers).get("authorization"),
+      });
+      return new Response(JSON.stringify({ data: [{ id: "gpt-5" }, { id: "gpt-5-mini" }] }));
+    }) as typeof globalThis.fetch;
+
     const store = createLlmSettingsStore({
       catalog: async () => catalog,
       storage: memoryStorage().storage,
-      fetch: (async (input: RequestInfo | URL) => {
-        calls.push(String(input));
-        return new Response("{}");
-      }) as typeof fetch,
+      fetch,
     });
     store.setApiKey("sk");
-    expect(await store.test()).toEqual({ ok: true });
+    expect(await store.test()).toEqual({
+      ok: true,
+      modelCount: 2,
+      models: ["gpt-5", "gpt-5-mini"],
+    });
+    expect(calls).toEqual([
+      { url: "https://api.openai.com/v1/models", authorization: "Bearer sk" },
+    ]);
+    expect(prompts).toHaveLength(0);
+
+    // A generation only when the app asks for one
+    calls.length = 0;
+    const generating = createLlmSettingsStore({
+      catalog: async () => catalog,
+      storage: memoryStorage().storage,
+      testMode: "generate",
+      fetch,
+    });
+    generating.setApiKey("sk");
+    expect(await generating.test()).toEqual({ ok: true });
     expect(prompts).toHaveLength(1);
     expect(calls).toEqual([]);
+    clearProviders();
+  });
 
-    store.toggleCustom(true);
-    store.setEndpoint("http://192.168.1.10/v1");
-    expect(await store.test()).toMatchObject({ ok: false, reason: "insecure" });
+  it("never calls an insecure endpoint, whatever the test mode", async () => {
+    clearProviders();
+    const prompts: unknown[] = [];
+    registerProvider("openai", () => {
+      return new MockLanguageModelV4({
+        doGenerate: async (options) => {
+          prompts.push(options.prompt);
+          throw new Error("must not be called");
+        },
+      });
+    });
+    const calls: string[] = [];
+    const fetch = (async (input: RequestInfo | URL) => {
+      calls.push(String(input));
+      return new Response("{}");
+    }) as typeof globalThis.fetch;
+    for (const testMode of ["models", "auto", "generate"] as const) {
+      const store = createLlmSettingsStore({
+        catalog: async () => catalog,
+        storage: memoryStorage().storage,
+        testMode,
+        fetch,
+      });
+      store.toggleCustom(true);
+      store.setEndpoint("http://192.168.1.10/v1");
+      expect(await store.test()).toMatchObject({ ok: false, reason: "insecure" });
+    }
     expect(calls).toEqual([]);
+    expect(prompts).toEqual([]);
     clearProviders();
   });
 });

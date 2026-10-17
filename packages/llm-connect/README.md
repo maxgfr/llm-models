@@ -81,14 +81,20 @@ What the built-in providers take care of:
 ```ts
 import { testConnection } from "llm-connect";
 
-const result = await testConnection(settings, { mode: "models" });
+const result = await testConnection(settings); // lists the models: costs nothing
 if (!result.ok) console.log(result.reason); // "auth" | "cors" | "http" | "timeout" | "config" | "insecure"
 ```
 
+A test is free unless you ask for a generation:
+
 - `models` (default): `GET {base}/models` with the provider's own auth headers (`x-api-key` for
   Anthropic, `x-goog-api-key` for Google, a bearer token otherwise). 5 s for a custom endpoint, 10 s
-  for a provider. Returns the model ids a server lists.
-- `generate`: a short generation through the AI SDK, exactly as the app will call the model.
+  for a provider. Returns the model ids a server lists. Never runs a generation.
+- `generate`: a short generation through the AI SDK, exactly as the app will call the model. It
+  spends a few tokens of the user's quota, so it only runs when you pass `mode: "generate"`.
+- `auto`: `models` first, then the generation only when the server has no model list to give
+  (404, 405 or 501, the request blocked by the browser, or no API URL). A refused key (401/403),
+  another status or a timeout stays the verdict. Passing `auto` opts in to that generation.
 
 A custom endpoint in plain http to another machine is not called at all (`insecure`).
 
@@ -126,7 +132,7 @@ Options:
 | `catalog` | required | A URL (`"/models.json"`) or a loader such as `liveCatalog(…)`; `catalogUrl` is a deprecated alias |
 | `storage` | required | `secureStorage(…)`, `webStorage(…)` or your own `SettingsStorage` |
 | `recommended` | `DEFAULT_RECOMMENDED` | Provider ids listed first: OpenAI, Anthropic, Google, Mistral |
-| `testMode` | `"auto"` | `auto`: the model list of a custom endpoint, a real generation for a provider; or `models` / `generate` |
+| `testMode` | `"models"` | The `testConnection` mode of `test()`: `models` (free), `auto` (model list, a generation only when there is none) or `generate` |
 | `defaults` | | `providerId`, `model`, `rememberKey` (false), `language` (the browser's) |
 
 State (`store.getState()`): `catalog`, `catalogStatus` (`idle | loading | error | ready`),
