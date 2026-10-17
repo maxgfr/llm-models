@@ -90,8 +90,8 @@ From `packages/llm-models`:
 - `.github/workflows/` - CI/CD (build, test, lint, publish, monitor-apis)
 
 ## llm-connect (`packages/llm-connect`)
-Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v6, `@ai-sdk/*` v3,
-`@ai-sdk/openai-compatible` v2, all optional peers) and `llm-models/catalog`.
+Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v7, `@ai-sdk/*` v4,
+`@ai-sdk/openai-compatible` v3, all optional peers) and `llm-models/catalog`.
 - `src/registry.ts` - provider registry (`registerProvider`, `fromSDK`, npm aliases → short names)
 - `src/model.ts` - `createModel` (sync, registered providers) / `loadModel` (imports a built-in provider on demand)
 - `src/providers/*.ts` - one module per built-in SDK (`factory`, `register()`), plus `all.ts`; entry `llm-connect/providers/*`

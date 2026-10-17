@@ -65,12 +65,12 @@
     "llm-models": "workspace:^"
   },
   "peerDependencies": {
-    "ai": "^6.0.0",
-    "@ai-sdk/anthropic": "^3.0.0",
-    "@ai-sdk/google": "^3.0.0",
-    "@ai-sdk/mistral": "^3.0.0",
-    "@ai-sdk/openai": "^3.0.0",
-    "@ai-sdk/openai-compatible": "^2.0.0",
+    "ai": "^7.0.0",
+    "@ai-sdk/anthropic": "^4.0.0",
+    "@ai-sdk/google": "^4.0.0",
+    "@ai-sdk/mistral": "^4.0.0",
+    "@ai-sdk/openai": "^4.0.0",
+    "@ai-sdk/openai-compatible": "^3.0.0",
     "react": ">=18"
   },
   "peerDependenciesMeta": {
@@ -97,15 +97,15 @@
     }
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^3.0.132",
-    "@ai-sdk/google": "^3.0.134",
-    "@ai-sdk/mistral": "^3.0.73",
-    "@ai-sdk/openai": "^3.0.129",
-    "@ai-sdk/openai-compatible": "^2.0.84",
+    "@ai-sdk/anthropic": "^4.0.82",
+    "@ai-sdk/google": "^4.0.99",
+    "@ai-sdk/mistral": "^4.0.66",
+    "@ai-sdk/openai": "^4.0.96",
+    "@ai-sdk/openai-compatible": "^3.0.71",
     "@happy-dom/global-registrator": "^21.0.3",
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.2.7",
-    "ai": "^6.0.308",
+    "ai": "^7.0.143",
     "fake-indexeddb": "^6.2.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

@@ -21,7 +21,8 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
 npm install llm-connect llm-models ai @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @ai-sdk/mistral @ai-sdk/openai-compatible
 ```
 
-`ai` (v6) and the `@ai-sdk/*` packages are optional peers: install the ones your users can pick.
+`ai` (v7), the `@ai-sdk/*` packages (v4) and `@ai-sdk/openai-compatible` (v3) are optional peers:
+install the ones your users can pick.
 `react` (18+) is only needed for `llm-connect/react`.
 
 The store builds the catalog in the browser when settings open (see

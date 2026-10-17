@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import type { LanguageModel } from "ai";
-import { MockLanguageModelV3 } from "ai/test";
+import { MockLanguageModelV4 } from "ai/test";
 import { anySignal, listEndpointModels, testConnection } from "../connection.js";
 import { clearProviders, registerProvider } from "../registry.js";
 
@@ -204,10 +204,10 @@ describe("anySignal without AbortSignal.any (Chrome < 116, Safari < 17.4)", () =
 });
 
 describe("testConnection, generate mode", () => {
-  function useModel(doGenerate: MockLanguageModelV3["doGenerate"]) {
+  function useModel(doGenerate: MockLanguageModelV4["doGenerate"]) {
     registerProvider(
       "openai",
-      () => new MockLanguageModelV3({ doGenerate }) as unknown as LanguageModel,
+      () => new MockLanguageModelV4({ doGenerate }) as unknown as LanguageModel,
     );
   }
 

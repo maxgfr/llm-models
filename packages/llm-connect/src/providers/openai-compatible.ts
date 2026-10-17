@@ -13,7 +13,7 @@ export const factory: ProviderFactory = (config) => {
     apiKey: config.apiKey,
     headers: config.headers,
     // Keep the SDK's schema, then translate it for JSON-object APIs such as GLM.
-    // generateObject still validates; the server need not implement json_schema.
+    // The AI SDK still validates the output; the server need not implement json_schema.
     supportsStructuredOutputs: true,
     transformRequestBody: (body) => {
       const format = body.response_format as

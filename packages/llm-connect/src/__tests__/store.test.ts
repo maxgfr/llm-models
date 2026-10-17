@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { MockLanguageModelV3 } from "ai/test";
+import { MockLanguageModelV4 } from "ai/test";
 import type { SlimCatalog } from "llm-models/catalog";
 import { clearCatalogCache } from "../catalog-client.js";
 import { clearProviders, registerProvider } from "../registry.js";
@@ -433,7 +433,7 @@ describe("createLlmSettingsStore", () => {
     clearProviders();
     const prompts: unknown[] = [];
     registerProvider("openai", () => {
-      return new MockLanguageModelV3({
+      return new MockLanguageModelV4({
         doGenerate: async (options) => {
           prompts.push(options.prompt);
           return {
