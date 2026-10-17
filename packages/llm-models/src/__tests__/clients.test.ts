@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { getCacheDir, setCacheDir, setCacheEnabled } from "../cache";
 import { fetchModelsDevModels, parseModelsDevResponse } from "../clients/models-dev";
 import { fetchOpenRouterModels, parseOpenRouterResponse } from "../clients/openrouter";
+import { buildSlimCatalog } from "../functions/catalog";
 import { fetchUnifiedData } from "../functions/normalize";
 
 beforeAll(() => {
@@ -332,5 +333,35 @@ describe("fetchUnifiedData model pairing", () => {
     expect(byId.has("openrouter/auto")).toBe(false);
     expect(byId.get("acme/good")?.api_id).toBe("good");
     expect(byId.get("acme/good:batch")?.api_id).toBeUndefined();
+  });
+});
+
+describe("a fetch passed in", () => {
+  it("downloads both APIs through it, never through the global fetch", async () => {
+    globalThis.fetch = mock(() =>
+      Promise.reject(new Error("global fetch must not be called")),
+    ) as unknown as typeof fetch;
+    const requested: string[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      requested.push(String(input));
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      return new Response(
+        JSON.stringify(
+          String(input).includes("openrouter")
+            ? { data: [{ ...validOpenRouterModel, id: "acme/good", canonical_slug: "acme/good" }] }
+            : { acme: { ...provider({ good: validModelsDevModel }), npm: "@ai-sdk/openai" } },
+        ),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const catalog = await buildSlimCatalog({ fetch: fetchImpl, npm: ["@ai-sdk/openai"] });
+    expect(requested.sort()).toEqual([
+      "https://models.dev/api.json",
+      "https://openrouter.ai/api/v1/models",
+    ]);
+    expect(Object.keys(catalog)).toEqual(["acme"]);
+    expect(Object.keys(catalog.acme?.models ?? {})).toEqual(["good"]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

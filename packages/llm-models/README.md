@@ -677,8 +677,10 @@ filterCatalogModels(anthropic, "sonnet"); // models whose name or id matches
 ```
 
 `CALLABLE_NPM` lists the SDK packages [llm-connect](https://github.com/maxgfr/llm-models/tree/main/packages/llm-connect) can call. On the Node side,
-`buildSlimCatalog(options)` fetches both sources and returns what `llm-models catalog` writes;
-`slimCatalog({ models, modelsDevData }, options)` builds it from data you already fetched.
+`buildSlimCatalog(options)` fetches both sources and returns what `llm-models catalog` writes
+(`options.fetch` replaces the global fetch for those downloads, e.g. with one that keeps the
+responses in a persistent cache); `slimCatalog({ models, modelsDevData }, options)` builds it from
+data you already fetched.
 
 ### Browser models (WebGPU)
 
@@ -760,6 +762,9 @@ import { fetchOpenRouterModels, fetchModelsDevModels } from "llm-models";
 const openrouter = await fetchOpenRouterModels();
 const modelsDev = await fetchModelsDevModels();
 ```
+
+Both take `{ fetch }` to download through another fetch than the global one, as do
+`fetchUnifiedData` and `buildSlimCatalog`. A response still in the cache is returned without a request.
 
 ### Zod Schemas
 

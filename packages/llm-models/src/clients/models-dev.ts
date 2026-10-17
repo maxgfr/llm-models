@@ -3,7 +3,7 @@ import { readCache, writeCache } from "../cache-core";
 import { debug } from "../log";
 import { ModelsDevModelSchema, ModelsDevProviderSchema } from "../schemas/models-dev";
 import type { ModelsDevModel, ModelsDevResponse } from "../types";
-import { fetchJson } from "./http";
+import { type FetchOptions, fetchJson } from "./http";
 
 const MODELS_DEV_URL = "https://models.dev/api.json";
 
@@ -46,11 +46,11 @@ export function parseModelsDevResponse(json: unknown): ModelsDevResponse {
   return result;
 }
 
-export async function fetchModelsDevModels(): Promise<ModelsDevResponse> {
+export async function fetchModelsDevModels(options: FetchOptions = {}): Promise<ModelsDevResponse> {
   const cached = readCache<ModelsDevResponse>("models-dev");
   if (cached) return cached;
 
-  const result = parseModelsDevResponse(await fetchJson(MODELS_DEV_URL, "models.dev"));
+  const result = parseModelsDevResponse(await fetchJson(MODELS_DEV_URL, "models.dev", options));
   writeCache("models-dev", result);
   return result;
 }

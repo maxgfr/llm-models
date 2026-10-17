@@ -1,4 +1,5 @@
 import { readFallbackCache } from "../cache-core";
+import type { FetchOptions } from "../clients/http";
 import { fetchModelsDevModels } from "../clients/models-dev";
 import { fetchOpenRouterModels } from "../clients/openrouter";
 import type {
@@ -221,11 +222,14 @@ function pairLooseIds(
   return pairs;
 }
 
-export async function fetchUnifiedData(): Promise<{
+export async function fetchUnifiedData(options: FetchOptions = {}): Promise<{
   models: UnifiedModel[];
   modelsDevData: ModelsDevResponse;
 }> {
-  const results = await Promise.allSettled([fetchOpenRouterModels(), fetchModelsDevModels()]);
+  const results = await Promise.allSettled([
+    fetchOpenRouterModels(options),
+    fetchModelsDevModels(options),
+  ]);
 
   let openRouterData: OpenRouterResponse | null =
     results[0].status === "fulfilled" ? results[0].value : null;

@@ -16,14 +16,25 @@ function requestHeaders(): Record<string, string> {
     : { Accept: "application/json" };
 }
 
+/** Options of the functions that download an API. */
+export interface FetchOptions {
+  /** fetch to download with, e.g. one that keeps responses in a persistent cache. Default the global fetch. */
+  fetch?: typeof fetch;
+}
+
 /**
  * GET a JSON document. Gives up after 15s so a stalled API cannot hang the
  * CLI (or an MCP client) forever; `label` names the API in error messages.
  */
-export async function fetchJson(url: string, label: string): Promise<unknown> {
+export async function fetchJson(
+  url: string,
+  label: string,
+  options: FetchOptions = {},
+): Promise<unknown> {
+  const doFetch = options.fetch ?? fetch;
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await doFetch(url, {
       headers: requestHeaders(),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });

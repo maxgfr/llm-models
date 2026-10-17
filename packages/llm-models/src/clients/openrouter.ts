@@ -3,7 +3,7 @@ import { readCache, writeCache } from "../cache-core";
 import { debug } from "../log";
 import { OpenRouterModelSchema } from "../schemas/openrouter";
 import type { OpenRouterModel, OpenRouterResponse } from "../types";
-import { fetchJson } from "./http";
+import { type FetchOptions, fetchJson } from "./http";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/models";
 
@@ -28,11 +28,13 @@ export function parseOpenRouterResponse(json: unknown): OpenRouterResponse {
   return { data };
 }
 
-export async function fetchOpenRouterModels(): Promise<OpenRouterResponse> {
+export async function fetchOpenRouterModels(
+  options: FetchOptions = {},
+): Promise<OpenRouterResponse> {
   const cached = readCache<OpenRouterResponse>("openrouter");
   if (cached) return cached;
 
-  const result = parseOpenRouterResponse(await fetchJson(OPENROUTER_URL, "OpenRouter"));
+  const result = parseOpenRouterResponse(await fetchJson(OPENROUTER_URL, "OpenRouter", options));
   writeCache("openrouter", result);
   return result;
 }

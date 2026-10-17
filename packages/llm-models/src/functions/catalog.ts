@@ -1,4 +1,5 @@
 import type { SlimCatalog, SlimModel, SlimProvider } from "../catalog";
+import type { FetchOptions } from "../clients/http";
 import type { ModelsDevModel, ModelsDevResponse, UnifiedModel } from "../types";
 import { DEFAULT_BASE_URLS } from "./browser";
 import { pickTiers } from "./latest";
@@ -221,7 +222,12 @@ export function slimCatalog(source: CatalogSource, options: SlimCatalogOptions =
   return catalog;
 }
 
+export interface BuildSlimCatalogOptions extends SlimCatalogOptions, FetchOptions {}
+
 /** Fetch models.dev and OpenRouter, then build the slim catalog (see {@link slimCatalog}). */
-export async function buildSlimCatalog(options: SlimCatalogOptions = {}): Promise<SlimCatalog> {
-  return slimCatalog(await fetchUnifiedData(), options);
+export async function buildSlimCatalog(
+  options: BuildSlimCatalogOptions = {},
+): Promise<SlimCatalog> {
+  const { fetch, ...catalogOptions } = options;
+  return slimCatalog(await fetchUnifiedData({ fetch }), catalogOptions);
 }
