@@ -15,6 +15,10 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
 - **The key never sits in clear text**: `secureStorage` encrypts it with AES-GCM under a
   non-extractable key, `createKeyVault` keeps the keys of several providers behind a passphrase,
   and a custom endpoint must be https (plain http only on this machine).
+- **Each provider's request rules**: reasoning effort per provider and model, what each model
+  accepts (sampling, prefill, tools, web search), Claude's adaptive thinking, stateless OpenAI
+  Responses calls, headers that pass a browser's CORS preflight, and errors classified without
+  the key.
 
 ## Install
 
@@ -53,6 +57,13 @@ const { text } = await generateText({ model, prompt: "Hello" });
 | `headers` | Extra request headers |
 | `language` | Code of the language answers are written in (`"fr"`) |
 
+Both take options as a second argument:
+
+| Option | Default | |
+|--------|---------|-|
+| `fetch` | `globalThis.fetch` | The fetch every request of the model goes through: route them through your own wrapper (logging, a proxy, a network policy) |
+| `strictHeaders` | `false` | Send only the headers the provider's API defines (plus `content-type` and `accept`); the settings' `headers` are dropped |
+
 `createModel(settings)` does the same synchronously, for providers you registered yourself:
 
 ```ts
@@ -72,10 +83,134 @@ What the built-in providers take care of:
 
 - A custom endpoint goes through the OpenAI SDK with Chat Completions; the official OpenAI URL
   keeps the Responses API.
-- Anthropic gets the `anthropic-dangerous-direct-browser-access` header, and an Anthropic-compatible
-  provider (MiniMax…) its own base URL, so its key never goes to Anthropic.
-- The generic SDK refuses a provider without URL, and turns structured output (`json_schema`) into
+- Every request goes through `guardedFetch`, which removes the `user-agent` header the AI SDK adds
+  (no provider's CORS preflight allows it, and Firefox sends it).
+- Anthropic's own API gets the `anthropic-dangerous-direct-browser-access` header. An
+  Anthropic-compatible provider (MiniMax…) gets its own base URL, so its key never goes to
+  Anthropic, and not that header, which its preflight does not allow. Its base URL works with
+  or without the trailing `/v1` (`anthropicBaseUrl`): gateways document it without, for
+  Anthropic's own clients, as Z.ai does with `https://api.z.ai/api/anthropic`.
+- A gateway that answers an error with HTTP 200 and a JSON body (Z.ai:
+  `{"code":500,"msg":"404 NOT_FOUND","success":false}`) gets the status the body stands for
+  (`maskedErrorStatus`), so the call fails with the provider's message instead of a parse error
+  or a stream that ends without a finish.
+- The generic SDK refuses a provider without URL, asks for the usage chunk at the end of a stream
+  (`stream_options.include_usage`), and turns structured output (`json_schema`) into
   `json_object` plus the schema in a system message, for APIs such as GLM.
+
+`guardedFetch(kind, { fetch, strictHeaders })` is exported for providers you register yourself:
+pass it as their `fetch`.
+
+## Call options
+
+What a call may carry depends on the provider and the model. `callOptions` builds the provider
+options for the model the settings point to, to spread into `streamText` or `generateText`:
+
+```ts
+import { streamText } from "ai";
+import { callOptions, callProblem, loadModel, resolveCapabilities, providerKindOf } from "llm-connect";
+
+const capabilities = resolveCapabilities({
+  kind: providerKindOf(settings), // "anthropic" | "openai" | "google" | "mistral" | "openai-compatible"
+  modelId: settings.model,
+  catalog: slimModel, // the catalog's entry, optional
+});
+const call = { effort: "high", messages } as const;
+const problem = callProblem(settings, call, capabilities); // null, or { code, message }
+if (problem) throw new Error(problem.message);
+
+const result = streamText({
+  model: await loadModel(settings),
+  messages,
+  ...callOptions(settings, { effort: "high", capabilities }),
+});
+```
+
+Per protocol, `callOptions` sends:
+
+| Protocol | Options |
+|----------|---------|
+| Anthropic | Claude 4.6 and later: `output_config.effort` and adaptive thinking with `display: "summarized"` (left out when the call sets a sampling parameter, which thinking refuses). Earlier models: a thinking budget, with the output cap lowered so the sum stays within the model's limit. `refusalFallback: true` opts in to the server-side refusal fallback (`fallbacks: "default"`) on Anthropic's own API, for the models that have one |
+| OpenAI (Responses, official URL) | `store: false`, so OpenAI keeps no conversation state. On a reasoning model, `include: ["reasoning.encrypted_content"]` and a reasoning summary; the effort as `reasoning.effort` |
+| Gemini | Thought summaries on a reasoning model; the effort as `thinkingLevel` (Gemini 3) or a thinking budget (Gemini 2.5) |
+| Mistral, OpenAI-compatible | Nothing: a server may refuse a parameter it does not know |
+
+Replaying a conversation needs nothing more: pass back each turn's `response.messages`. Their
+reasoning parts carry Anthropic's thinking signatures, OpenAI's encrypted reasoning and Gemini's
+thought signatures, and the SDK sends them back unchanged.
+
+`callOptions` throws `LlmCallError` (`code: "effort"`) for an effort the model does not take.
+`callProblem(settings, call, capabilities?)` checks the rest before any network call, rather than
+letting a parameter be dropped: an effort or sampling parameter the model refuses, a sampling
+parameter next to a thinking budget, an assistant message last (prefill), a system message after
+the first one, tools, a forced tool choice, web search, images, PDFs, and the output cap.
+
+### Reasoning effort
+
+`EFFORTS` is the scale, weakest first: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`.
+`effortLevels(kind, modelId)` gives the levels a model takes, from the makers' documentation, and
+an empty list for a model nobody documented (hide the control then):
+
+| Models | Levels | Sent as |
+|--------|--------|---------|
+| Claude Opus 4.7 and later, Claude 5 | `low` to `max`, `xhigh` included | `output_config.effort` |
+| Claude Opus and Sonnet 4.6 | `low`, `medium`, `high`, `max` | `output_config.effort` |
+| Claude 4 to 4.5 | `low`, `medium`, `high` | `thinking.budget_tokens` (2048, 8192, 24576) |
+| GPT-5 and later, o-series | per model (`none` / `minimal` to `xhigh`, never `max`) | `reasoning.effort` |
+| Gemini 3 | per model (`minimal` to `high`) | `thinkingConfig.thinkingLevel` |
+| Gemini 2.5 | `low`, `medium`, `high` | `thinkingConfig.thinkingBudget` (1024, 8192, 24576) |
+| Mistral, OpenAI-compatible servers | none | |
+
+Model ids match without case, dots, `:variant` or date suffix (`modelKey`), so
+`claude-sonnet-4-6-20260115` and `gemini-2.5-flash` resolve like their bare names.
+`effortWire(kind, modelId, effort)` says where a level goes, and `usableEffort(effort, levels)`
+keeps a saved level only when the model takes it.
+
+### Capabilities
+
+`resolveCapabilities({ kind, modelId, catalog?, override? })` says what a model accepts: `vision`,
+`pdf`, `tools`, `reasoning`, `effort` (`levels`, `default`), `thinkingDisplay`, `sampling`,
+`prefill`, `forcedToolChoice`, `webSearch`, `midConversationSystem`, `toolChanges`,
+`refusalFallback`, `contextWindow`, `maxOutput` and `cost`.
+
+- Current Claude models are pinned from Anthropic's documentation (`KNOWN_ANTHROPIC_MODELS`), and
+  win over the catalog: Claude 4.6 and later take no prefill, Opus 4.7 and later no sampling
+  parameter, and some refuse a forced tool choice.
+- Every other model follows its catalog entry (a `SlimModel`, or a richer `CatalogModelInfo` with
+  limits, input modalities and prices), with conservative defaults for what it leaves out: no
+  prefill, no forced tool choice unless the API documents it, no mid-conversation system message.
+- `override`, a user's corrections, is applied last.
+
+### Web search
+
+`webSearchTools(capabilities.webSearch, { maxUses })` returns the provider's own search tool, keyed
+`web_search`, to spread into `tools`; `{}` when the model has none. It imports only that
+provider's SDK: Anthropic's dynamic-filtering search (Claude 4.6 and later) or its basic one,
+capped at `maxUses` searches per answer (5); OpenAI's `web_search`; Gemini's Google Search. A Gemini
+model before 3 cannot combine it with function tools (`callProblem` says so). Anthropic's results
+come back encrypted in `response.messages` and are replayed unchanged on the next turn.
+
+### Stop reasons and errors
+
+`stopReasonOf(kind, finishReason, rawFinishReason)` reads a step's or a response's end: `end`,
+`length`, `tool-calls`, `stop-sequence`, `refusal` (Anthropic's `stop_reason: "refusal"`; its
+category and explanation come from `refusalOf(providerMetadata)`), `content-filter`, `pause`
+(Anthropic's `pause_turn`), `truncated` (the stream closed before the provider's finish event) or
+`other`.
+
+`describeError(error, apiKey)` classifies any failed call as `{ code, message, status?, retryable }`:
+
+| Code | |
+|------|-|
+| `auth` | Key refused: 401, 403, or Gemini's 400 "API key not valid" |
+| `auth-or-network` | No readable answer: offline, DNS, a CORS refusal, or a key refused by a server that answers errors without CORS headers. A page cannot tell these apart: show "key refused or network" |
+| `rate-limit`, `overloaded`, `server` | Retryable |
+| `context-length`, `invalid-request`, `not-found`, `unknown` | Not retryable |
+
+It reads the provider's error body (Anthropic, OpenAI, Gemini and Z.ai shapes), an error event inside a
+stream, and a `RetryError` through its last attempt. The message is the provider's, untrusted:
+show it as text. It is cut to 500 characters, and the key is replaced by `***` in case a server
+echoed it back.
 
 ## Test a connection
 
@@ -90,7 +225,8 @@ A test is free unless you ask for a generation:
 
 - `models` (default): `GET {base}/models` with the provider's own auth headers (`x-api-key` for
   Anthropic, `x-goog-api-key` for Google, a bearer token otherwise). 5 s for a custom endpoint, 10 s
-  for a provider. Returns the model ids a server lists. Never runs a generation.
+  for a provider. Returns the model ids a server lists, OpenAI's `data` or Gemini's `models`. Never
+  runs a generation.
 - `generate`: a short generation through the AI SDK, exactly as the app will call the model. It
   spends a few tokens of the user's quota, so it only runs when you pass `mode: "generate"`.
 - `auto`: `models` first, then the generation only when the server has no model list to give
@@ -98,6 +234,12 @@ A test is free unless you ask for a generation:
   another status or a timeout stays the verdict. Passing `auto` opts in to that generation.
 
 A custom endpoint in plain http to another machine is not called at all (`insecure`).
+
+`cors` means the request failed without a readable answer: offline, a CORS refusal, or a key
+refused by a server that sends its errors without CORS headers. Show it as "key refused or
+network". `fetch` is used for every request of the test, the listing and the generation, and a
+message never contains the key. A listing answered with HTTP 200 and an error body fails with
+that error's status and message.
 
 `listEndpointModels(endpoint, apiKey?)` lists the models of an OpenAI-compatible server.
 
@@ -142,7 +284,7 @@ State (`store.getState()`): `catalog`, `catalogStatus` (`idle | loading | error 
 `recommendedModel`, `apiKey` (active slot), `canSave`, `canTest`.
 
 Actions: `load`, `reset(settings)` (for settings the app already holds), `open`, `retryCatalog`, `selectProvider`, `selectModel`, `setApiKey`, `setSearch`,
-`toggleCustom`, `applyPreset(ENDPOINT_PRESETS.ollama)`, `setEndpoint`, `setCustomModel`,
+`toggleCustom`, `applyPreset(ENDPOINT_PRESETS.ollama)` (also `lmstudio` and `jan`), `setEndpoint`, `setCustomModel`,
 `setRememberKey`, `setLanguage`, `settings`, `test`, `save`, `clear` (also resets the language).
 
 ### The catalog
@@ -329,7 +471,10 @@ endpoint **with a model name** (local servers need no key).
 
 - `endpointProblem(url)` / `validateEndpoint(url)` accept https anywhere and http only on this
   machine (`localhost`, `127.0.0.0/8`, `[::1]`), so a key never crosses the network in clear.
-  `save()` answers `insecure-endpoint` and `testConnection` does not call such an endpoint.
+  `save()` answers `insecure-endpoint` and `testConnection` does not call such an endpoint. A URL
+  with a user name or password is `invalid-endpoint`: fetch refuses it.
+- `strictHeaders` keeps every request to the headers the provider's API defines, so nothing
+  identifying leaves and nothing fails the CORS preflight.
 - A matching CSP: `connect-src 'self' https: http://localhost:* http://127.0.0.1:*`.
 
 ### Response language
