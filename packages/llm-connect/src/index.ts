@@ -25,6 +25,13 @@ export {
   testConnection,
 } from "./connection.js";
 export {
+  describeError,
+  type LlmError,
+  type LlmErrorCode,
+  maskedErrorStatus,
+  scrubSecret,
+} from "./errors.js";
+export {
   createKeyVault,
   type KeyVault,
   KeyVaultError,
