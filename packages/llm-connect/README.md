@@ -13,7 +13,8 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
 - **The catalog comes from [llm-models](https://github.com/maxgfr/llm-models/tree/main/packages/llm-models)**, built live in the browser
   (`liveCatalog`) with a static `models.json` as fallback, and a recommended model per provider.
 - **The key never sits in clear text**: `secureStorage` encrypts it with AES-GCM under a
-  non-extractable key, and a custom endpoint must be https (plain http only on this machine).
+  non-extractable key, `createKeyVault` keeps the keys of several providers behind a passphrase,
+  and a custom endpoint must be https (plain http only on this machine).
 
 ## Install
 
@@ -130,7 +131,7 @@ Options:
 | Option | Default | |
 |--------|---------|-|
 | `catalog` | required | A URL (`"/models.json"`) or a loader such as `liveCatalog(…)`; `catalogUrl` is a deprecated alias |
-| `storage` | required | `secureStorage(…)`, `webStorage(…)` or your own `SettingsStorage` |
+| `storage` | required | `secureStorage(…)`, `vaultStorage(…)`, `webStorage(…)` or your own `SettingsStorage` |
 | `recommended` | `DEFAULT_RECOMMENDED` | Provider ids listed first: OpenAI, Anthropic, Google, Mistral |
 | `testMode` | `"models"` | The `testConnection` mode of `test()`: `models` (free), `auto` (model list, a generation only when there is none) or `generate` |
 | `defaults` | | `providerId`, `model`, `rememberKey` (false), `language` (the browser's) |
@@ -186,6 +187,141 @@ Content-Security-Policy is what protects against that.
 `localStorage` when remembered; it stays for compatibility. Any other scheme fits the
 `SettingsStorage` interface (`load`, optional `loadDraft`, `save`, `clear`).
 
+`vaultStorage({ vault, prefsKey, keyName? })` keeps the key in a passphrase-protected vault (see
+[Key vault](#key-vault)).
+
+### Choosing a storage
+
+| | `webStorage` | `secureStorage` | `vaultStorage` + `createKeyVault` |
+|-|-|-|-|
+| Key at rest | In clear | AES-GCM under a non-extractable key of the browser | AES-GCM under a vault key wrapped by the passphrase |
+| Keys | One | One | One per provider (any name) |
+| The user types | Nothing | Nothing | A passphrase on each load (unless remembered on the device) |
+| Copy of the browser profile (backup, stolen disk, forensic dump) | Reads the key | Gets ciphertext, and the key that decrypts it is in the same profile: protected only as far as the browser protects its non-extractable keys | Gets ciphertext; has to guess the passphrase, at the cost of the KDF per guess |
+| Script in the page (XSS, a compromised dependency) | Reads the key | Has the browser decrypt it at any time | Reads keys only while the vault is unlocked; nothing while locked |
+| A browser extension or the OS | Reads the key | Reads the key | Reads the key while unlocked, or captures the passphrase |
+
+- `webStorage`: an app that already stores keys this way, or keys with no value (a local server).
+- `secureStorage`: the default. No prompt, and nothing readable in a dump of the storage, but a
+  script running in the page can still use the key.
+- The vault: keys worth a prompt (paid accounts, several providers), shared or unmanaged devices,
+  and apps where a script loaded later should not be able to read keys at any time. It does not
+  protect against a script that runs while the vault is unlocked, or that shows a fake passphrase
+  prompt: a strict Content-Security-Policy is still what keeps foreign code out of the page.
+
+### Key vault
+
+```ts
+import { createKeyVault, createLlmSettingsStore, vaultStorage } from "llm-connect";
+
+const vault = createKeyVault({ dbName: "my-app-vault", autoLockMs: 15 * 60_000 });
+if ((await vault.load()) === "empty") await vault.create(passphrase);
+else if (vault.isLocked) await vault.unlock(passphrase);
+
+await vault.set("anthropic", key); // any name; vaultStorage uses the provider id
+await vault.get("anthropic"); // the key, or null
+await vault.list(); // ["anthropic"]: names, never values
+
+const store = createLlmSettingsStore({
+  catalog: "/models.json",
+  storage: vaultStorage({ vault, prefsKey: "my-app-ai" }),
+});
+```
+
+States (`vault.getState()`, `vault.subscribe(listener)`, `vault.isLocked`): `loading` (storage not
+read yet), `empty` (no vault: `create`), `locked` (`unlock`), `unlocked`.
+
+| Method | |
+|--------|-|
+| `load()` | Read storage once, and unlock with the device key when one is remembered; the other methods call it |
+| `create(passphrase, { rememberOnDevice? })` | A new vault, unlocked; `exists` when there is one |
+| `unlock(passphrase, { rememberOnDevice? })` | `wrong-passphrase` on a wrong one, and the vault stays locked |
+| `lock()` | Drop the vault key from memory; reads that were in flight fail with `locked` |
+| `touch()` | Restart the `autoLockMs` timer (user activity); every read and write also does |
+| `changePassphrase(old, new)` | Rewrap the vault key under the new passphrase; secrets are not re-encrypted |
+| `get(name)`, `set(name, secret)` | Need the vault unlocked (`locked` otherwise) |
+| `delete(name)`, `list()` | Also work while locked: names are stored in clear, and deleting needs no key |
+| `isRememberedOnDevice()`, `forgetDevice()` | Whether the vault unlocks itself on load; remove that copy |
+| `reset()` (alias `destroy()`) | Delete the vault and every secret, without the passphrase |
+
+Errors are `KeyVaultError`s with a `code`: `no-vault`, `exists`, `locked`, `wrong-passphrase`,
+`invalid-input` (an empty passphrase or name), `tampered`, `unsupported` (an unknown format or
+KDF, or parameters out of bounds) or `storage` (IndexedDB refused a write).
+
+**A lost passphrase cannot be recovered.** Nothing else unwraps the vault key, so the secrets are
+gone with it. `reset()` is the only way out: it works while locked, asks for no passphrase, and
+deletes the wrapped vault key, its salt and KDF parameters, the device copy and every secret from
+IndexedDB, then returns the vault to `empty`. It cannot be undone. Other databases are not touched.
+
+How it is built (WebCrypto only, no dependency):
+
+- **Secrets**: each one is encrypted with AES-GCM 256 under a random 256-bit vault key, with a fresh
+  12-byte IV on every write. The additional data binds the record to the format version
+  (`llm-connect-vault/1`), the vault id (16 random bytes) and its name, so a record that is edited,
+  moved to another name or copied from another vault fails to decrypt (`tampered`).
+- **Passphrase**: normalised to NFKC, then PBKDF2-HMAC-SHA256 with 600 000 iterations (OWASP's
+  recommendation) and a random 16-byte salt. HKDF-SHA256 turns the output into an AES-GCM key that
+  wraps the vault key and an HMAC key whose tag over the vault id tells a wrong passphrase
+  (`wrong-passphrase`) from tampering (`tampered`). The KDF, its parameters and the salt are
+  stored with the vault, so later versions can change the defaults; a stored iteration count
+  outside 100 000 to 10 000 000 is refused before anything is derived.
+- **Your own KDF**: pass `kdf` to use Argon2id or another function without llm-connect depending
+  on it. New and changed passphrases use it; a vault wrapped with PBKDF2 still opens, and is
+  rewrapped with the configured KDF on its next unlock.
+
+  ```ts
+  import { argon2id } from "hash-wasm";
+
+  const vault = createKeyVault({
+    dbName: "my-app-vault",
+    kdf: {
+      id: "argon2id",
+      params: { m: 65536, t: 3, p: 1 },
+      derive: (password, salt, { m, t, p }) =>
+        argon2id({
+          password,
+          salt,
+          memorySize: Number(m),
+          iterations: Number(t),
+          parallelism: Number(p),
+          hashLength: 32,
+          outputType: "binary",
+        }),
+    },
+  });
+  ```
+
+- **In memory**: only the vault key while unlocked, as a non-extractable `CryptoKey`. Secrets are
+  decrypted on each `get` and not cached.
+- **`rememberOnDevice: true`** also wraps the vault key with a non-extractable `CryptoKey` kept in
+  IndexedDB, so the vault unlocks itself on the next load. This is a convenience: it gives up the
+  protection against same-origin script, which can again use the keys at any time, exactly as with
+  `secureStorage`. A copy of the browser profile still only yields ciphertext. `lock()` holds for
+  the page; `forgetDevice()` or `unlock(passphrase, { rememberOnDevice: false })` removes the copy.
+- **Fallbacks**: without IndexedDB (some private modes) the vault works in memory for the page
+  (`vault.persistent` is false); without WebCrypto (an insecure context) secrets are kept in memory
+  unencrypted and `lock()` forgets them, as `secureStorage` keeps its key for the page.
+
+`vaultStorage` stores the key of the saved settings under `keyName(settings)` (the provider id, or
+`"custom"` for a custom endpoint), so each provider keeps its own; preferences go to `localStorage`
+without the key. While the vault is locked the key reads as empty (`load()` gives null for a
+provider) and saving a key throws `locked`. A key saved with `rememberKey: false` stays in memory
+for the page and is forgotten on lock. `clear()` removes the saved provider's key only; the vault
+keeps the others (`vault.reset()` removes everything). To fill the form when the user switches
+provider, read `vault.get(providerId)` and pass it to `store.setApiKey`.
+
+`migrateToVault(from, to)` moves saved settings from `secureStorage` or `webStorage` to a
+`vaultStorage`: the key is written to the (unlocked) vault first, then `from.clear()` erases the old
+copy (and `secureStorage`'s `CryptoKey`), then the preferences are written again. It resolves to
+whether a key moved.
+
+```ts
+const legacy = secureStorage({ prefsKey: "my-app-ai", dbName: "my-app-secrets" });
+const storage = vaultStorage({ vault, prefsKey: "my-app-ai" });
+await vault.unlock(passphrase);
+await migrateToVault(legacy, storage);
+```
+
 `isConfigured(settings)` tells whether settings can call a model: a provider key, or a custom
 endpoint **with a model name** (local servers need no key).
 
@@ -240,6 +376,26 @@ function Settings({ storage }) {
 ```
 
 `useLlmSettings(store)` subscribes to a store created elsewhere.
+
+`useKeyVault(vault)` reads the vault's storage on mount and returns `{ state, isLocked, create,
+unlock, lock, reset, vault }`, re-rendering on every state change:
+
+```tsx
+import { useKeyVault } from "llm-connect/react";
+
+function VaultGate({ vault, children }) {
+  const { state, unlock, create, reset } = useKeyVault(vault);
+  if (state === "loading") return null;
+  if (state === "unlocked") return children;
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); const p = e.currentTarget.passphrase.value; state === "empty" ? create(p) : unlock(p); }}>
+      <input name="passphrase" type="password" autoComplete="current-password" />
+      <button>{state === "empty" ? "Create" : "Unlock"}</button>
+      {state === "locked" && <button type="button" onClick={reset}>Forgot it: delete every key</button>}
+    </form>
+  );
+}
+```
 
 ## Svelte
 

@@ -25,6 +25,21 @@ export {
   testConnection,
 } from "./connection.js";
 export {
+  createKeyVault,
+  type KeyVault,
+  KeyVaultError,
+  type KeyVaultErrorCode,
+  type KeyVaultKdf,
+  type KeyVaultKdfParams,
+  type KeyVaultOptions,
+  type KeyVaultState,
+  PBKDF2_DEFAULT_ITERATIONS,
+  PBKDF2_ITERATION_BOUNDS,
+  PBKDF2_KDF_ID,
+  pbkdf2Kdf,
+  type UnlockOptions,
+} from "./key-vault.js";
+export {
   browserLanguage,
   DEFAULT_LANGUAGE,
   languageName,
@@ -75,3 +90,9 @@ export {
   type LlmStoreOptions,
   type SaveResult,
 } from "./store.js";
+export {
+  defaultKeyName,
+  migrateToVault,
+  type VaultStorageOptions,
+  vaultStorage,
+} from "./vault-storage.js";

@@ -100,10 +100,12 @@ Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v7, `@a
 - `src/language.ts` - `RESPONSE_LANGUAGES` (16, stored as codes), `languageName`, `toLanguageCode`, `browserLanguage`
 - `src/storage.ts` - `SettingsStorage` interface and `webStorage` (key in clear: compatibility only)
 - `src/secure-storage.ts` - `secureStorage`: prefs in localStorage, key AES-GCM encrypted under a non-extractable CryptoKey in IndexedDB (ciphertext in IndexedDB when remembered, sessionStorage otherwise)
+- `src/key-vault.ts` - `createKeyVault`: several secrets by name, AES-GCM under a random vault key wrapped by a passphrase key (PBKDF2-SHA256 600k + HKDF, or a `kdf` hook such as Argon2id), HMAC check for a wrong passphrase, AAD = format + vault id + name; `lock`/`autoLockMs`, `changePassphrase` (rewrap only), `rememberOnDevice` (device-key copy), `reset` = `destroy` (no passphrase); memory fallback without IndexedDB/WebCrypto
+- `src/vault-storage.ts` - `vaultStorage` (`SettingsStorage` over a vault, key per provider, empty while locked), `migrateToVault` (from secureStorage/webStorage, erases the old copy)
 - `src/catalog-client.ts` - `liveCatalog` (lazy `llm-models/browser` build through `cachedFetch`, static fallback), `loadCatalog` (one shared request per URL, forgotten on failure), `splitProviders`, `providerMeta`, `DEFAULT_RECOMMENDED`
 - `src/http-cache.ts` - `cachedFetch`: GET responses in Cache Storage keyed by URL (1 h TTL, ETag revalidation on the page's origin, stale copy on network failure); plain fetch without Cache Storage; no Node APIs
 - `src/store.ts` - `createLlmSettingsStore`: framework-free state + actions, Svelte store contract
-- `src/react.ts` - entry `llm-connect/react`: `useLlmSettings`, `useLlmStore`
+- `src/react.ts` - entry `llm-connect/react`: `useLlmSettings`, `useLlmStore`, `useKeyVault`
 
 Conventions:
 - No eager SDK import outside `providers/`: `ai` and each `@ai-sdk/*` load through dynamic imports

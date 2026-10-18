@@ -1,5 +1,8 @@
+import "fake-indexeddb/auto";
 import { afterAll, describe, expect, it } from "bun:test";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import { IDBFactory } from "fake-indexeddb";
+import { createKeyVault } from "../key-vault.js";
 import type { SettingsStorage } from "../storage.js";
 import { createLlmSettingsStore } from "../store.js";
 
@@ -7,7 +10,7 @@ import { createLlmSettingsStore } from "../store.js";
 GlobalRegistrator.register();
 afterAll(() => GlobalRegistrator.unregister());
 const { act, renderHook, waitFor } = await import("@testing-library/react");
-const { useLlmSettings, useLlmStore } = await import("../react.js");
+const { useKeyVault, useLlmSettings, useLlmStore } = await import("../react.js");
 
 const storage: SettingsStorage = {
   load: async () => null,
@@ -60,5 +63,27 @@ describe("llm-connect/react", () => {
     const { result } = renderHook(() => useLlmSettings(store));
     act(() => store.setSearch("large"));
     expect(result.current.search).toBe("large");
+  });
+
+  it("useKeyVault follows the lock state and unlocks, locks and resets", async () => {
+    globalThis.indexedDB = new IDBFactory();
+    await createKeyVault({ dbName: "react-vault" }).create("a passphrase");
+    const vault = createKeyVault({ dbName: "react-vault" });
+    const { result } = renderHook(() => useKeyVault(vault));
+    await waitFor(() => expect(result.current.state).toBe("locked"));
+    expect(result.current.isLocked).toBe(true);
+
+    await act(() => result.current.unlock("a passphrase"));
+    expect(result.current.state).toBe("unlocked");
+    expect(result.current.isLocked).toBe(false);
+
+    act(() => result.current.lock());
+    expect(result.current.state).toBe("locked");
+
+    await act(() => result.current.reset());
+    expect(result.current.state).toBe("empty");
+    await act(() => result.current.create("another passphrase"));
+    expect(result.current.state).toBe("unlocked");
+    expect(result.current.vault).toBe(vault);
   });
 });
