@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { browserLanguage, languageName, RESPONSE_LANGUAGES, toLanguageCode } from "../language.js";
-import { endpointProblem, isConfigured, validateEndpoint } from "../settings.js";
+import { ENDPOINT_PRESETS, endpointProblem, isConfigured, validateEndpoint } from "../settings.js";
 
 describe("endpoints", () => {
   it("accepts https anywhere and http on this machine only", () => {
@@ -23,6 +23,21 @@ describe("endpoints", () => {
       expect(endpointProblem(url)).toBe("insecure-endpoint");
     for (const url of ["localhost:11434", "ftp://example.com", "", "not a url"])
       expect(endpointProblem(url)).toBe("invalid-endpoint");
+  });
+
+  it("refuses credentials in the URL, which fetch would refuse too", () => {
+    expect(endpointProblem("https://user:pass@api.example.com/v1")).toBe("invalid-endpoint");
+    expect(endpointProblem("http://user@localhost:11434/v1")).toBe("invalid-endpoint");
+  });
+
+  it("has presets for the local servers", () => {
+    expect(Object.values(ENDPOINT_PRESETS).map((p) => [p.id, p.endpoint])).toEqual([
+      ["ollama", "http://localhost:11434/v1"],
+      ["lmstudio", "http://localhost:1234/v1"],
+      ["jan", "http://localhost:1337/v1"],
+    ]);
+    for (const preset of Object.values(ENDPOINT_PRESETS))
+      expect(endpointProblem(preset.endpoint)).toBeNull();
   });
 
   it("normalizes a valid endpoint and refuses the others", () => {

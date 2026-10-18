@@ -62,7 +62,10 @@ export function canTest(draft: LlmDraft): boolean {
   return draft.custom ? !!draft.customEndpoint.trim() : !!draft.apiKey.trim();
 }
 
-/** Why an endpoint is refused: not an http(s) URL, or plain http to another machine. */
+/**
+ * Why an endpoint is refused: not an http(s) URL (or one with credentials in it), or plain http
+ * to another machine.
+ */
 export type EndpointProblem = "invalid-endpoint" | "insecure-endpoint";
 
 /** Whether a host name is this machine: localhost, 127.0.0.0/8 or [::1]. */
@@ -79,6 +82,7 @@ export function isLoopbackHost(hostname: string): boolean {
 /**
  * What is wrong with an endpoint, or null when it can be called: https, or
  * http on this machine only, so that a key never crosses the network in clear.
+ * A URL with a user name or password is invalid: fetch refuses it.
  */
 export function endpointProblem(url: string): EndpointProblem | null {
   let parsed: URL;
@@ -87,6 +91,7 @@ export function endpointProblem(url: string): EndpointProblem | null {
   } catch {
     return "invalid-endpoint";
   }
+  if (parsed.username || parsed.password) return "invalid-endpoint";
   if (parsed.protocol === "https:") return null;
   if (parsed.protocol !== "http:") return "invalid-endpoint";
   return isLoopbackHost(parsed.hostname) ? null : "insecure-endpoint";
@@ -122,5 +127,10 @@ export const ENDPOINT_PRESETS = {
     name: "LM Studio",
     endpoint: "http://localhost:1234/v1",
     model: "local-model",
+  },
+  jan: {
+    id: "jan",
+    name: "Jan",
+    endpoint: "http://localhost:1337/v1",
   },
 } as const satisfies Record<string, EndpointPreset>;
