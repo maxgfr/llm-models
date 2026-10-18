@@ -32,6 +32,12 @@ export {
   scrubSecret,
 } from "./errors.js";
 export {
+  ANTHROPIC_BROWSER_HEADER,
+  type FetchLike,
+  type GuardedFetchOptions,
+  guardedFetch,
+} from "./fetch.js";
+export {
   createKeyVault,
   type KeyVault,
   KeyVaultError,
@@ -54,7 +60,16 @@ export {
   type ResponseLanguage,
   toLanguageCode,
 } from "./language.js";
-export { createModel, loadModel, providerNameOf } from "./model.js";
+export { createModel, loadModel, type ModelOptions, providerNameOf } from "./model.js";
+export {
+  anthropicBaseUrl,
+  baseUrlOf,
+  DEFAULT_BASE_URLS,
+  isAnthropicHost,
+  modelIdOf,
+  type ProviderKind,
+  providerKindOf,
+} from "./provider-kind.js";
 export {
   clearProviders,
   fromSDK,

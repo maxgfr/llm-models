@@ -1,4 +1,5 @@
 import type { LanguageModel } from "ai";
+import type { FetchLike } from "./fetch.js";
 
 /** Configuration passed to a provider factory when creating a model. */
 export interface ProviderConfig {
@@ -6,6 +7,11 @@ export interface ProviderConfig {
   model: string;
   baseURL?: string;
   headers?: Record<string, string>;
+  /**
+   * The fetch the SDK must call. `createModel` always passes one: `guardedFetch` over the app's
+   * own fetch, or over `globalThis.fetch`.
+   */
+  fetch?: FetchLike;
 }
 
 /** A function that creates a LanguageModel from configuration. */
@@ -79,6 +85,7 @@ export function fromSDK(
       apiKey: config.apiKey,
       ...(config.baseURL && { baseURL: config.baseURL }),
       ...(config.headers && { headers: config.headers }),
+      ...(config.fetch && { fetch: config.fetch }),
     });
     // OpenAI-compatible servers generally implement Chat Completions rather than
     // Responses; the official OpenAI URL keeps the SDK default (Responses API).

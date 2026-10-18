@@ -12,6 +12,9 @@ export const factory: ProviderFactory = (config) => {
     baseURL: config.baseURL,
     apiKey: config.apiKey,
     headers: config.headers,
+    ...(config.fetch && { fetch: config.fetch as typeof globalThis.fetch }),
+    // Ask for the usage chunk at the end of a stream (`stream_options.include_usage`)
+    includeUsage: true,
     // Keep the SDK's schema, then translate it for JSON-object APIs such as GLM.
     // The AI SDK still validates the output; the server need not implement json_schema.
     supportsStructuredOutputs: true,

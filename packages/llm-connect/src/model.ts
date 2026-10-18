@@ -1,4 +1,6 @@
 import type { LanguageModel } from "ai";
+import { type GuardedFetchOptions, guardedFetch } from "./fetch.js";
+import { providerKindOf } from "./provider-kind.js";
 import { hasProvider, requireProvider, resolveAlias } from "./registry.js";
 import type { LlmSettings } from "./settings.js";
 
@@ -9,21 +11,32 @@ export function providerNameOf(settings: LlmSettings): string {
 }
 
 /**
+ * How a model sends its requests: `fetch` routes every one of them through the app's own wrapper
+ * (default `globalThis.fetch`), and `strictHeaders` sends only the headers the provider's API
+ * defines, dropping custom `headers`.
+ */
+export type ModelOptions = GuardedFetchOptions;
+
+/**
  * Create the model the settings point to. Its provider must be registered
  * (see `registerProvider` or `llm-connect/providers/*`); {@link loadModel}
  * registers the built-in ones on demand.
  *
  * A custom endpoint goes through the OpenAI SDK with Chat Completions; a
- * catalog provider through its SDK, with its own base URL.
+ * catalog provider through its SDK, with its own base URL. Every request goes
+ * through {@link guardedFetch}: no `user-agent`, and Anthropic's direct-browser
+ * header to Anthropic's own host only.
  */
-export function createModel(settings: LlmSettings): LanguageModel {
+export function createModel(settings: LlmSettings, options: ModelOptions = {}): LanguageModel {
   const factory = requireProvider(providerNameOf(settings));
+  const fetch = guardedFetch(providerKindOf(settings), options);
   if (settings.customEndpoint) {
     return factory({
       apiKey: settings.apiKey || "",
       model: settings.customModel || settings.model || "",
       baseURL: settings.customEndpoint,
       ...(settings.headers && { headers: settings.headers }),
+      fetch,
     });
   }
   return factory({
@@ -31,6 +44,7 @@ export function createModel(settings: LlmSettings): LanguageModel {
     model: settings.model || "",
     ...(settings.providerApi && { baseURL: settings.providerApi }),
     ...(settings.headers && { headers: settings.headers }),
+    fetch,
   });
 }
 
@@ -60,8 +74,11 @@ async function registerBuiltin(name: string): Promise<void> {
  * nothing is registered under its name yet. Only that SDK is loaded, so an app
  * can keep the others out of its bundle (or uninstalled).
  */
-export async function loadModel(settings: LlmSettings): Promise<LanguageModel> {
+export async function loadModel(
+  settings: LlmSettings,
+  options: ModelOptions = {},
+): Promise<LanguageModel> {
   const name = providerNameOf(settings);
   if (!hasProvider(name)) await registerBuiltin(name);
-  return createModel(settings);
+  return createModel(settings, options);
 }

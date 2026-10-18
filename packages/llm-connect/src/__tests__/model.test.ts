@@ -99,8 +99,14 @@ describe("createModel", () => {
         model: "llama3.2",
         baseURL: "http://localhost:11434/v1",
         headers: { "x-a": "1" },
+        fetch: expect.any(Function),
       },
-      { apiKey: "sk", model: "gpt-5", baseURL: "https://api.openai.com/v1" },
+      {
+        apiKey: "sk",
+        model: "gpt-5",
+        baseURL: "https://api.openai.com/v1",
+        fetch: expect.any(Function),
+      },
     ]);
   });
 });
@@ -146,7 +152,7 @@ describe("loadModel", () => {
     expect(providerOf(model)).toBe("openai.responses");
   });
 
-  it("sends an Anthropic-compatible key to its own URL, with the browser header", async () => {
+  it("sends an Anthropic-compatible key to its own URL, without Anthropic's browser header", async () => {
     serve(anthropicMessage);
     const model = await loadModel({
       apiKey: "mm-key",
@@ -157,6 +163,19 @@ describe("loadModel", () => {
     await generateText({ model, prompt: "hi", maxRetries: 0 });
     expect(calls[0].url).toBe("https://api.minimax.io/anthropic/v1/messages");
     expect(calls[0].headers["x-api-key"]).toBe("mm-key");
+    // MiniMax's preflight does not allow it: the opt-in is Anthropic's own
+    expect(calls[0].headers["anthropic-dangerous-direct-browser-access"]).toBeUndefined();
+  });
+
+  it("sends the browser header to Anthropic's own API", async () => {
+    serve(anthropicMessage);
+    const model = await loadModel({
+      apiKey: "sk-ant",
+      model: "claude-opus-5-5",
+      providerNpm: "@ai-sdk/anthropic",
+    });
+    await generateText({ model, prompt: "hi", maxRetries: 0 });
+    expect(calls[0].url).toBe("https://api.anthropic.com/v1/messages");
     expect(calls[0].headers["anthropic-dangerous-direct-browser-access"]).toBe("true");
   });
 
