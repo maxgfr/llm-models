@@ -97,6 +97,13 @@ Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v7, `@a
 - `src/providers/*.ts` - one module per built-in SDK (`factory`, `register()`), plus `all.ts`; entry `llm-connect/providers/*`
 - `src/connection.ts` - `testConnection` (`models` by default, free; `generate`; `auto`: models, then a generation only when there is no list), `listEndpointModels`; never throws on a failed connection
 - `src/settings.ts` - `LlmSettings`, `LlmDraft`, `isConfigured` (custom endpoint needs a model), `canSave`, `endpointProblem` / `validateEndpoint` (https, or http on loopback only), `ENDPOINT_PRESETS`
+- `src/provider-kind.ts` - which wire protocol a provider speaks (Anthropic, OpenAI Responses, Gemini, OpenAI-compatible)
+- `src/effort.ts` - reasoning-effort levels per model from the makers' docs (Claude 4.7+/5 `low`..`max` incl. `xhigh`, OpenAI `reasoning.effort`, Gemini levels or budgets); none for undocumented models
+- `src/capabilities.ts` - capability resolution: pinned Claude table, then the catalog entry, then user overrides; cautious defaults
+- `src/call.ts` - `callOptions` (provider options to spread into `streamText`/`generateText`: adaptive thinking + summarized display, Responses `store: false` + encrypted reasoning, Gemini thought summaries), `callProblem` (checks before any call), `stopReasonOf`, `refusalOf`
+- `src/web-search.ts` - each provider's own web search tool (Anthropic newer/older variants, OpenAI, Gemini)
+- `src/errors.ts` - `describeError`: code, status, retryable, provider message with the key masked; `auth-or-network` for an unreadable failure
+- `src/fetch.ts` - `guardedFetch` used by every built-in model: drops the SDK user-agent, Anthropic's browser header only to api.anthropic.com, `strictHeaders`, gateway errors sent as 200 JSON turned into their status; apps may pass their own `fetch`
 - `src/language.ts` - `RESPONSE_LANGUAGES` (16, stored as codes), `languageName`, `toLanguageCode`, `browserLanguage`
 - `src/storage.ts` - `SettingsStorage` interface and `webStorage` (key in clear: compatibility only)
 - `src/secure-storage.ts` - `secureStorage`: prefs in localStorage, key AES-GCM encrypted under a non-extractable CryptoKey in IndexedDB (ciphertext in IndexedDB when remembered, sessionStorage otherwise)
