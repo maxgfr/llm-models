@@ -103,6 +103,54 @@ describe("testConnection, models mode", () => {
     expect(calls[2].headers.authorization).toBe("Bearer key");
   });
 
+  it("lists Gemini's models by name", async () => {
+    const fetch = fakeFetch(() =>
+      json({ models: [{ name: "models/gemini-3-pro" }, { name: "models/gemini-3-flash" }] }),
+    );
+    expect(
+      await testConnection(
+        {
+          apiKey: "key",
+          model: "m",
+          providerNpm: "@ai-sdk/google",
+          providerApi: "https://generativelanguage.googleapis.com/v1beta",
+        },
+        { fetch },
+      ),
+    ).toEqual({ ok: true, modelCount: 2, models: ["gemini-3-pro", "gemini-3-flash"] });
+  });
+
+  it("sends Anthropic's direct-browser header to Anthropic's own host only", async () => {
+    const fetch = fakeFetch(() => json({ data: [] }));
+    await testConnection(
+      {
+        apiKey: "key",
+        model: "m",
+        providerNpm: "@ai-sdk/anthropic",
+        providerApi: "https://api.minimax.io/anthropic/v1",
+      },
+      { fetch },
+    );
+    expect(calls[0].headers["x-api-key"]).toBe("key");
+    expect(calls[0].headers["anthropic-dangerous-direct-browser-access"]).toBeUndefined();
+  });
+
+  it("reports an error a gateway sends with HTTP 200, and lists an Anthropic URL without /v1", async () => {
+    const fetch = fakeFetch(() => json({ code: 500, msg: "404 NOT_FOUND" }));
+    expect(
+      await testConnection(
+        {
+          apiKey: "key",
+          model: "glm-5",
+          providerNpm: "@ai-sdk/anthropic",
+          providerApi: "https://api.z.ai/api/anthropic",
+        },
+        { fetch },
+      ),
+    ).toEqual({ ok: false, reason: "http", status: 500, message: "404 NOT_FOUND" });
+    expect(calls[0].url).toBe("https://api.z.ai/api/anthropic/v1/models");
+  });
+
   it("classifies a refused key, another status, a blocked request and a missing URL", async () => {
     const settings = { apiKey: "k", model: "m", providerApi: "https://api.openai.com/v1" };
     expect(await testConnection(settings, { fetch: fakeFetch(() => json({}, 401)) })).toEqual({
@@ -266,6 +314,46 @@ describe("testConnection, generate mode", () => {
       reason: "config",
       message: "Model not found in config",
     });
+  });
+
+  it("never shows the key a server echoed back", async () => {
+    useModel(async () => {
+      throw new Error("Invalid key k-secret-123");
+    });
+    const result = await testConnection(
+      { ...settings, apiKey: "k-secret-123" },
+      { mode: "generate" },
+    );
+    expect(result).toMatchObject({ reason: "config", message: "Invalid key ***" });
+  });
+
+  it("sends the generation through the given fetch", async () => {
+    let given: ((input: string, init?: RequestInit) => Promise<Response>) | undefined;
+    registerProvider("openai", (config) => {
+      given = config.fetch;
+      return new MockLanguageModelV4({
+        doGenerate: async () => {
+          await config.fetch?.("https://api.openai.com/v1/responses", {
+            headers: { "user-agent": "ai-sdk" },
+          });
+          return {
+            content: [{ type: "text", text: "OK" }],
+            finishReason: { unified: "stop", raw: "stop" },
+            usage: {
+              inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+              outputTokens: { total: 1, text: 1, reasoning: 0 },
+            },
+            warnings: [],
+          };
+        },
+      }) as unknown as LanguageModel;
+    });
+    const fetch = fakeFetch(() => json({}));
+    expect(await testConnection(settings, { mode: "generate", fetch })).toEqual({ ok: true });
+    expect(given).toBeDefined();
+    expect(calls).toEqual([
+      { url: "https://api.openai.com/v1/responses", headers: {}, signal: undefined },
+    ]);
   });
 
   it("reports a provider that cannot be created", async () => {

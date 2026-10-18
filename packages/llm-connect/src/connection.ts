@@ -1,10 +1,16 @@
+import { describeError, maskedErrorStatus, scrubSecret } from "./errors.js";
 import { loadModel } from "./model.js";
+import { anthropicBaseUrl, isAnthropicHost } from "./provider-kind.js";
 import { endpointProblem, type LlmSettings } from "./settings.js";
 
 /**
  * Why a connection failed: the key was refused, the browser blocked the call,
  * another status, no answer in time, incomplete settings, or a custom endpoint
  * in plain http to another machine (not called, so the key never leaves in clear).
+ *
+ * `cors` is a request that failed without a readable answer: offline, DNS, a
+ * CORS refusal, or a key refused by a server that answers errors without CORS
+ * headers. A web page cannot tell these apart: show it as "key refused or network".
  */
 export type ConnectionFailureReason = "auth" | "cors" | "http" | "timeout" | "config" | "insecure";
 
@@ -38,6 +44,7 @@ export interface TestConnectionOptions {
   signal?: AbortSignal;
   /** Milliseconds; defaults to 5 s for a custom endpoint and 10 s for a provider when listing models, none for a generation. */
   timeoutMs?: number;
+  /** The fetch every request of the test goes through, the listing and the generation. */
   fetch?: typeof fetch;
 }
 
@@ -54,15 +61,18 @@ function trimBase(url: string): string {
   return url.trim().replace(/\/+$/, "");
 }
 
-/** Auth headers of a provider's own API: Anthropic and Google do not use bearer tokens. */
-function authHeaders(npm: string | undefined, key: string): Record<string, string> {
+/**
+ * Auth headers of a provider's own API: Anthropic and Google do not use bearer tokens, and
+ * Anthropic's direct-browser opt-in goes to Anthropic's own host only.
+ */
+function authHeaders(npm: string | undefined, key: string, url: string): Record<string, string> {
   const apiKey = key.trim();
   if (!apiKey) return {};
   if (npm === "@ai-sdk/anthropic")
     return {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
+      ...(isAnthropicHost(url) && { "anthropic-dangerous-direct-browser-access": "true" }),
     };
   if (npm === "@ai-sdk/google") return { "x-goog-api-key": apiKey };
   return { Authorization: `Bearer ${apiKey}` };
@@ -70,6 +80,21 @@ function authHeaders(npm: string | undefined, key: string): Record<string, strin
 
 function isAbort(error: unknown, name: "AbortError" | "TimeoutError"): boolean {
   return error instanceof Error && error.name === name;
+}
+
+/** Model ids from an OpenAI-style `{data: [{id}]}` or a Gemini `{models: [{name: "models/<id>"}]}` list. */
+function modelIds(data: unknown): string[] {
+  const body = data as { data?: unknown; models?: unknown } | null;
+  if (Array.isArray(body?.data))
+    return body.data
+      .map((entry) => (entry as { id?: unknown })?.id)
+      .filter((id): id is string => typeof id === "string");
+  if (Array.isArray(body?.models))
+    return body.models
+      .map((entry) => (entry as { name?: unknown })?.name)
+      .filter((name): name is string => typeof name === "string")
+      .map((name) => name.replace(/^models\//, ""));
+  return [];
 }
 
 function statusFailure(status: number, message?: string): ConnectionResult {
@@ -105,6 +130,7 @@ async function getModels(
   url: string,
   headers: Record<string, string>,
   options: ListModelsOptions,
+  apiKey: string,
 ): Promise<ConnectionResult> {
   const doFetch = options.fetch ?? globalThis.fetch;
   try {
@@ -114,12 +140,14 @@ async function getModels(
     });
     if (!res.ok) return statusFailure(res.status);
     // Some servers answer without a list: reachable is enough
-    const data = (await res.json().catch(() => null)) as { data?: unknown } | null;
-    const models = Array.isArray(data?.data)
-      ? data.data
-          .map((entry) => (entry as { id?: unknown })?.id)
-          .filter((id): id is string => typeof id === "string")
-      : [];
+    const data = await res.json().catch(() => null);
+    // A gateway may answer an error with a 2xx status (Z.ai: {"code":500,"msg":"404 NOT_FOUND"})
+    const masked = maskedErrorStatus(data);
+    if (masked !== null) {
+      const { message } = describeError({ statusCode: masked, data }, apiKey.trim());
+      return statusFailure(masked, message || undefined);
+    }
+    const models = modelIds(data);
     return { ok: true, modelCount: models.length, models };
   } catch (error) {
     // The caller's own abort is not a connection verdict
@@ -130,7 +158,7 @@ async function getModels(
     return {
       ok: false,
       reason: "cors",
-      ...(error instanceof Error ? { message: error.message } : {}),
+      ...(error instanceof Error ? { message: scrubSecret(error.message, apiKey.trim()) } : {}),
     };
   }
 }
@@ -141,10 +169,13 @@ export function listEndpointModels(
   apiKey = "",
   options: ListModelsOptions = {},
 ): Promise<ConnectionResult> {
-  return getModels(`${trimBase(endpoint)}/models`, authHeaders(undefined, apiKey), {
-    timeoutMs: ENDPOINT_TIMEOUT_MS,
-    ...options,
-  });
+  const url = `${trimBase(endpoint)}/models`;
+  return getModels(
+    url,
+    authHeaders(undefined, apiKey, url),
+    { timeoutMs: ENDPOINT_TIMEOUT_MS, ...options },
+    apiKey,
+  );
 }
 
 /** Whether an error thrown by the AI SDK looks like a blocked request rather than an answer. */
@@ -162,7 +193,10 @@ async function generate(
   options: TestConnectionOptions,
 ): Promise<ConnectionResult> {
   try {
-    const [{ generateText }, model] = await Promise.all([import("ai"), loadModel(settings)]);
+    const [{ generateText }, model] = await Promise.all([
+      import("ai"),
+      loadModel(settings, options.fetch ? { fetch: options.fetch } : {}),
+    ]);
     await generateText({
       model,
       prompt: "Reply with OK.",
@@ -176,7 +210,10 @@ async function generate(
     if (options.signal?.aborted) throw error;
     if (isAbort(error, "TimeoutError") || isAbort(error, "AbortError"))
       return { ok: false, reason: "timeout" };
-    const message = error instanceof Error ? error.message : String(error);
+    const message = scrubSecret(
+      error instanceof Error ? error.message : String(error),
+      settings.apiKey?.trim(),
+    );
     const status = (error as { statusCode?: unknown } | null)?.statusCode;
     if (typeof status === "number") return statusFailure(status, message);
     if (isNetworkError(error)) return { ok: false, reason: "cors", message };
@@ -208,13 +245,20 @@ async function listModels(
       timeoutMs: options.timeoutMs ?? ENDPOINT_TIMEOUT_MS,
     });
   }
-  const base = trimBase(settings.providerApi ?? "");
+  const api = trimBase(settings.providerApi ?? "");
+  const base = api && settings.providerNpm === "@ai-sdk/anthropic" ? anthropicBaseUrl(api) : api;
   if (!base) return null;
-  return getModels(`${base}/models`, authHeaders(settings.providerNpm, settings.apiKey), {
-    signal: options.signal,
-    fetch: options.fetch,
-    timeoutMs: options.timeoutMs ?? PROVIDER_TIMEOUT_MS,
-  });
+  const url = `${base}/models`;
+  return getModels(
+    url,
+    authHeaders(settings.providerNpm, settings.apiKey, url),
+    {
+      signal: options.signal,
+      fetch: options.fetch,
+      timeoutMs: options.timeoutMs ?? PROVIDER_TIMEOUT_MS,
+    },
+    settings.apiKey,
+  );
 }
 
 /**
