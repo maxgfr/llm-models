@@ -1,0 +1,6 @@
+data: {"candidates": [{"content": {"parts": [{"text": "A haiku about rain:\n\nSoft rain on the roof"}],"role": "model"},"index": 0}],"usageMetadata": {"promptTokenCount": 9,"candidatesTokenCount": 9,"totalTokenCount": 64,"promptTokensDetails": [{"modality": "TEXT","tokenCount": 9}],"thoughtsTokenCount": 46},"modelVersion": "gemini-3-flash","responseId": "kXvyaN-3Ep2Lz7IPq8yQ4Ak"}
+
+data: {"candidates": [{"content": {"parts": [{"text": ",\nthe gutter hums its one song,\nthe street"}],"role": "model"},"index": 0}],"usageMetadata": {"promptTokenCount": 9,"candidatesTokenCount": 19,"totalTokenCount": 74,"promptTokensDetails": [{"modality": "TEXT","tokenCount": 9}],"thoughtsTokenCount": 46},"modelVersion": "gemini-3-flash","responseId": "kXvyaN-3Ep2Lz7IPq8yQ4Ak"}
+
+data: {"candidates": [{"content": {"parts": [{"text": " shines and sleeps."}],"role": "model"},"finishReason": "STOP","index": 0}],"usageMetadata": {"promptTokenCount": 9,"candidatesTokenCount": 24,"totalTokenCount": 79,"promptTokensDetails": [{"modality": "TEXT","tokenCount": 9}],"thoughtsTokenCount": 46},"modelVersion": "gemini-3-flash","responseId": "kXvyaN-3Ep2Lz7IPq8yQ4Ak"}
+

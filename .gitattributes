@@ -1,0 +1,2 @@
+# Recorded provider streams keep their exact bytes (Gemini sends CRLF line endings).
+packages/llm-connect/src/__tests__/fixtures/** -text

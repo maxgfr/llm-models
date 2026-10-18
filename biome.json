@@ -20,6 +20,6 @@
     }
   },
   "files": {
-    "includes": ["**", "!**/build/", "!**/dist/", "!**/node_modules/"]
+    "includes": ["**", "!**/build/", "!**/dist/", "!**/node_modules/", "!**/__tests__/fixtures/**"]
   }
 }

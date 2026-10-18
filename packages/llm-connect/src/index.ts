@@ -5,6 +5,32 @@
 export type { SlimCatalog, SlimModel, SlimProvider } from "llm-models/catalog";
 export { CALLABLE_NPM, defaultModelOf, filterCatalogModels } from "llm-models/catalog";
 export {
+  type CallCheck,
+  type CallOptions,
+  type CallOptionsInput,
+  type CallProblem,
+  type CallProblemCode,
+  callOptions,
+  callProblem,
+  LlmCallError,
+  refusalOf,
+  type Sampling,
+  type StopReason,
+  stopReasonOf,
+} from "./call.js";
+export {
+  type Capabilities,
+  type CapabilityOverride,
+  type CatalogModelInfo,
+  KNOWN_ANTHROPIC_MODELS,
+  type ModelCost,
+  type ResolveCapabilitiesInput,
+  resolveCapabilities,
+  SAMPLING_PARAMS,
+  type SamplingParam,
+  type WebSearchVariant,
+} from "./capabilities.js";
+export {
   type CatalogSource,
   clearCatalogCache,
   DEFAULT_PROVIDER_META,
@@ -24,6 +50,15 @@ export {
   type TestConnectionOptions,
   testConnection,
 } from "./connection.js";
+export {
+  EFFORTS,
+  type Effort,
+  type EffortWire,
+  effortLevels,
+  effortWire,
+  modelKey,
+  usableEffort,
+} from "./effort.js";
 export {
   describeError,
   type LlmError,
@@ -118,3 +153,4 @@ export {
   type VaultStorageOptions,
   vaultStorage,
 } from "./vault-storage.js";
+export { WEB_SEARCH_TOOL, type WebSearchOptions, webSearchTools } from "./web-search.js";

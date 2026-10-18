@@ -1,0 +1,30 @@
+event: response.created
+data: {"type":"response.created","sequence_number":0,"response":{"id":"resp_0a7b3c9d1e5f2a4b","object":"response","created_at":1760700000,"status":"in_progress","background":false,"error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-5.1","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":"medium","summary":"auto"},"store":false,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+event: response.in_progress
+data: {"type":"response.in_progress","sequence_number":1,"response":{"id":"resp_0a7b3c9d1e5f2a4b","object":"response","created_at":1760700000,"status":"in_progress","background":false,"error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-5.1","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":"medium","summary":"auto"},"store":false,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":2,"output_index":0,"item":{"id":"rs_0c4e8a2b6d1f3e5a","type":"reasoning","summary":[],"encrypted_content":null}}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":3,"output_index":0,"item":{"id":"rs_0c4e8a2b6d1f3e5a","type":"reasoning","summary":[],"encrypted_content":"gAAAAABo8pZ1xW3qR7tY2uI5oP9aS4dF6gH8jK0lZ1xC3vB5nM7qW9eR2tY4uI6oP8aS0dF2gH4jK6lZ8xC0vB2nM4qW6eR8tY0uI2o="}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","sequence_number":4,"output_index":1,"item":{"id":"fc_0d5f9b3c7e2a4d6b","type":"function_call","status":"in_progress","arguments":"","call_id":"call_Mx4Tq8Wn2Zr6","name":"calculator"}}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","sequence_number":5,"item_id":"fc_0d5f9b3c7e2a4d6b","output_index":1,"delta":"{\"expression\":"}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","sequence_number":6,"item_id":"fc_0d5f9b3c7e2a4d6b","output_index":1,"delta":"\"17 * 24\"}"}
+
+event: response.function_call_arguments.done
+data: {"type":"response.function_call_arguments.done","sequence_number":7,"item_id":"fc_0d5f9b3c7e2a4d6b","output_index":1,"arguments":"{\"expression\":\"17 * 24\"}"}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","sequence_number":8,"output_index":1,"item":{"id":"fc_0d5f9b3c7e2a4d6b","type":"function_call","status":"completed","arguments":"{\"expression\":\"17 * 24\"}","call_id":"call_Mx4Tq8Wn2Zr6","name":"calculator"}}
+
+event: response.completed
+data: {"type":"response.completed","sequence_number":9,"response":{"id":"resp_0a7b3c9d1e5f2a4b","object":"response","created_at":1760700000,"status":"completed","background":false,"error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-5.1","output":[{"id":"rs_0c4e8a2b6d1f3e5a","type":"reasoning","summary":[],"encrypted_content":"gAAAAABo8pZ1xW3qR7tY2uI5oP9aS4dF6gH8jK0lZ1xC3vB5nM7qW9eR2tY4uI6oP8aS0dF2gH4jK6lZ8xC0vB2nM4qW6eR8tY0uI2o="},{"id":"fc_0d5f9b3c7e2a4d6b","type":"function_call","status":"completed","arguments":"{\"expression\":\"17 * 24\"}","call_id":"call_Mx4Tq8Wn2Zr6","name":"calculator"}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":"medium","summary":"auto"},"store":false,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":164,"input_tokens_details":{"cached_tokens":0},"output_tokens":58,"output_tokens_details":{"reasoning_tokens":36},"total_tokens":222},"user":null,"metadata":{}}}
+
