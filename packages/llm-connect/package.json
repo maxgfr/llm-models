@@ -1,6 +1,6 @@
 {
   "name": "llm-connect",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Connect a web app to any LLM provider through the AI SDK: provider registry, model creation, connection test and a settings store, with a React adapter",
   "author": "maxgfr",
   "license": "MIT",
