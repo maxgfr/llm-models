@@ -4,7 +4,7 @@ import { describe, expect, it } from "bun:test";
 import { APICallError, RetryError } from "ai";
 import { describeError, maskedErrorStatus, scrubSecret } from "../errors.js";
 
-const KEY = "sk-secret-0123456789abcdef";
+const KEY = "test-key-not-a-real-secret";
 
 function http(status: number, body: string) {
   return new APICallError({

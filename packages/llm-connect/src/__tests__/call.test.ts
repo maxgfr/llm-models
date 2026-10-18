@@ -13,7 +13,7 @@ import { type Call, fixtureText, serve, serveFixture } from "./sse.js";
 
 (globalThis as { AI_SDK_LOG_WARNINGS?: boolean }).AI_SDK_LOG_WARNINGS = false;
 
-const KEY = "sk-test-key-0123456789";
+const KEY = "test-key-not-a-real-secret";
 
 const anthropic = (model: string, providerApi?: string): LlmSettings => ({
   apiKey: KEY,
