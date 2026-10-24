@@ -7,7 +7,7 @@ import {
   toWebVtt,
   wordsFromSegments,
 } from "../transcript.js";
-import { fromAsrOutput } from "../whisper.js";
+import { fromAsrOutput, spokenLanguage } from "../whisper.js";
 
 const w = (text: string, start: number, end: number) => ({ text, start, end });
 
@@ -104,5 +104,23 @@ describe("fromAsrOutput", () => {
     expect(t.words).toEqual([w("Hello", 0, 0.4), w("world", 0.4, 2)]);
     expect(t.duration).toBe(2);
     expect(t.wordTimings).toBe("exact");
+  });
+});
+
+describe("spokenLanguage", () => {
+  it("is the browser's language, as a two-letter code, English without one", () => {
+    const nav = globalThis.navigator;
+    const set = (language: string | undefined) =>
+      Object.defineProperty(globalThis, "navigator", { value: { language }, configurable: true });
+    try {
+      set("fr-FR");
+      expect(spokenLanguage()).toBe("fr");
+      set("pt_BR");
+      expect(spokenLanguage()).toBe("pt");
+      set(undefined);
+      expect(spokenLanguage()).toBe("en");
+    } finally {
+      Object.defineProperty(globalThis, "navigator", { value: nav, configurable: true });
+    }
   });
 });

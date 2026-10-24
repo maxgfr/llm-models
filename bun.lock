@@ -21,7 +21,7 @@
     },
     "packages/llm-connect": {
       "name": "llm-connect",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "dependencies": {
         "llm-models": "workspace:^",
       },
@@ -32,7 +32,7 @@
         "@ai-sdk/openai": "^4.0.96",
         "@ai-sdk/openai-compatible": "^3.0.71",
         "@happy-dom/global-registrator": "^21.0.3",
-        "@huggingface/transformers": "4.3.1",
+        "@huggingface/transformers": "^4.3.1",
         "@testing-library/react": "^16.3.3",
         "@types/react": "^19.2.7",
         "ai": "^7.0.143",
@@ -47,6 +47,7 @@
         "@ai-sdk/mistral": "^4.0.0",
         "@ai-sdk/openai": "^4.0.0",
         "@ai-sdk/openai-compatible": "^3.0.0",
+        "@huggingface/transformers": "^4.0.0",
         "ai": "^7.0.0",
         "react": ">=18",
       },
@@ -56,6 +57,7 @@
         "@ai-sdk/mistral",
         "@ai-sdk/openai",
         "@ai-sdk/openai-compatible",
+        "@huggingface/transformers",
         "ai",
         "react",
       ],
