@@ -20,7 +20,8 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
   Responses calls, headers that pass a browser's CORS preflight, and errors classified without
   the key.
 - **Speech to text**: `transcribe` with the provider's own transcription model (OpenAI, Gemini,
-  Mistral, Groq), or Whisper in the page with `llm-connect/whisper`, both timed to the word.
+  Mistral, Groq), or on the device with NVIDIA Parakeet or Canary (`llm-connect/nemo`) or Whisper
+  (`llm-connect/whisper`), all in one shape and timed to the word.
 
 ## Install
 
@@ -522,6 +523,47 @@ MP4 audio from their bytes). When a model gives only segments, words are estimat
 when it gives words, segments are rebuilt at sentence ends and pauses. Providers cap uploads (25 MB
 for OpenAI and Groq), so cut long recordings first. `loadTranscriptionModel(settings)` returns the
 AI SDK model itself, and `transcriptionTargetOf(settings)` the SDK, model and URL it uses.
+
+### NVIDIA Parakeet and Canary in the page
+
+`llm-connect/nemo` runs NVIDIA's NeMo speech models in the browser with
+[onnxruntime-web](https://www.npmjs.com/package/onnxruntime-web) (install `onnxruntime-web`): no
+key, nothing leaves the device, same `Transcript` shape. They hear better than Whisper and keep
+the fillers ("euh", "um") that text-based editing removes.
+
+| Model | Languages | Word timings | Download |
+| --- | --- | --- | --- |
+| `parakeet` (default): Parakeet TDT 0.6B v3 | 25 European ones, found by the model | exact (transducer frames, 80 ms) | ~670 MB |
+| `canary`: Canary 180M Flash | English, French, German, Spanish | spread over each phrase | ~215 MB |
+
+```ts
+// On the page
+import { decodeAudio } from "llm-connect/nemo";
+const samples = await decodeAudio(blob); // 16 kHz mono
+worker.postMessage(samples, [samples.buffer]);
+
+// In a worker
+import { loadNemo, nemoSupports } from "llm-connect/nemo";
+const nemo = await loadNemo({
+  model: "parakeet",
+  wasmPaths: "/ort/", // serve onnxruntime-web's .wasm files yourself
+  onProgress: ({ ratio }) => postMessage({ progress: ratio }),
+});
+const transcript = await nemo.transcribe(samples, { onProgress: (r) => postMessage({ done: r }) });
+```
+
+The files (istupakov's ONNX exports, int8, with NeMo's mel front end) come from Hugging Face once,
+then from Cache Storage (`llm-connect-models`); pass `baseUrl` to serve them yourself and `cache:
+null` to keep nothing. Long audio is cut at its quietest moments (30 s at most for Parakeet).
+Canary's own timestamp tokens drift in the ONNX export, so it is cut at every pause and each
+phrase's time is spread over its words: pick it for a smaller download, Parakeet for editing to
+the word. Canary needs the spoken language (`language`, the browser's by default); Parakeet does
+not. `nemoSupports(model, language)` says whether one fits, so an app can fall back to Whisper.
+
+It runs on WebAssembly, about three times faster than real time on a laptop. Any onnxruntime with
+the same API fits (`runtime`, for instance onnxruntime-node with `executionProviders: ["cpu"]`).
+A CSP needs `'wasm-unsafe-eval'` in `script-src` and `https:` (or `https://huggingface.co
+https://*.hf.co`) in `connect-src`.
 
 ### Whisper in the page
 

@@ -7,7 +7,10 @@
 // OfflineAudioContext, which workers lack: call it on the page and transfer
 // the samples.
 
+import { spokenLanguage } from "./audio.js";
 import { type Transcript, type TranscriptPiece, toTranscript } from "./transcript.js";
+
+export { decodeAudio, spokenLanguage } from "./audio.js";
 
 export type WhisperPreset = "fast" | "balanced" | "accurate";
 
@@ -111,17 +114,6 @@ interface TransformersModule {
   env: { backends: { onnx: { wasm?: { wasmPaths?: string } } } };
 }
 
-/**
- * The language Whisper listens for when the app does not say: the browser's (also known in a
- * worker), as an ISO 639-1 code; English without one. transformers.js does not detect the language,
- * and decodes in English when none is given, which translates any other speech.
- */
-export function spokenLanguage(): string {
-  const nav = (globalThis as { navigator?: { language?: string } }).navigator;
-  const code = (nav?.language ?? "").toLowerCase().split(/[-_]/)[0] ?? "";
-  return /^[a-z]{2,3}$/.test(code) ? code : "en";
-}
-
 /** The pipeline's output as a transcript; a chunk without an end lasts until the audio's end. */
 export function fromAsrOutput(output: AsrOutput, duration: number): Transcript {
   const pieces: TranscriptPiece[] = (output.chunks ?? []).map((c) => {
@@ -182,37 +174,4 @@ export async function loadWhisper(options: WhisperOptions = {}): Promise<Whisper
       await asr.dispose?.();
     },
   };
-}
-
-type OfflineCtx = new (
-  channels: number,
-  length: number,
-  sampleRate: number,
-) => {
-  decodeAudioData(data: ArrayBuffer): Promise<AudioBuffer>;
-  createBufferSource(): AudioBufferSourceNode;
-  destination: AudioNode;
-  startRendering(): Promise<AudioBuffer>;
-};
-
-/**
- * Any audio or video file the browser can decode, as mono samples at Whisper's rate. Runs on the
- * page (OfflineAudioContext); transfer the result to the worker that runs Whisper.
- */
-export async function decodeAudio(
-  input: Blob | ArrayBuffer,
-  sampleRate = WHISPER_SAMPLE_RATE,
-): Promise<Float32Array> {
-  const Ctx = (globalThis as { OfflineAudioContext?: OfflineCtx }).OfflineAudioContext;
-  if (!Ctx) throw new Error("This browser cannot decode audio here (no OfflineAudioContext).");
-  const data = input instanceof ArrayBuffer ? input : await input.arrayBuffer();
-  const decoded = await new Ctx(1, 1, sampleRate).decodeAudioData(data);
-  const length = Math.max(1, Math.ceil(decoded.duration * sampleRate));
-  const ctx = new Ctx(1, length, sampleRate);
-  const source = ctx.createBufferSource();
-  source.buffer = decoded;
-  source.connect(ctx.destination);
-  source.start();
-  const rendered = await ctx.startRendering();
-  return rendered.getChannelData(0);
 }
