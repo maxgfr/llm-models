@@ -19,6 +19,8 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
   accepts (sampling, prefill, tools, web search), Claude's adaptive thinking, stateless OpenAI
   Responses calls, headers that pass a browser's CORS preflight, and errors classified without
   the key.
+- **Speech to text**: `transcribe` with the provider's own transcription model (OpenAI, Gemini,
+  Mistral, Groq), or Whisper in the page with `llm-connect/whisper`, both timed to the word.
 
 ## Install
 
@@ -487,6 +489,71 @@ reads the names older settings stored), `toLanguageCode(value)` migrates them, a
 ```ts
 const system = `Answer in ${languageName(settings.language)}.`;
 ```
+
+## Speech to text
+
+`transcribe(settings, audio, options)` sends audio to the transcription model of the provider the
+settings already point to, with the same key and the same guarded fetch, and always answers one
+shape:
+
+```ts
+import { transcribe, transcriptionProblem, toWebVtt } from "llm-connect";
+
+const problem = transcriptionProblem(settings); // null, or { code, message } to show
+const t = await transcribe(settings, recordingBlob, { language: "fr", vocabulary: ["stepcast"] });
+// t.text, t.language, t.duration
+// t.segments: [{ text, start, end }]  about a sentence each, in seconds
+// t.words:    [{ text, start, end }]
+// t.wordTimings: "exact" | "estimated" | "none"
+const vtt = toWebVtt(t);
+```
+
+| Provider | Model (default) | Word timings |
+| --- | --- | --- |
+| OpenAI | `whisper-1` (`gpt-4o-transcribe` on request) | exact with Whisper |
+| Gemini | `gemini-3.5-transcribe` | exact |
+| Mistral | `voxtral-mini-latest` | exact |
+| Groq | `whisper-large-v3-turbo` | exact |
+| A custom OpenAI-compatible server | the `model` you name | when it sends them |
+| Anthropic | none: `transcriptionProblem` says so | |
+
+A `MediaRecorder` blob works as is: its own type is sent (the AI SDK does not recognise WebM or
+MP4 audio from their bytes). When a model gives only segments, words are estimated inside them;
+when it gives words, segments are rebuilt at sentence ends and pauses. Providers cap uploads (25 MB
+for OpenAI and Groq), so cut long recordings first. `loadTranscriptionModel(settings)` returns the
+AI SDK model itself, and `transcriptionTargetOf(settings)` the SDK, model and URL it uses.
+
+### Whisper in the page
+
+`llm-connect/whisper` runs Whisper in the browser with
+[transformers.js](https://github.com/huggingface/transformers.js) (install
+`@huggingface/transformers`): no key, nothing leaves the device, same `Transcript` shape.
+
+| Preset | Model | Download |
+| --- | --- | --- |
+| `fast` | `onnx-community/whisper-base_timestamped` | ~80 MB |
+| `balanced` | `onnx-community/whisper-small_timestamped` | ~250 MB |
+| `accurate` | `onnx-community/whisper-large-v3-turbo_timestamped` (WebGPU) | ~600 MB |
+
+```ts
+// On the page: decode any audio or video file to 16 kHz mono samples
+import { decodeAudio } from "llm-connect/whisper";
+const samples = await decodeAudio(blob);
+worker.postMessage(samples, [samples.buffer]);
+
+// In a worker
+import { loadWhisper, recommendedWhisperPreset } from "llm-connect/whisper";
+const whisper = await loadWhisper({
+  preset: await recommendedWhisperPreset(), // accurate on WebGPU, fast otherwise
+  wasmPaths: "/ort/", // serve onnxruntime-web's .wasm files yourself
+  onProgress: ({ ratio }) => postMessage({ progress: ratio }),
+});
+const transcript = await whisper.transcribe(samples, { language: "fr" });
+```
+
+The model is downloaded once from Hugging Face, then served from the browser's cache. WebGPU is used
+when the browser has it, WebAssembly otherwise. A CSP needs `'wasm-unsafe-eval'` in `script-src`
+and `https:` (or `https://huggingface.co https://*.hf.co`) in `connect-src`.
 
 ## React
 
