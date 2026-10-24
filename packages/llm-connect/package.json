@@ -1,7 +1,7 @@
 {
   "name": "llm-connect",
   "version": "2.3.1",
-  "description": "Connect a web app to any LLM provider through the AI SDK: provider registry, model creation, connection test, a settings store and speech-to-text (provider models or Whisper in the page), with a React adapter",
+  "description": "Connect a web app to any LLM provider through the AI SDK: provider registry, model creation, connection test, a settings store and speech-to-text (provider models, or NVIDIA Parakeet, Canary and Whisper in the page), with a React adapter",
   "author": "maxgfr",
   "license": "MIT",
   "type": "module",
@@ -19,6 +19,10 @@
     "./whisper": {
       "types": "./build/whisper.d.ts",
       "default": "./build/whisper.js"
+    },
+    "./nemo": {
+      "types": "./build/nemo.d.ts",
+      "default": "./build/nemo.js"
     },
     "./providers/*": {
       "types": "./build/providers/*.d.ts",
@@ -57,7 +61,10 @@
     "browser",
     "transcription",
     "speech-to-text",
-    "whisper"
+    "whisper",
+    "parakeet",
+    "canary",
+    "nvidia"
   ],
   "scripts": {
     "build": "rm -rf build && tsc",
@@ -79,7 +86,8 @@
     "@ai-sdk/openai": "^4.0.0",
     "@ai-sdk/openai-compatible": "^3.0.0",
     "react": ">=18",
-    "@huggingface/transformers": "^4.0.0"
+    "@huggingface/transformers": "^4.0.0",
+    "onnxruntime-web": ">=1.22.0"
   },
   "peerDependenciesMeta": {
     "ai": {
@@ -105,6 +113,9 @@
     },
     "@huggingface/transformers": {
       "optional": true
+    },
+    "onnxruntime-web": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -119,6 +130,7 @@
     "@types/react": "^19.2.7",
     "ai": "^7.0.143",
     "fake-indexeddb": "^6.2.6",
+    "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "zod": "^4.4.3"
