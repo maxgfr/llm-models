@@ -551,6 +551,10 @@ const whisper = await loadWhisper({
 const transcript = await whisper.transcribe(samples, { language: "fr" });
 ```
 
+Whisper in the page does not detect the spoken language, and without one it decodes in English
+(French speech comes back translated). Pass `language` when you know it; otherwise the browser's
+language is used (`spokenLanguage()`).
+
 The model is downloaded once from Hugging Face, then served from the browser's cache. WebGPU is used
 when the browser has it, WebAssembly otherwise. A CSP needs `'wasm-unsafe-eval'` in `script-src`
 and `https:` (or `https://huggingface.co https://*.hf.co`) in `connect-src`.

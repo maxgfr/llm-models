@@ -75,7 +75,10 @@ export interface WhisperOptions {
 }
 
 export interface WhisperTranscribeOptions {
-  /** ISO 639-1 code of the spoken language; detected when missing. */
+  /**
+   * ISO 639-1 code of the spoken language. Whisper in the page does not detect it: without one,
+   * the browser's language is used ({@link spokenLanguage}). Pass it when you know it.
+   */
   language?: string;
   /** Word timings (default) or segment timings only, which is faster. */
   words?: boolean;
@@ -106,6 +109,17 @@ type Asr = ((audio: Float32Array, options: Record<string, unknown>) => Promise<A
 interface TransformersModule {
   pipeline(task: string, model: string, options: Record<string, unknown>): Promise<Asr>;
   env: { backends: { onnx: { wasm?: { wasmPaths?: string } } } };
+}
+
+/**
+ * The language Whisper listens for when the app does not say: the browser's (also known in a
+ * worker), as an ISO 639-1 code; English without one. transformers.js does not detect the language,
+ * and decodes in English when none is given, which translates any other speech.
+ */
+export function spokenLanguage(): string {
+  const nav = (globalThis as { navigator?: { language?: string } }).navigator;
+  const code = (nav?.language ?? "").toLowerCase().split(/[-_]/)[0] ?? "";
+  return /^[a-z]{2,3}$/.test(code) ? code : "en";
 }
 
 /** The pipeline's output as a transcript; a chunk without an end lasts until the audio's end. */
@@ -160,7 +174,7 @@ export async function loadWhisper(options: WhisperOptions = {}): Promise<Whisper
         chunk_length_s: 30,
         stride_length_s: 5,
         task: "transcribe",
-        ...(opts.language ? { language: opts.language } : {}),
+        language: opts.language || spokenLanguage(),
       });
       return fromAsrOutput(output, samples.length / WHISPER_SAMPLE_RATE);
     },
