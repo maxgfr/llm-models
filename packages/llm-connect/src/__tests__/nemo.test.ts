@@ -167,15 +167,6 @@ const files = (vocab: string) =>
     return new Response(name === "vocab.txt" ? vocab : name);
   }) as unknown as typeof fetch;
 
-const frontEnd: Run = (feeds) => {
-  const n = (feeds.waveforms as OrtTensor).dims[1] as number;
-  const frames = Math.floor(n / 160);
-  return {
-    features: new Tensor("float32", new Float32Array(128 * frames), [1, 128, frames]),
-    features_lens: new Tensor("int64", BigInt64Array.of(BigInt(frames)), [1]),
-  };
-};
-
 describe("loadNemo with Parakeet", () => {
   it("times each word on the frames the transducer gives its tokens", async () => {
     // vocab: <unk>, ▁hel, lo, ▁world, <blk>; durations 0..4 follow the tokens.
@@ -221,7 +212,6 @@ describe("loadNemo with Parakeet", () => {
     };
     const nemo = await loadNemo({
       runtime: fakeRuntime({
-        "nemo128.onnx": frontEnd,
         "encoder-model.int8.onnx": encoder,
         "decoder_joint-model.int8.onnx": decoder,
       }),
@@ -282,7 +272,6 @@ describe("loadNemo with Canary", () => {
     const nemo = await loadNemo({
       model: "canary",
       runtime: fakeRuntime({
-        "nemo128.onnx": frontEnd,
         "encoder-model.int8.onnx": encoder,
         "decoder-model.int8.onnx": decoder,
       }),

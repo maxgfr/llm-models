@@ -8,12 +8,13 @@
 //   download. Its timestamp tokens drift in the ONNX export, so the audio is cut
 //   at its pauses and each phrase's time is spread over its words.
 //
-// The ONNX exports are istupakov's (onnx-asr), with NeMo's mel front end as a
-// small graph of its own. Files are downloaded once and kept in Cache Storage.
+// The ONNX exports are istupakov's (onnx-asr); NeMo's mel front end is computed
+// here (mel.ts). Files are downloaded once and kept in Cache Storage.
 // Long audio is cut at its quietest moments. Inference is heavy: run `loadNemo`
 // in a worker; `decodeAudio` needs the page.
 
 import { SPEECH_SAMPLE_RATE, spokenLanguage } from "./audio.js";
+import { nemoFeatures } from "./mel.js";
 import {
   joinWords,
   type Transcript,
@@ -87,8 +88,6 @@ export const NEMO_MODELS: Readonly<Record<NemoModel, NemoModelInfo>> = {
   },
 };
 
-/** NeMo's 128-band mel front end, the same for both models. */
-const FRONT_END = { repo: "istupakov/parakeet-tdt-0.6b-v3-onnx", file: "nemo128.onnx" };
 const VOCAB = "vocab.txt";
 const CACHE_NAME = "llm-connect-models";
 /** Each encoder frame covers 80 ms (10 ms mel hops, subsampled 8 times). */
@@ -134,7 +133,7 @@ export interface NemoOptions {
   executionProviders?: readonly string[];
   /** Where onnxruntime-web's .wasm files are, to serve them yourself rather than from a CDN. */
   wasmPaths?: string | { mjs: string; wasm: string };
-  /** Base URL of the model's files, instead of Hugging Face (front end, encoder, decoder, vocab.txt). */
+  /** Base URL of the model's files, instead of Hugging Face (encoder, decoder, vocab.txt). */
   baseUrl?: string;
   /** Where the files are kept between visits; Cache Storage when the browser has it, `null` for nowhere. */
   cache?: CacheStorage | null;
@@ -373,20 +372,19 @@ function argmax(values: Float32Array, from = 0, to = values.length): number {
 
 interface Sessions {
   ort: OrtRuntime;
-  frontEnd: OrtSession;
   encoder: OrtSession;
   decoder: OrtSession;
   vocab: string[];
 }
 
-/** Mel features of mono 16 kHz samples. */
-async function features(s: Sessions, samples: Float32Array) {
+/** The encoder's input: 128-band mel features of mono 16 kHz samples. */
+function features(s: Sessions, samples: Float32Array) {
   const { Tensor } = s.ort;
-  const out = await s.frontEnd.run({
-    waveforms: new Tensor("float32", samples, [1, samples.length]),
-    waveforms_lens: new Tensor("int64", BigInt64Array.of(BigInt(samples.length)), [1]),
-  });
-  return { audio_signal: out.features as OrtTensor, length: out.features_lens as OrtTensor };
+  const f = nemoFeatures(samples, SPEECH_SAMPLE_RATE, 128);
+  return {
+    audio_signal: new Tensor("float32", f.data, [1, 128, f.frames]),
+    length: new Tensor("int64", BigInt64Array.of(BigInt(f.length)), [1]),
+  };
 }
 
 /** Parakeet: greedy TDT decoding; each token gets the frames it covers. */
@@ -396,7 +394,7 @@ async function parakeetTokens(
   signal?: AbortSignal,
 ): Promise<TranscriptPiece[]> {
   const { Tensor } = s.ort;
-  const enc = await s.encoder.run(await features(s, samples));
+  const enc = await s.encoder.run(features(s, samples));
   const out = enc.outputs as OrtTensor;
   const [, dim = 0, frames = 0] = out.dims;
   const data = out.data as Float32Array;
@@ -456,7 +454,7 @@ async function canaryText(
   signal?: AbortSignal,
 ): Promise<string> {
   const { Tensor } = s.ort;
-  const enc = await s.encoder.run(await features(s, samples));
+  const enc = await s.encoder.run(features(s, samples));
   // The tokenizer joins one vocabulary per language, so " " is there several times: the prompt
   // takes the last one, as NeMo's lookup table does.
   const id = (token: string) => {
@@ -521,15 +519,10 @@ export async function loadNemo(options: NemoOptions = {}): Promise<NemoTranscrib
   const base = options.baseUrl?.replace(/\/+$/, "");
   const hub = (repo: string, file: string) =>
     base ? `${base}/${file}` : `https://huggingface.co/${repo}/resolve/main/${file}`;
-  const files = [
-    hub(FRONT_END.repo, FRONT_END.file),
-    hub(info.repo, info.encoder),
-    hub(info.repo, info.decoder),
-    hub(info.repo, VOCAB),
-  ];
+  const files = [hub(info.repo, info.encoder), hub(info.repo, info.decoder), hub(info.repo, VOCAB)];
   // Progress over every file: the expected size until a download says its own.
   const expected = info.size * 1e6;
-  const totals = files.map((_, i) => (i === 1 ? expected * 0.8 : i === 2 ? expected * 0.2 : 1e5));
+  const totals = files.map((_, i) => (i === 0 ? expected * 0.8 : i === 1 ? expected * 0.2 : 1e5));
   const loaded = files.map(() => 0);
   const report = () => {
     const total = totals.reduce((a, b) => a + b, 0);
@@ -556,10 +549,9 @@ export async function loadNemo(options: NemoOptions = {}): Promise<NemoTranscrib
     });
   const sessions: Sessions = {
     ort,
-    frontEnd: await session(bytes[0] as Uint8Array),
-    encoder: await session(bytes[1] as Uint8Array),
-    decoder: await session(bytes[2] as Uint8Array),
-    vocab: parseVocab(new TextDecoder().decode(bytes[3])),
+    encoder: await session(bytes[0] as Uint8Array),
+    decoder: await session(bytes[1] as Uint8Array),
+    vocab: parseVocab(new TextDecoder().decode(bytes[2])),
   };
 
   return {
@@ -607,9 +599,7 @@ export async function loadNemo(options: NemoOptions = {}): Promise<NemoTranscrib
       };
     },
     async dispose() {
-      await Promise.all(
-        [sessions.frontEnd, sessions.encoder, sessions.decoder].map((x) => x.release?.()),
-      );
+      await Promise.all([sessions.encoder, sessions.decoder].map((x) => x.release?.()));
     },
   };
 }

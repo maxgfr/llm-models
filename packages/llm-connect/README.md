@@ -552,7 +552,7 @@ const nemo = await loadNemo({
 const transcript = await nemo.transcribe(samples, { onProgress: (r) => postMessage({ done: r }) });
 ```
 
-The files (istupakov's ONNX exports, int8, with NeMo's mel front end) come from Hugging Face once,
+The files (istupakov's ONNX exports, int8; NeMo's mel front end is computed in TypeScript) come from Hugging Face once,
 then from Cache Storage (`llm-connect-models`); pass `baseUrl` to serve them yourself and `cache:
 null` to keep nothing. Long audio is cut at its quietest moments (30 s at most for Parakeet).
 Canary's own timestamp tokens drift in the ONNX export, so it is cut at every pause and each
