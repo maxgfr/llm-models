@@ -90,8 +90,8 @@ export interface Capabilities {
 export type CapabilityOverride = Partial<Capabilities>;
 
 /**
- * What a catalog says about a model. The slim catalog's `SlimModel` (`tool_call`, `reasoning`)
- * fits; a richer source can add limits, input modalities and prices.
+ * What a catalog says about a model. The slim catalog's `SlimModel` (`tool_call`, `reasoning`,
+ * `input`) fits; a richer source can add limits and prices.
  */
 export interface CatalogModelInfo {
   id?: string;
