@@ -194,6 +194,25 @@ describe("slimCatalog", () => {
     });
   });
 
+  it("lists the input modalities of a model that takes more than text", () => {
+    const vision = slimCatalog(
+      {
+        modelsDevData: {
+          openai: devProvider("openai", "@ai-sdk/openai", [
+            devModel("gpt-5", {
+              modalities: { input: ["text", "image", "pdf"], output: ["text"] },
+            }),
+            devModel("gpt-5-mini"),
+          ]),
+        },
+        models: [],
+      },
+      { npm: CALLABLE_NPM, defaultModel: false },
+    );
+    expect(vision.openai.models["gpt-5"].input).toEqual(["text", "image", "pdf"]);
+    expect(vision.openai.models["gpt-5-mini"]).not.toHaveProperty("input");
+  });
+
   it("recommends the balanced tier: the fast sibling, or Claude's sonnet", () => {
     const catalog = slimCatalog(source, { npm: CALLABLE_NPM });
     expect(catalog.openai.defaultModel).toBe("gpt-5-mini");

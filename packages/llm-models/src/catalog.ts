@@ -9,6 +9,8 @@ export interface SlimModel {
   name: string;
   tool_call?: boolean;
   reasoning?: boolean;
+  /** Input modalities (`text`, `image`, `pdf`, `audio`…), listed only when the model takes more than text. */
+  input?: string[];
 }
 
 /** A provider as the slim catalog lists it, with its non-deprecated models. */

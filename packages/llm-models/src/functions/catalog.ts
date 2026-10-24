@@ -197,6 +197,9 @@ export function slimCatalog(source: CatalogSource, options: SlimCatalogOptions =
         name: model.name || key,
         ...(model.tool_call ? { tool_call: true } : {}),
         ...(model.reasoning ? { reasoning: true } : {}),
+        ...(model.modalities.input.some((m) => m !== "text")
+          ? { input: [...model.modalities.input] }
+          : {}),
       };
     }
     if (Object.keys(models).length === 0) continue;
