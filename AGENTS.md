@@ -113,6 +113,9 @@ Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v7, `@a
 - `src/http-cache.ts` - `cachedFetch`: GET responses in Cache Storage keyed by URL (1 h TTL, ETag revalidation on the page's origin, stale copy on network failure); plain fetch without Cache Storage; no Node APIs
 - `src/store.ts` - `createLlmSettingsStore`: framework-free state + actions, Svelte store contract
 - `src/react.ts` - entry `llm-connect/react`: `useLlmSettings`, `useLlmStore`, `useKeyVault`
+- `src/transcript.ts` - `Transcript` (text, segments, words, `wordTimings`), `toTranscript` (words ↔ segments: rebuilds segments at sentence ends and pauses, estimates words inside segments), `toWebVtt`
+- `src/transcription.ts` - `transcribe` over the AI SDK's `transcribe` with the provider's transcription model (OpenAI `whisper-1`, Gemini, Mistral Voxtral, Groq, named model on a custom endpoint; none for Anthropic), `transcriptionProblem`, `transcriptionTargetOf`, `loadTranscriptionModel`; sends the blob's own media type through `download`, reads raw `words` when a server also sends segments
+- `src/whisper.ts` - entry `llm-connect/whisper`: `loadWhisper` (transformers.js, optional peer, imported on use; WebGPU or wasm; presets fast/balanced/accurate on onnx-community `_timestamped` models), `decodeAudio` (page only: OfflineAudioContext), `fromAsrOutput`
 
 Conventions:
 - No eager SDK import outside `providers/`: `ai` and each `@ai-sdk/*` load through dynamic imports

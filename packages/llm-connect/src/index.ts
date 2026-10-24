@@ -1,6 +1,7 @@
 // llm-connect: connect a web app to an LLM provider through the AI SDK.
 // No UI framework here (see llm-connect/react), and no SDK imported eagerly:
 // each one loads on demand (loadModel) or through llm-connect/providers/*.
+// Speech to text: `transcribe` with the provider's model, or llm-connect/whisper in the page.
 
 export type { SlimCatalog, SlimModel, SlimProvider } from "llm-models/catalog";
 export { CALLABLE_NPM, defaultModelOf, filterCatalogModels } from "llm-models/catalog";
@@ -147,6 +148,32 @@ export {
   type LlmStoreOptions,
   type SaveResult,
 } from "./store.js";
+export {
+  joinWords,
+  looksLikeWords,
+  segmentsFromWords,
+  type Transcript,
+  type TranscriptInput,
+  type TranscriptPiece,
+  toTranscript,
+  toWebVtt,
+  type WordTimings,
+  wordsFromSegments,
+} from "./transcript.js";
+export {
+  type AudioInput,
+  DEFAULT_TRANSCRIPTION_MODELS,
+  loadTranscriptionModel,
+  type TranscribeOptions,
+  type TranscriptionModelOptions,
+  type TranscriptionProblem,
+  type TranscriptionProblemCode,
+  type TranscriptionSdk,
+  type TranscriptionTarget,
+  transcribe,
+  transcriptionProblem,
+  transcriptionTargetOf,
+} from "./transcription.js";
 export {
   defaultKeyName,
   migrateToVault,
