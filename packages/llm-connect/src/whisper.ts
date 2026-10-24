@@ -30,16 +30,25 @@ export const WHISPER_SAMPLE_RATE = 16_000;
 
 export type WhisperDevice = "webgpu" | "wasm";
 
+interface GpuAdapter {
+  features: { has(name: string): boolean };
+}
+
+async function gpuAdapter(): Promise<GpuAdapter | null> {
+  const gpu = (
+    globalThis.navigator as { gpu?: { requestAdapter(): Promise<GpuAdapter | null> } } | undefined
+  )?.gpu;
+  if (!gpu) return null;
+  try {
+    return await gpu.requestAdapter();
+  } catch {
+    return null;
+  }
+}
+
 /** Whether the browser exposes WebGPU with an adapter. */
 export async function hasWebGpu(): Promise<boolean> {
-  const gpu = (globalThis.navigator as { gpu?: { requestAdapter(): Promise<unknown> } } | undefined)
-    ?.gpu;
-  if (!gpu) return false;
-  try {
-    return !!(await gpu.requestAdapter());
-  } catch {
-    return false;
-  }
+  return !!(await gpuAdapter());
 }
 
 /** The preset to offer by default: the accurate one on WebGPU, the fast one otherwise. */
@@ -123,12 +132,17 @@ export async function loadWhisper(options: WhisperOptions = {}): Promise<Whisper
   }
   const wasm = transformers.env.backends.onnx.wasm;
   if (options.wasmPaths && wasm) wasm.wasmPaths = options.wasmPaths;
+  // The encoder dominates quality, the merged decoder size: the split transformers.js suggests,
+  // with a full-precision encoder on GPUs without 16-bit floats.
+  const fp16 = device === "webgpu" && !!(await gpuAdapter())?.features.has("shader-f16");
   const asr = await transformers.pipeline("automatic-speech-recognition", model, {
     device,
-    // The encoder dominates quality, the merged decoder size: the split transformers.js suggests.
     dtype:
       device === "webgpu"
-        ? { encoder_model: /large/.test(model) ? "fp16" : "fp32", decoder_model_merged: "q4" }
+        ? {
+            encoder_model: fp16 && /large/.test(model) ? "fp16" : "fp32",
+            decoder_model_merged: "q4",
+          }
         : "q8",
     progress_callback: (info: { status: string; loaded?: number; total?: number }) => {
       if (info.status !== "progress_total" || !options.onProgress) return;
