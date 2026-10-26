@@ -4,6 +4,7 @@
 // not something a catalog can say. Every other model follows its catalog entry,
 // with conservative defaults for what the entry leaves out.
 
+import { normalizeModality } from "llm-models/catalog";
 import { type Effort, effortLevels, modelKey } from "./effort.js";
 
 /** Sampling parameters a call may set. */
@@ -49,6 +50,13 @@ export interface Capabilities {
   vision: boolean;
   /** Native PDF input. */
   pdf: boolean;
+  /**
+   * Audio in a message (a recording the model hears, not a transcription): the catalog says the
+   * model hears and the protocol's SDK sends audio parts (Gemini, OpenAI-compatible servers).
+   */
+  audio: boolean;
+  /** Video in a message: the catalog says the model watches and the protocol's SDK sends video. */
+  video: boolean;
   /** Function tools. */
   tools: boolean;
   /** It reasons before answering. */
@@ -98,7 +106,7 @@ export interface CatalogModelInfo {
   name?: string;
   contextWindow?: number;
   maxOutput?: number;
-  /** Input modalities: `text`, `image`, `pdf`, `audio`... */
+  /** Input modalities: `text`, `image`, `pdf`, `audio`, `video` (OpenRouter's `file` reads as `pdf`). */
   input?: readonly string[];
   reasoning?: boolean;
   toolCall?: boolean;
@@ -289,6 +297,8 @@ function pinnedClaude(modelId: string): Capabilities | null {
   return {
     vision: true,
     pdf: true,
+    audio: false,
+    video: false,
     tools: true,
     reasoning: true,
     effort: { levels: effortLevels("anthropic", modelId), default: row.effortDefault },
@@ -336,12 +346,24 @@ function catalogWebSearch(kind: string, modelId: string, tools: boolean): WebSea
   return null;
 }
 
+/**
+ * The media each protocol's SDK puts in a chat message, besides images and PDFs. Anthropic,
+ * Mistral and OpenAI's Responses API refuse audio and video parts (Mistral and OpenAI hear
+ * through their transcription models instead); Gemini takes both; an OpenAI-compatible server
+ * gets audio as `input_audio` and video as `video_url` (`callProblem` narrows that per SDK).
+ */
+const MESSAGE_MEDIA: Record<string, { audio: boolean; video: boolean }> = {
+  google: { audio: true, video: true },
+  "openai-compatible": { audio: true, video: true },
+};
+
 function fromCatalog(
   kind: string,
   modelId: string,
   catalog: CatalogModelInfo | undefined,
 ): Capabilities {
-  const input = catalog?.input ?? [];
+  const input = (catalog?.input ?? []).map(normalizeModality);
+  const media = MESSAGE_MEDIA[kind] ?? { audio: false, video: false };
   const documented = effortLevels(kind, modelId);
   // A catalog that says the model does not reason wins over a table match; otherwise the
   // makers' table is evidence that it does.
@@ -354,6 +376,8 @@ function fromCatalog(
   return {
     vision: input.includes("image"),
     pdf: input.includes("pdf"),
+    audio: media.audio && input.includes("audio"),
+    video: media.video && input.includes("video"),
     tools,
     reasoning,
     effort: {

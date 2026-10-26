@@ -454,6 +454,59 @@ describe("callProblem", () => {
     ).toBe("web-search");
     expect(callProblem(google("gemini-2.5-flash"), { webSearch: true }, caps)).toBeNull();
   });
+
+  it("audio and video need the model to take them and the SDK to send them", () => {
+    const media = (mediaType: string): ModelMessage => ({
+      role: "user",
+      content: [{ type: "file", data: new Uint8Array([1]), mediaType }],
+    });
+    const wav = media("audio/wav");
+    const webm = media("audio/webm");
+    const mp4 = media("video/mp4");
+    const hears = { input: ["text", "audio", "video"] };
+    const geminiCaps = resolveCapabilities({
+      kind: "google",
+      modelId: "gemini-2.5-flash",
+      catalog: hears,
+    });
+    expect(
+      callProblem(google("gemini-2.5-flash"), { messages: [webm, mp4] }, geminiCaps),
+    ).toBeNull();
+    // Claude, and OpenAI's Responses API, take neither.
+    expect(callProblem(opus, { messages: [wav] })?.code).toBe("audio");
+    expect(callProblem(opus, { messages: [mp4] })?.code).toBe("video");
+    const gpt = resolveCapabilities({ kind: "openai", modelId: "gpt-5", catalog: hears });
+    expect(callProblem(openai("gpt-5"), { messages: [wav] }, gpt)?.code).toBe("audio");
+
+    const router: LlmSettings = {
+      apiKey: KEY,
+      model: "google/gemini-3-flash-preview",
+      providerNpm: "@ai-sdk/openai-compatible",
+      providerApi: "https://openrouter.ai/api/v1",
+    };
+    const routerCaps = resolveCapabilities({
+      kind: "openai-compatible",
+      modelId: router.model,
+      catalog: hears,
+    });
+    expect(callProblem(router, { messages: [wav, mp4] }, routerCaps)).toBeNull();
+    // input_audio takes WAV or MP3 only.
+    expect(callProblem(router, { messages: [webm] }, routerCaps)?.message).toContain("WAV or MP3");
+    // A custom endpoint goes through the OpenAI SDK's Chat Completions: audio yes, video no.
+    const local: LlmSettings = {
+      apiKey: "",
+      model: "",
+      customEndpoint: "http://localhost:8000/v1",
+      customModel: "qwen-omni",
+    };
+    const localCaps = resolveCapabilities({
+      kind: "openai-compatible",
+      modelId: "qwen-omni",
+      override: { audio: true, video: true },
+    });
+    expect(callProblem(local, { messages: [wav] }, localCaps)).toBeNull();
+    expect(callProblem(local, { messages: [mp4] }, localCaps)?.code).toBe("video");
+  });
 });
 
 describe("stopReasonOf", () => {
