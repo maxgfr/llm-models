@@ -1,6 +1,6 @@
 {
   "name": "llm-connect",
-  "version": "2.4.2",
+  "version": "2.5.0",
   "description": "Connect a web app to any LLM provider through the AI SDK: provider registry, model creation, connection test, a settings store and speech-to-text (provider models, or NVIDIA Parakeet, Canary and Whisper in the page), with a React adapter",
   "author": "maxgfr",
   "license": "MIT",
