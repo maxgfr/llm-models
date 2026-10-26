@@ -12,7 +12,23 @@ import {
 } from "./capabilities.js";
 import { type Effort, effortWire } from "./effort.js";
 import { baseUrlOf, isAnthropicHost, modelIdOf, providerKindOf } from "./provider-kind.js";
+import { resolveAlias } from "./registry.js";
 import type { LlmSettings } from "./settings.js";
+
+/** The audio an OpenAI-compatible message carries (`input_audio`): WAV or MP3, inline. */
+const MESSAGE_AUDIO = new Set(["audio/wav", "audio/mp3", "audio/mpeg"]);
+
+/**
+ * An OpenAI-compatible protocol called through the OpenAI SDK's Chat Completions (a custom
+ * endpoint, or the OpenAI package on another URL), which sends no video, rather than through
+ * `@ai-sdk/openai-compatible`.
+ */
+function viaOpenAIChat(settings: LlmSettings): boolean {
+  return (
+    providerKindOf(settings) === "openai-compatible" &&
+    (!!settings.customEndpoint || resolveAlias(settings.providerNpm || "openai") === "openai")
+  );
+}
 
 /** Sampling values a call may set, in the AI SDK's names. */
 export type Sampling = { [K in SamplingParam]?: number };
@@ -52,6 +68,8 @@ export type CallProblemCode =
   | "max-output"
   | "vision"
   | "pdf"
+  | "audio"
+  | "video"
   | "no-messages";
 
 export interface CallProblem {
@@ -189,7 +207,8 @@ function partsOf(message: ModelMessage): readonly { type: string; mediaType?: st
  * What the model would refuse in a call, or null when it can be made: an effort it does not take,
  * a sampling parameter it refuses (or one next to a thinking budget), an assistant message last
  * (prefill), a system message after the first one, tools, a forced tool choice, web search,
- * images or PDFs it does not take, or an output cap above its limit. Check before calling: a
+ * images, PDFs, audio or video it does not take (or that its SDK cannot send), or an output cap
+ * above its limit. Check before calling: a
  * parameter is never silently dropped.
  */
 export function callProblem(
@@ -259,6 +278,16 @@ export function callProblem(
         return problem("vision", "The model does not take images");
       if (part.type === "file" && media === "application/pdf" && !caps.pdf)
         return problem("pdf", "The model does not take PDFs");
+      if (part.type === "file" && media.startsWith("audio")) {
+        if (!caps.audio) return problem("audio", "The model does not take audio");
+        if (kind === "openai-compatible" && !MESSAGE_AUDIO.has(media))
+          return problem("audio", "This API takes audio as WAV or MP3 only");
+      }
+      if (part.type === "file" && media.startsWith("video")) {
+        if (!caps.video) return problem("video", "The model does not take video");
+        if (viaOpenAIChat(settings))
+          return problem("video", "Chat Completions through the OpenAI SDK sends no video");
+      }
     }
   }
   return null;

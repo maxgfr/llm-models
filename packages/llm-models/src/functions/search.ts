@@ -1,3 +1,4 @@
+import { normalizeModality } from "../catalog";
 import type { ModelFilter, ModelSortField, UnifiedModel } from "../types";
 import { fetchUnifiedModels } from "./normalize";
 
@@ -16,8 +17,8 @@ export function filterModels(models: UnifiedModel[], filter: ModelFilter): Unifi
 
   // Input side only: "image" means "can read images", not "generates images".
   if (filter.modality) {
-    const mod = filter.modality.toLowerCase();
-    result = result.filter((m) => m.modalities.input.some((i) => i.toLowerCase() === mod));
+    const mod = normalizeModality(filter.modality);
+    result = result.filter((m) => m.modalities.input.some((i) => normalizeModality(i) === mod));
   }
 
   if (filter.maxCostInput != null) {

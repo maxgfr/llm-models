@@ -146,7 +146,8 @@ thought signatures, and the SDK sends them back unchanged.
 `callProblem(settings, call, capabilities?)` checks the rest before any network call, rather than
 letting a parameter be dropped: an effort or sampling parameter the model refuses, a sampling
 parameter next to a thinking budget, an assistant message last (prefill), a system message after
-the first one, tools, a forced tool choice, web search, images, PDFs, and the output cap.
+the first one, tools, a forced tool choice, web search, images, PDFs, audio, video, and the output
+cap.
 
 ### Reasoning effort
 
@@ -172,7 +173,7 @@ keeps a saved level only when the model takes it.
 ### Capabilities
 
 `resolveCapabilities({ kind, modelId, catalog?, override? })` says what a model accepts: `vision`,
-`pdf`, `tools`, `reasoning`, `effort` (`levels`, `default`), `thinkingDisplay`, `sampling`,
+`pdf`, `audio`, `video`, `tools`, `reasoning`, `effort` (`levels`, `default`), `thinkingDisplay`, `sampling`,
 `prefill`, `forcedToolChoice`, `webSearch`, `midConversationSystem`, `toolChanges`,
 `refusalFallback`, `contextWindow`, `maxOutput` and `cost`.
 
@@ -183,6 +184,20 @@ keeps a saved level only when the model takes it.
   limits, input modalities and prices), with conservative defaults for what it leaves out: no
   prefill, no forced tool choice unless the API documents it, no mid-conversation system message.
 - `override`, a user's corrections, is applied last.
+
+Audio and video in a message (a recording the model hears, a clip it watches) need two things: the
+catalog says the model takes them (`input`, see llm-models' `acceptsInput`), and the protocol's SDK
+puts them in a chat message:
+
+| Protocol | Audio | Video |
+|----------|-------|-------|
+| Gemini | yes, any format | yes |
+| OpenAI-compatible (`@ai-sdk/openai-compatible`: OpenRouter, Groq…) | WAV or MP3 | yes |
+| A custom endpoint, or the OpenAI package on another URL (Chat Completions) | WAV or MP3 | no |
+| OpenAI (Responses), Mistral, Anthropic | no | no |
+
+OpenAI and Mistral hear through their transcription models instead (`transcribe`). `callProblem`
+answers `audio` or `video` before any request when a part cannot go.
 
 ### Web search
 

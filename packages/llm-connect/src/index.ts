@@ -3,8 +3,15 @@
 // each one loads on demand (loadModel) or through llm-connect/providers/*.
 // Speech to text: `transcribe` with the provider's model, or llm-connect/whisper in the page.
 
-export type { SlimCatalog, SlimModel, SlimProvider } from "llm-models/catalog";
-export { CALLABLE_NPM, defaultModelOf, filterCatalogModels } from "llm-models/catalog";
+export type { InputModality, SlimCatalog, SlimModel, SlimProvider } from "llm-models/catalog";
+export {
+  acceptsInput,
+  CALLABLE_NPM,
+  defaultModelOf,
+  filterCatalogModels,
+  INPUT_MODALITIES,
+  inputsOf,
+} from "llm-models/catalog";
 export {
   type CallCheck,
   type CallOptions,

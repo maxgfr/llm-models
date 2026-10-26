@@ -156,9 +156,47 @@ describe("unknown and catalog models", () => {
     expect(c.webSearch).toBe("google:google_search");
   });
 
+  it("audio and video need the catalog and an SDK that sends them", () => {
+    const hears = { input: ["text", "image", "audio", "video"] };
+    const caps = (kind: string, modelId = "m") =>
+      resolveCapabilities({ kind, modelId, catalog: hears });
+    expect([caps("google").audio, caps("google").video]).toEqual([true, true]);
+    expect([caps("openai-compatible").audio, caps("openai-compatible").video]).toEqual([
+      true,
+      true,
+    ]);
+    // Their SDKs refuse audio and video parts in a chat message.
+    for (const kind of ["openai", "mistral", "anthropic"])
+      expect([caps(kind).audio, caps(kind).video]).toEqual([false, false]);
+    const voxtral = resolveCapabilities({
+      kind: "openai-compatible",
+      modelId: "voxtral",
+      catalog: { input: ["text", "audio"] },
+    });
+    expect([voxtral.audio, voxtral.video]).toEqual([true, false]);
+    const claude = resolveCapabilities({ kind: "anthropic", modelId: "claude-opus-4-7" });
+    expect([claude.vision, claude.audio, claude.video]).toEqual([true, false, false]);
+  });
+
+  it("OpenRouter's file input reads as PDF", () => {
+    const c = resolveCapabilities({
+      kind: "openai-compatible",
+      modelId: "google/gemini-3-flash-preview",
+      catalog: { input: ["text", "file"] },
+    });
+    expect(c.pdf).toBe(true);
+  });
+
   it("without a catalog entry nothing optional is assumed", () => {
     const c = resolveCapabilities({ kind: "openai-compatible", modelId: "my-local-model" });
-    expect([c.vision, c.pdf, c.reasoning, c.tools]).toEqual([false, false, false, false]);
+    expect([c.vision, c.pdf, c.audio, c.video, c.reasoning, c.tools]).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
     expect(c.thinkingDisplay).toBeNull();
     expect(c.webSearch).toBeNull();
     expect(c.cost).toBeNull();
