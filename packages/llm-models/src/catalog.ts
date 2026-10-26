@@ -9,8 +9,40 @@ export interface SlimModel {
   name: string;
   tool_call?: boolean;
   reasoning?: boolean;
-  /** Input modalities (`text`, `image`, `pdf`, `audio`…), listed only when the model takes more than text. */
+  /** Input modalities (`text`, `image`, `pdf`, `audio`, `video`), listed only when the model takes more than text. */
   input?: string[];
+}
+
+/** What a model can read, by the names llm-models gives them. */
+export const INPUT_MODALITIES = ["text", "image", "pdf", "audio", "video"] as const;
+export type InputModality = (typeof INPUT_MODALITIES)[number];
+
+/** A model as a slim (`input`) or full (`modalities.input`) entry lists its inputs. */
+export type WithInputs =
+  | { input?: readonly string[]; modalities?: { input?: readonly string[] } }
+  | null
+  | undefined;
+
+/** A source's name for an input, in llm-models' words: OpenRouter's `file` is a `pdf`. */
+export function normalizeModality(modality: string): string {
+  const name = modality.trim().toLowerCase();
+  return name === "file" ? "pdf" : name;
+}
+
+/** The known inputs a model reads, in `INPUT_MODALITIES` order; text only when it lists none. */
+export function inputsOf(model: WithInputs): InputModality[] {
+  const listed = model?.input ?? model?.modalities?.input ?? [];
+  const known = new Set<string>(["text", ...listed.map(normalizeModality)]);
+  return INPUT_MODALITIES.filter((m) => known.has(m));
+}
+
+/**
+ * Whether the model reads `modality` (`image`, `pdf`, `audio`, `video`), as its catalog entry
+ * says. A model that lists no input reads text only. The SDK that calls it may still refuse a
+ * kind of part: llm-connect's capabilities apply that per provider.
+ */
+export function acceptsInput(model: WithInputs, modality: InputModality | string): boolean {
+  return (inputsOf(model) as string[]).includes(normalizeModality(modality));
 }
 
 /** A provider as the slim catalog lists it, with its non-deprecated models. */

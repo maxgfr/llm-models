@@ -1,4 +1,5 @@
 import { readFallbackCache } from "../cache-core";
+import { normalizeModality } from "../catalog";
 import type { FetchOptions } from "../clients/http";
 import { fetchModelsDevModels } from "../clients/models-dev";
 import { fetchOpenRouterModels } from "../clients/openrouter";
@@ -63,7 +64,8 @@ export function normalizeOpenRouterModel(model: OpenRouterModel): UnifiedModel {
         }
       : undefined,
     modalities: {
-      input: model.architecture.input_modalities,
+      // OpenRouter names documents "file"; llm-models says "pdf", as models.dev does.
+      input: [...new Set(model.architecture.input_modalities.map(normalizeModality))],
       output: model.architecture.output_modalities,
     },
     capabilities: {

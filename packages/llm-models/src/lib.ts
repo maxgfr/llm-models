@@ -3,8 +3,16 @@
 // touch the file system at load: browser-bundle.test.ts enforces it.
 
 export { clearCache, setCacheEnabled } from "./cache-core";
-export type { SlimCatalog, SlimModel, SlimProvider } from "./catalog";
-export { CALLABLE_NPM, defaultModelOf, filterCatalogModels } from "./catalog";
+export type { InputModality, SlimCatalog, SlimModel, SlimProvider, WithInputs } from "./catalog";
+export {
+  acceptsInput,
+  CALLABLE_NPM,
+  defaultModelOf,
+  filterCatalogModels,
+  INPUT_MODALITIES,
+  inputsOf,
+  normalizeModality,
+} from "./catalog";
 export type { FetchOptions } from "./clients/http";
 export { fetchModelsDevModels } from "./clients/models-dev";
 export { fetchOpenRouterModels } from "./clients/openrouter";

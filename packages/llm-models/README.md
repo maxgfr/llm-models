@@ -79,7 +79,8 @@ llm-models find -p google --json
 Table and Markdown output stop at 20 rows (or `defaults.limit` from the config) and the table ends
 with `(20 of N models shown, -n 0 to show all)`. JSON, CSV, `--count`, `--ids-only` and `--field`
 return every match unless you pass `-n`. `-m/--modality` matches what a model *accepts*: `-m image`
-finds models that read images, not image generators.
+finds models that read images, not image generators. `-m audio` and `-m video` tell apart the
+models that hear and those that watch; `-m pdf` also finds what OpenRouter calls `file`.
 
 #### Compare models
 
@@ -676,6 +677,23 @@ const anthropic = catalog.anthropic;
 defaultModelOf(anthropic); // its defaultModel when listed, else its first model
 filterCatalogModels(anthropic, "sonnet"); // models whose name or id matches
 ```
+
+What a model reads (`INPUT_MODALITIES`: `text`, `image`, `pdf`, `audio`, `video`), from a slim
+entry (`input`) or a full one (`modalities.input`):
+
+```typescript
+import { acceptsInput, inputsOf } from "llm-models/catalog";
+
+const gemini = catalog.google.models["gemini-2.5-flash"];
+inputsOf(gemini); // ["text", "image", "pdf", "audio", "video"]
+acceptsInput(gemini, "audio"); // true
+acceptsInput(catalog.mistral.models["voxtral-small-latest"], "video"); // false
+```
+
+A model that lists no input reads text only. OpenRouter's `file` is read as `pdf`
+(`normalizeModality`), in the full models too, so `-m pdf` finds documents on both sources. The
+catalog says what the model reads; whether the SDK that calls it can send that part is another
+matter: llm-connect's capabilities (`audio`, `video`) apply both.
 
 `CALLABLE_NPM` lists the SDK packages [llm-connect](https://github.com/maxgfr/llm-models/tree/main/packages/llm-connect) can call. On the Node side,
 `buildSlimCatalog(options)` fetches both sources and returns what `llm-models catalog` writes
