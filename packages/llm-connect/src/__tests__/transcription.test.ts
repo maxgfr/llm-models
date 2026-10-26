@@ -192,6 +192,31 @@ describe("transcribe", () => {
     expect(t.segments).toEqual([{ text: "Open stepcast", start: 0, end: 1 }]);
   });
 
+  it("keeps Mistral's word timings over a spoken language, which it refuses together", async () => {
+    serve({ model: "voxtral-mini-latest", text: "Ouvre stepcast", language: "fr", segments: [] });
+    await transcribe(
+      { apiKey: "m", model: "mistral-large", providerNpm: "@ai-sdk/mistral" },
+      audio,
+      { language: "fr", maxRetries: 0 },
+    );
+    const form = calls[0]?.form as FormData;
+    expect(form.get("timestamp_granularities")).toBe("word");
+    expect(form.get("language")).toBeNull();
+  });
+
+  it("sends Mistral the spoken language when no word timings are asked", async () => {
+    serve({ model: "voxtral-mini-latest", text: "Deux œufs", language: "fr" });
+    const t = await transcribe(
+      { apiKey: "m", model: "mistral-large", providerNpm: "@ai-sdk/mistral" },
+      audio,
+      { language: "fr", words: false, maxRetries: 0 },
+    );
+    const form = calls[0]?.form as FormData;
+    expect(form.get("language")).toBe("fr");
+    expect(form.get("timestamp_granularities")).toBeNull();
+    expect(t.text).toBe("Deux œufs");
+  });
+
   it("falls back to estimated words for a model without timings", async () => {
     serve({ text: "No timings here." });
     const t = await transcribe(openai, audio, { model: "gpt-4o-transcribe", maxRetries: 0 });

@@ -518,6 +518,9 @@ const vtt = toWebVtt(t);
 | A custom OpenAI-compatible server | the `model` you name | when it sends them |
 | Anthropic | none: `transcriptionProblem` says so | |
 
+Mistral refuses a spoken language next to timings: with `words` (the default) the timings are
+asked and Voxtral finds the language itself; with `words: false`, `language` is sent instead.
+
 A `MediaRecorder` blob works as is: its own type is sent (the AI SDK does not recognise WebM or
 MP4 audio from their bytes). When a model gives only segments, words are estimated inside them;
 when it gives words, segments are rebuilt at sentence ends and pauses. Providers cap uploads (25 MB
