@@ -192,11 +192,16 @@ function providerOptionsFor(
         },
       };
     case "mistral":
+      // Mistral refuses a spoken language next to timestamp granularities: word timings win
+      // when asked (Voxtral finds the language), the language otherwise.
       return {
         mistral: {
-          ...(options.language ? { language: options.language } : {}),
           ...(vocabulary.length ? { contextBias: vocabulary } : {}),
-          timestampGranularities: words ? ["word"] : ["segment"],
+          ...(words
+            ? { timestampGranularities: ["word"] }
+            : options.language
+              ? { language: options.language }
+              : { timestampGranularities: ["segment"] }),
         },
       };
   }
