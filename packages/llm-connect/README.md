@@ -381,6 +381,12 @@ await secrets.delete("github-token");
   value and the key.
 - The same limit as `secureStorage`: script on the same origin can still have the browser decrypt.
   Prefix `dbName` with the app on a shared origin, and use the vault where a passphrase is acceptable.
+- `llm-connect/sealed-store` exports it alone, with no import of its own: an app that only seals a
+  secret does not bundle the AI SDK or install its peer dependencies.
+
+```ts
+import { sealedStore } from "llm-connect/sealed-store";
+```
 
 ### Choosing a storage
 

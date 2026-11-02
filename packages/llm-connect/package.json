@@ -24,6 +24,10 @@
       "types": "./build/nemo.d.ts",
       "default": "./build/nemo.js"
     },
+    "./sealed-store": {
+      "types": "./build/sealed-store.d.ts",
+      "default": "./build/sealed-store.js"
+    },
     "./providers/*": {
       "types": "./build/providers/*.d.ts",
       "default": "./build/providers/*.js"
