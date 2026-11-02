@@ -357,6 +357,31 @@ to `false` when it could only keep the settings for the page.
 `vaultStorage({ vault, prefsKey, keyName? })` keeps the key in a passphrase-protected vault (see
 [Key vault](#key-vault)).
 
+### Other secrets: `sealedStore`
+
+The sealing `secureStorage` uses, for any other secret of an app (a sync token, a TURN password,
+a server key), so no app writes its own crypto:
+
+```ts
+import { sealedStore } from "llm-connect";
+
+const secrets = sealedStore({ dbName: "my-app-secrets" });
+if (!(await secrets.set("github-token", token))) showError("Storage full: not kept");
+const token = await secrets.get("github-token"); // null when absent or no longer readable
+await secrets.delete("github-token");
+```
+
+- AES-GCM 256 under a non-extractable `CryptoKey` kept in the IndexedDB database `dbName`, a fresh IV
+  on every write, and the name bound as additional data: a record copied under another name does
+  not open.
+- `set` resolves to whether the value was stored (false: storage full, blocked, or no
+  IndexedDB/WebCrypto); a value is never written in clear.
+- `seal(name, value)` / `unseal(name, record)` seal without storing, for a copy kept elsewhere
+  (`secureStorage` keeps a tab-only key in `sessionStorage` this way). `destroy()` removes every
+  value and the key.
+- The same limit as `secureStorage`: script on the same origin can still have the browser decrypt.
+  Prefix `dbName` with the app on a shared origin, and use the vault where a passphrase is acceptable.
+
 ### Choosing a storage
 
 | | `webStorage` | `secureStorage` | `vaultStorage` + `createKeyVault` |
