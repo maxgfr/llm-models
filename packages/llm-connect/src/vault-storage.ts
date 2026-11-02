@@ -78,7 +78,7 @@ export function vaultStorage<E extends object = object>({
       else await vault.delete(name);
       memory.delete(name);
       if (apiKey && !rememberKey) memory.set(name, apiKey);
-      writeWeb("localStorage", prefsKey, JSON.stringify({ ...prefs, rememberKey }));
+      return writeWeb("localStorage", prefsKey, JSON.stringify({ ...prefs, rememberKey }));
     },
     async clear() {
       const prefs = readPrefs<E>(prefsKey);
@@ -100,7 +100,8 @@ export function vaultStorage<E extends object = object>({
  * a vault-backed one: the key goes into the vault (`to` must be unlocked), then
  * `from` is cleared, which erases its copy of the key, and the preferences are
  * written again through `to` (both may share a `prefsKey`). Resolves to whether
- * a key moved; without one, nothing is touched.
+ * a key moved; without one, or when `to` could not store the preferences
+ * (storage full), the old copy is left in place.
  */
 export async function migrateToVault<E extends object = object>(
   from: SettingsStorage<E>,
@@ -111,7 +112,7 @@ export async function migrateToVault<E extends object = object>(
   const { rememberKey: _remembered, ...rest } = saved;
   const settings = rest as LlmSettings & E;
   // Stored first, so a locked vault or a failed write leaves the old copy in place
-  await to.save(settings, { rememberKey: true });
+  if ((await to.save(settings, { rememberKey: true })) === false) return false;
   await from.clear();
   await to.save(settings, { rememberKey: true });
   return true;

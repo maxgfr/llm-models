@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { webStorage } from "../storage.js";
-import { installStorages, MemoryStorage } from "./memory-storage.js";
+import { FullStorage, installStorages, MemoryStorage } from "./memory-storage.js";
 
 let stores: ReturnType<typeof installStorages>;
 const storage = webStorage<{ language?: string }>({ prefsKey: "prefs", apiKeyKey: "key" });
@@ -99,5 +99,12 @@ describe("webStorage", () => {
     g.sessionStorage = undefined;
     await storage.save({ apiKey: "sk", model: "m" }, { rememberKey: false });
     expect(await storage.load()).toBeNull();
+  });
+
+  it("says whether the settings were stored, so a full storage is not taken for a save", async () => {
+    expect(await storage.save({ apiKey: "sk", model: "m" }, { rememberKey: true })).toBe(true);
+    globalThis.localStorage = new FullStorage();
+    expect(await storage.save({ apiKey: "sk", model: "m" }, { rememberKey: true })).toBe(false);
+    expect(await storage.save({ apiKey: "", model: "m" }, { rememberKey: false })).toBe(false);
   });
 });

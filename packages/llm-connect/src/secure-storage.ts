@@ -155,25 +155,29 @@ export function secureStorage<E extends object = object>({
     }
   }
 
-  async function writeKey(apiKey: string, rememberKey: boolean): Promise<void> {
+  /** Whether the key will survive a reload (no key to keep counts as kept). */
+  async function writeKey(apiKey: string, rememberKey: boolean): Promise<boolean> {
     removeWeb("sessionStorage", sessionKey);
-    if (!hasCrypto()) return;
+    if (!hasCrypto()) return !apiKey;
     try {
       if (!apiKey || !rememberKey) await idbDelete(API_KEY_ID);
-      if (!apiKey) return;
+      if (!apiKey) return true;
       const secret = await encrypt(apiKey);
-      if (rememberKey) await idbPut(API_KEY_ID, secret);
-      else
-        writeWeb(
-          "sessionStorage",
-          sessionKey,
-          JSON.stringify({
-            iv: toBase64(secret.iv),
-            ciphertext: toBase64(new Uint8Array(secret.ciphertext)),
-          }),
-        );
+      if (rememberKey) {
+        await idbPut(API_KEY_ID, secret);
+        return true;
+      }
+      return writeWeb(
+        "sessionStorage",
+        sessionKey,
+        JSON.stringify({
+          iv: toBase64(secret.iv),
+          ciphertext: toBase64(new Uint8Array(secret.ciphertext)),
+        }),
+      );
     } catch {
-      // IndexedDB blocked: the key lasts for this page
+      // IndexedDB blocked or full: the key lasts for this page
+      return false;
     }
   }
 
@@ -192,9 +196,9 @@ export function secureStorage<E extends object = object>({
     },
     async save(settings, { rememberKey }) {
       const { apiKey, ...prefs } = settings;
-      writeWeb("localStorage", prefsKey, JSON.stringify({ ...prefs, rememberKey }));
+      const stored = writeWeb("localStorage", prefsKey, JSON.stringify({ ...prefs, rememberKey }));
       memoryKey = apiKey;
-      await writeKey(apiKey, rememberKey);
+      return (await writeKey(apiKey, rememberKey)) && stored;
     },
     async clear() {
       memoryKey = null;

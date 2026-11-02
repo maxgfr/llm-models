@@ -83,7 +83,15 @@ export interface LlmSettingsState<E extends object = object> {
 }
 
 export type SaveResult<E extends object = object> =
-  | { ok: true; settings: StoredSettings<E> }
+  | {
+      ok: true;
+      settings: StoredSettings<E>;
+      /**
+       * False when the storage could not keep them (full, blocked): they work
+       * for this page and are gone after a reload. Tell the user.
+       */
+      persisted: boolean;
+    }
   | { ok: false; reason: "incomplete" | "invalid-endpoint" | "insecure-endpoint" };
 
 export interface LlmSettingsStore<E extends object = object> {
@@ -352,10 +360,11 @@ export function createLlmSettingsStore<E extends object = object>(
       const problem = draft.custom ? endpointProblem(draft.customEndpoint) : null;
       if (problem) return { ok: false, reason: problem };
       const saved = { ...settings(), ...extra } as LlmSettings & E;
-      await options.storage.save(saved, { rememberKey: draft.rememberKey });
+      const persisted =
+        (await options.storage.save(saved, { rememberKey: draft.rememberKey })) !== false;
       const stored = { ...saved, rememberKey: draft.rememberKey } as StoredSettings<E>;
       set({ saved: stored });
-      return { ok: true, settings: stored };
+      return { ok: true, settings: stored, persisted };
     },
 
     async clear() {

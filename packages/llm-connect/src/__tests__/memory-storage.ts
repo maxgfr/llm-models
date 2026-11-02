@@ -21,6 +21,13 @@ export class MemoryStorage implements Storage {
   }
 }
 
+/** A Web Storage whose quota is used up, as when another site of the origin filled it. */
+export class FullStorage extends MemoryStorage {
+  override setItem(): void {
+    throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+  }
+}
+
 type Kind = "localStorage" | "sessionStorage";
 const globals = globalThis as { [K in Kind]?: Storage };
 
