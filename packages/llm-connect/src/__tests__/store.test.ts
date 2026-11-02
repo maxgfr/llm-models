@@ -519,4 +519,23 @@ describe("createLlmSettingsStore", () => {
     expect(prompts).toEqual([]);
     clearProviders();
   });
+
+  it("reports settings the storage could not keep, while using them for the page", async () => {
+    const storage: SettingsStorage<{ language?: string }> = {
+      load: async () => null,
+      save: async () => false,
+      clear: async () => {},
+    };
+    const { store } = makeStore({ storage });
+    store.selectModel("gpt-5");
+    store.setApiKey("sk-1");
+    const result = await store.save();
+    expect(result).toMatchObject({ ok: true, persisted: false });
+    expect(store.getState().saved?.model).toBe("gpt-5");
+
+    const kept = makeStore();
+    kept.store.selectModel("gpt-5");
+    kept.store.setApiKey("sk-1");
+    expect(await kept.store.save()).toMatchObject({ ok: true, persisted: true });
+  });
 });

@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { IDBFactory } from "fake-indexeddb";
 import { secureStorage } from "../secure-storage.js";
-import { installStorages } from "./memory-storage.js";
+import { FullStorage, installStorages } from "./memory-storage.js";
 
 const KEY = "sk-ant-secret-123";
 const options = { prefsKey: "prefs", dbName: "secrets" };
@@ -165,5 +165,18 @@ describe("secureStorage", () => {
     expect(await secureStorage(options).load()).toBeNull();
     await storage.clear();
     expect(await storage.loadDraft?.()).toBeNull();
+  });
+
+  it("says whether the settings were stored: a full storage keeps them for the page only", async () => {
+    const storage = secureStorage(options);
+    expect(await storage.save({ apiKey: KEY, model: "m" }, { rememberKey: false })).toBe(true);
+    expect(await storage.save({ apiKey: KEY, model: "m" }, { rememberKey: true })).toBe(true);
+
+    globalThis.localStorage = new FullStorage();
+    expect(await storage.save({ apiKey: KEY, model: "m" }, { rememberKey: true })).toBe(false);
+
+    globalThis.localStorage = new FullStorage();
+    globalThis.sessionStorage = new FullStorage();
+    expect(await storage.save({ apiKey: KEY, model: "m" }, { rememberKey: false })).toBe(false);
   });
 });

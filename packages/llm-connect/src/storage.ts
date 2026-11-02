@@ -13,7 +13,12 @@ export interface SettingsStorage<E extends object = object> {
   load(): Promise<StoredSettings<E> | null>;
   /** Saved settings even without a key, to prefill a form. Falls back to `load`. */
   loadDraft?(): Promise<StoredSettings<E> | null>;
-  save(settings: LlmSettings & E, options: { rememberKey: boolean }): Promise<void>;
+  /**
+   * Store the settings. Resolves to `false` when they could only be kept for
+   * the page (storage full, blocked or missing), so the app can say so instead
+   * of claiming they will survive a reload; `true` or nothing when stored.
+   */
+  save(settings: LlmSettings & E, options: { rememberKey: boolean }): Promise<boolean | void>;
   clear(): Promise<void>;
 }
 
@@ -43,11 +48,20 @@ export function readWeb(kind: Kind, key: string): string | null {
   }
 }
 
-export function writeWeb(kind: Kind, key: string, value: string): void {
+/**
+ * Whether the value was stored. False when the storage is missing, blocked or
+ * full: on an origin shared by several sites (a GitHub Pages user site), one of
+ * them filling the quota makes every other one's writes fail.
+ */
+export function writeWeb(kind: Kind, key: string, value: string): boolean {
   try {
-    webStore(kind)?.setItem(key, value);
+    const store = webStore(kind);
+    if (!store) return false;
+    store.setItem(key, value);
+    return true;
   } catch {
     // Full or blocked: the settings only last for this page
+    return false;
   }
 }
 
@@ -121,10 +135,11 @@ export function webStorage<E extends object = object>({
     },
     async save(settings, { rememberKey }) {
       const { apiKey, ...prefs } = settings;
-      writeWeb("localStorage", prefsKey, JSON.stringify({ ...prefs, rememberKey }));
+      const stored = writeWeb("localStorage", prefsKey, JSON.stringify({ ...prefs, rememberKey }));
       removeWeb("localStorage", apiKeyKey);
       removeWeb("sessionStorage", apiKeyKey);
-      if (apiKey) writeWeb(rememberKey ? "localStorage" : "sessionStorage", apiKeyKey, apiKey);
+      if (!apiKey) return stored;
+      return writeWeb(rememberKey ? "localStorage" : "sessionStorage", apiKeyKey, apiKey) && stored;
     },
     async clear() {
       removeWeb("localStorage", prefsKey);

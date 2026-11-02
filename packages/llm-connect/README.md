@@ -284,7 +284,13 @@ store.setLanguage("fr");
 await store.test();
 const result = await store.save({ theme: "dark" }); // your own fields are kept too
 if (!result.ok) console.log(result.reason); // "incomplete" | "invalid-endpoint" | "insecure-endpoint"
+else if (!result.persisted) console.log("Storage full or blocked: kept for this page only");
 ```
+
+`save()` resolves to `{ ok: true, settings, persisted }`. `persisted` is false when the storage
+refused the write (quota used up, site data blocked): the settings work for the page and are gone
+after a reload, so say so rather than "Saved". On an origin several sites share (all the project
+pages of a `user.github.io`), one of them filling `localStorage` is enough.
 
 Options:
 
@@ -345,7 +351,8 @@ Content-Security-Policy is what protects against that.
 
 `webStorage({ prefsKey, apiKeyKey })` keeps the key in clear text, in `sessionStorage` or in
 `localStorage` when remembered; it stays for compatibility. Any other scheme fits the
-`SettingsStorage` interface (`load`, optional `loadDraft`, `save`, `clear`).
+`SettingsStorage` interface (`load`, optional `loadDraft`, `save`, `clear`); its `save` resolves
+to `false` when it could only keep the settings for the page.
 
 `vaultStorage({ vault, prefsKey, keyName? })` keeps the key in a passphrase-protected vault (see
 [Key vault](#key-vault)).
@@ -494,6 +501,10 @@ endpoint **with a model name** (local servers need no key).
 - `strictHeaders` keeps every request to the headers the provider's API defines, so nothing
   identifying leaves and nothing fails the CORS preflight.
 - A matching CSP: `connect-src 'self' https: http://localhost:* http://127.0.0.1:*`.
+- Storage belongs to the origin, not the path. Every project page of `user.github.io` shares one
+  `localStorage`, IndexedDB and quota, and any of them can run the code that decrypts a
+  `secureStorage` key. Give each app its own origin (a custom subdomain) when keys matter; on a
+  shared one, prefix `prefsKey`/`dbName` with the app, and prefer the vault for remembered keys.
 
 ### Response language
 
