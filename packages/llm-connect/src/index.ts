@@ -126,6 +126,13 @@ export {
   requireProvider,
   resolveAlias,
 } from "./registry.js";
+export {
+  type SealedRecord,
+  type SealedStore,
+  type SealedStoreOptions,
+  SealedStoreUnavailable,
+  sealedStore,
+} from "./sealed-store.js";
 export { type SecureStorageOptions, secureStorage } from "./secure-storage.js";
 export {
   activeKey,

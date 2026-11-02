@@ -1,3 +1,4 @@
+import { type SealedRecord, sealedStore } from "./sealed-store.js";
 import { isConfigured } from "./settings.js";
 import {
   readPrefs,
@@ -17,22 +18,7 @@ export interface SecureStorageOptions {
   sessionKey?: string;
 }
 
-interface EncryptedSecret {
-  iv: Uint8Array<ArrayBuffer>;
-  ciphertext: ArrayBuffer;
-}
-
-const STORE = "kv";
-const CRYPTO_KEY_ID = "crypto-key";
 const API_KEY_ID = "api-key";
-
-function hasCrypto(): boolean {
-  try {
-    return !!globalThis.indexedDB && !!globalThis.crypto?.subtle;
-  } catch {
-    return false;
-  }
-}
 
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -67,110 +53,46 @@ export function secureStorage<E extends object = object>({
 }: SecureStorageOptions): SettingsStorage<E> {
   // The key as last saved or decrypted; null until read once
   let memoryKey: string | null = null;
+  const sealed = sealedStore({ dbName });
 
-  function openDb(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(dbName, 1);
-      request.onupgradeneeded = () => request.result.createObjectStore(STORE);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async function withStore<T>(
-    mode: IDBTransactionMode,
-    run: (store: IDBObjectStore) => IDBRequest<T>,
-  ): Promise<T> {
-    const db = await openDb();
-    try {
-      return await new Promise<T>((resolve, reject) => {
-        const tx = db.transaction(STORE, mode);
-        const request = run(tx.objectStore(STORE));
-        tx.oncomplete = () => resolve(request.result);
-        tx.onerror = () => reject(tx.error);
-        tx.onabort = () => reject(tx.error);
-      });
-    } finally {
-      db.close();
-    }
-  }
-
-  const idbGet = <T>(id: string) =>
-    withStore<T | undefined>("readonly", (s) => s.get(id) as IDBRequest<T | undefined>);
-  const idbPut = (id: string, value: unknown) => withStore("readwrite", (s) => s.put(value, id));
-  const idbDelete = (id: string) => withStore("readwrite", (s) => s.delete(id));
-
-  async function cryptoKey(create: boolean): Promise<CryptoKey | undefined> {
-    const existing = await idbGet<CryptoKey>(CRYPTO_KEY_ID);
-    if (existing || !create) return existing;
-    const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
-      "encrypt",
-      "decrypt",
-    ]);
-    await idbPut(CRYPTO_KEY_ID, key);
-    return key;
-  }
-
-  async function encrypt(apiKey: string): Promise<EncryptedSecret> {
-    const key = await cryptoKey(true);
-    if (!key) throw new Error("No encryption key");
-    const iv = crypto.getRandomValues(new Uint8Array(new ArrayBuffer(12)));
-    const ciphertext = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      key,
-      new TextEncoder().encode(apiKey),
-    );
-    return { iv, ciphertext };
-  }
-
-  async function decrypt(secret: EncryptedSecret | undefined): Promise<string> {
-    const key = secret && (await cryptoKey(false));
-    if (!secret || !key) return "";
-    const plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: secret.iv },
-      key,
-      secret.ciphertext,
-    );
-    return new TextDecoder().decode(plain);
-  }
-
-  function sessionSecret(): EncryptedSecret | undefined {
+  function sessionSecret(): SealedRecord | undefined {
     const raw = readWeb("sessionStorage", sessionKey);
     if (!raw) return undefined;
     try {
-      const { iv, ciphertext } = JSON.parse(raw) as { iv: string; ciphertext: string };
-      return { iv: fromBase64(iv), ciphertext: fromBase64(ciphertext).buffer };
+      const { v, iv, ciphertext } = JSON.parse(raw) as { v?: 2; iv: string; ciphertext: string };
+      return {
+        ...(v === 2 ? { v } : {}),
+        iv: fromBase64(iv),
+        ciphertext: fromBase64(ciphertext).buffer,
+      };
     } catch {
       return undefined;
     }
   }
 
   async function readKey(rememberKey: boolean): Promise<string> {
-    if (!hasCrypto()) return "";
-    try {
-      return await decrypt(rememberKey ? await idbGet(API_KEY_ID) : sessionSecret());
-    } catch {
-      // Tampered or undecryptable (the CryptoKey was cleared): ask for the key again
-      return "";
-    }
+    if (!sealed.available) return "";
+    const key = rememberKey
+      ? await sealed.get(API_KEY_ID)
+      : await sealed.unseal(API_KEY_ID, sessionSecret());
+    // Tampered or undecryptable (the CryptoKey was cleared): ask for the key again
+    return key ?? "";
   }
 
   /** Whether the key will survive a reload (no key to keep counts as kept). */
   async function writeKey(apiKey: string, rememberKey: boolean): Promise<boolean> {
     removeWeb("sessionStorage", sessionKey);
-    if (!hasCrypto()) return !apiKey;
+    if (!sealed.available) return !apiKey;
+    if (!apiKey || !rememberKey) await sealed.delete(API_KEY_ID);
+    if (!apiKey) return true;
+    if (rememberKey) return sealed.set(API_KEY_ID, apiKey);
     try {
-      if (!apiKey || !rememberKey) await idbDelete(API_KEY_ID);
-      if (!apiKey) return true;
-      const secret = await encrypt(apiKey);
-      if (rememberKey) {
-        await idbPut(API_KEY_ID, secret);
-        return true;
-      }
+      const secret = await sealed.seal(API_KEY_ID, apiKey);
       return writeWeb(
         "sessionStorage",
         sessionKey,
         JSON.stringify({
+          v: secret.v,
           iv: toBase64(secret.iv),
           ciphertext: toBase64(new Uint8Array(secret.ciphertext)),
         }),
@@ -204,13 +126,7 @@ export function secureStorage<E extends object = object>({
       memoryKey = null;
       removeWeb("localStorage", prefsKey);
       removeWeb("sessionStorage", sessionKey);
-      if (!hasCrypto()) return;
-      try {
-        await idbDelete(API_KEY_ID);
-        await idbDelete(CRYPTO_KEY_ID);
-      } catch {
-        // Nothing to clean up
-      }
+      await sealed.destroy();
     },
   };
 }
