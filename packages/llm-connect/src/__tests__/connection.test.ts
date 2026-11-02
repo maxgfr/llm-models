@@ -252,7 +252,7 @@ describe("anySignal without AbortSignal.any (Chrome < 116, Safari < 17.4)", () =
 });
 
 describe("testConnection, generate mode", () => {
-  function useModel(doGenerate: MockLanguageModelV4["doGenerate"]) {
+  function registerMockModel(doGenerate: MockLanguageModelV4["doGenerate"]) {
     registerProvider(
       "openai",
       () => new MockLanguageModelV4({ doGenerate }) as unknown as LanguageModel,
@@ -262,7 +262,7 @@ describe("testConnection, generate mode", () => {
   const settings = { apiKey: "k", model: "gpt-5", providerNpm: "@ai-sdk/openai" };
 
   it("succeeds when the model answers", async () => {
-    useModel(async () => ({
+    registerMockModel(async () => ({
       content: [{ type: "text", text: "OK" }],
       finishReason: { unified: "stop", raw: "stop" },
       usage: {
@@ -284,7 +284,7 @@ describe("testConnection, generate mode", () => {
         statusCode,
       });
 
-    useModel(async () => {
+    registerMockModel(async () => {
       throw apiError(401, "Incorrect API key");
     });
     expect(await testConnection(settings, { mode: "generate" })).toEqual({
@@ -294,7 +294,7 @@ describe("testConnection, generate mode", () => {
       message: "Incorrect API key",
     });
 
-    useModel(async () => {
+    registerMockModel(async () => {
       throw apiError(429, "Rate limited");
     });
     expect(await testConnection(settings, { mode: "generate" })).toMatchObject({
@@ -302,12 +302,12 @@ describe("testConnection, generate mode", () => {
       status: 429,
     });
 
-    useModel(async () => {
+    registerMockModel(async () => {
       throw apiError(undefined, "Cannot connect to API: Failed to fetch");
     });
     expect(await testConnection(settings, { mode: "generate" })).toMatchObject({ reason: "cors" });
 
-    useModel(async () => {
+    registerMockModel(async () => {
       throw new Error("Model not found in config");
     });
     expect(await testConnection(settings, { mode: "generate" })).toMatchObject({
@@ -317,7 +317,7 @@ describe("testConnection, generate mode", () => {
   });
 
   it("never shows the key a server echoed back", async () => {
-    useModel(async () => {
+    registerMockModel(async () => {
       throw new Error("Invalid key k-secret-123");
     });
     const result = await testConnection(
