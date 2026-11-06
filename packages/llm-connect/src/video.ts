@@ -4,58 +4,28 @@
 // often as the app likes. Entry `llm-connect/video`.
 
 import type { JSONValue, Experimental_VideoModelV4 as VideoModelV4 } from "@ai-sdk/provider";
-import { type VideoProviderId, videoSize } from "llm-models/video";
-import { describeError, scrubSecret } from "./errors.js";
-import type { FetchLike } from "./fetch.js";
+import { VIDEO_PROVIDERS, type VideoProviderId, videoSize } from "llm-models/video";
+import { scrubSecret } from "./errors.js";
+import {
+  fetchOf,
+  type MediaOptions,
+  type MediaProviderInfo,
+  mediaFailure,
+  missingPackage,
+  providerInfoOf,
+  warningText,
+} from "./media.js";
+import { type MediaKeyReport, testMediaKey } from "./media-keys.js";
 import { createOpenRouterVideoModel, OPENROUTER_API } from "./video-openrouter.js";
 
 export type { VideoProviderId } from "llm-models/video";
 export { VIDEO_PROVIDERS } from "llm-models/video";
 
 /** Where a provider's key comes from, and what calls it. */
-export interface VideoProviderInfo {
-  name: string;
-  /** The page that issues a key. */
-  keyUrl: string;
-  /** The environment variable its SDK reads by convention. */
-  env: string;
-  /** The package `loadVideoModel` imports (`null`: built into llm-connect). */
-  package: string | null;
-}
+export type VideoProviderInfo = MediaProviderInfo;
 
-export const VIDEO_PROVIDER_INFO: Readonly<Record<VideoProviderId, VideoProviderInfo>> = {
-  openrouter: {
-    name: "OpenRouter",
-    keyUrl: "https://openrouter.ai/settings/keys",
-    env: "OPENROUTER_API_KEY",
-    package: null,
-  },
-  gateway: {
-    name: "Vercel AI Gateway",
-    keyUrl: "https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%2Fapi-keys",
-    env: "AI_GATEWAY_API_KEY",
-    package: "@ai-sdk/gateway",
-  },
-  fal: {
-    name: "fal.ai",
-    keyUrl: "https://fal.ai/dashboard/keys",
-    env: "FAL_KEY",
-    package: "@ai-sdk/fal",
-  },
-  google: {
-    name: "Google (Gemini API)",
-    keyUrl: "https://aistudio.google.com/apikey",
-    env: "GEMINI_API_KEY",
-    package: "@ai-sdk/google",
-  },
-  xai: { name: "xAI", keyUrl: "https://console.x.ai", env: "XAI_API_KEY", package: "@ai-sdk/xai" },
-  replicate: {
-    name: "Replicate",
-    keyUrl: "https://replicate.com/account/api-tokens",
-    env: "REPLICATE_API_TOKEN",
-    package: "@ai-sdk/replicate",
-  },
-};
+export const VIDEO_PROVIDER_INFO: Readonly<Record<VideoProviderId, VideoProviderInfo>> =
+  providerInfoOf(VIDEO_PROVIDERS);
 
 /** Which provider, which key, which model (the id `listVideoModels` gives). */
 export interface VideoSettings {
@@ -66,11 +36,7 @@ export interface VideoSettings {
   baseUrl?: string;
 }
 
-export interface VideoOptions {
-  /** The fetch every request goes through. Default `globalThis.fetch`. */
-  fetch?: FetchLike;
-  abortSignal?: AbortSignal;
-}
+export type VideoOptions = MediaOptions;
 
 /** One render, in the words llm-models lists a model's settings with. */
 export interface VideoRequest {
@@ -122,14 +88,7 @@ export async function loadVideoModel(
     ...(baseUrl ? { baseURL: baseUrl } : {}),
     ...(options.fetch ? { fetch: options.fetch as typeof fetch } : {}),
   };
-  const missing = (pkg: string) => (error: unknown) => {
-    throw new Error(
-      `Rendering with ${settings.provider} needs the ${pkg} package (npm install ${pkg}).`,
-      {
-        cause: error,
-      },
-    );
-  };
+  const missing = (pkg: string) => missingPackage("Rendering", settings.provider, pkg);
   switch (settings.provider) {
     case "openrouter":
       return createOpenRouterVideoModel({ apiKey, modelId: model, baseUrl, fetch: options.fetch });
@@ -205,16 +164,6 @@ export function videoCallOptions(provider: VideoProviderId, request: VideoReques
   };
 }
 
-/** The message of a failed call, the key scrubbed from it. */
-function failure(error: unknown, apiKey: string): Error {
-  const described = describeError(error, apiKey);
-  const message = described.message || (error instanceof Error ? error.message : String(error));
-  return Object.assign(new Error(scrubSecret(message, apiKey)), {
-    code: described.code,
-    status: described.status,
-  });
-}
-
 /** Start a render. Answers as soon as the provider has the job; nothing waits for the video. */
 export async function startVideo(
   settings: VideoSettings,
@@ -233,14 +182,10 @@ export async function startVideo(
       provider: settings.provider,
       model: settings.model,
       operation: started.operation,
-      warnings: started.warnings.map((w) =>
-        "details" in w && w.details
-          ? `${(w as { feature?: string }).feature ?? "setting"}: ${w.details}`
-          : w.type,
-      ),
+      warnings: started.warnings.map(warningText),
     };
   } catch (error) {
-    throw failure(error, settings.apiKey);
+    throw mediaFailure(error, settings.apiKey);
   }
 }
 
@@ -257,7 +202,7 @@ export async function checkVideo(
   try {
     result = await model.doStatus({ operation: job.operation, abortSignal: options.abortSignal });
   } catch (error) {
-    throw failure(error, settings.apiKey);
+    throw mediaFailure(error, settings.apiKey);
   }
   if (result.status === "pending") return { status: "pending" };
   if (result.status === "error")
@@ -296,68 +241,14 @@ function keyedUrl(settings: VideoSettings, raw: string, mediaType: string): Vide
   return { url: raw, mediaType };
 }
 
-/** A key check that renders nothing: one free request per provider. */
-const KEY_CHECKS: Record<
-  VideoProviderId,
-  (key: string) => { url: string; headers: Record<string, string> }
-> = {
-  openrouter: (key) => ({
-    url: `${OPENROUTER_API}/key`,
-    headers: { authorization: `Bearer ${key}` },
-  }),
-  gateway: (key) => ({
-    url: "https://ai-gateway.vercel.sh/v1/credits",
-    headers: { authorization: `Bearer ${key}` },
-  }),
-  fal: (key) => ({
-    url: "https://api.fal.ai/v1/models/pricing?endpoint_id=fal-ai%2Fveo3",
-    headers: { authorization: `Key ${key}` },
-  }),
-  google: (key) => ({
-    url: "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1",
-    headers: { "x-goog-api-key": key },
-  }),
-  xai: (key) => ({
-    url: "https://api.x.ai/v1/api-key",
-    headers: { authorization: `Bearer ${key}` },
-  }),
-  replicate: (key) => ({
-    url: "https://api.replicate.com/v1/account",
-    headers: { authorization: `Bearer ${key}` },
-  }),
-};
-
-export interface VideoKeyReport {
-  /** true: the key works; false: refused or unreachable. */
-  ok: boolean;
-  message: string;
-}
+export type VideoKeyReport = MediaKeyReport;
 
 /** Whether the provider takes the key, without rendering (and so without cost). */
-export async function testVideoKey(
+export function testVideoKey(
   settings: Pick<VideoSettings, "provider" | "apiKey">,
   options: VideoOptions = {},
 ): Promise<VideoKeyReport> {
-  const name = VIDEO_PROVIDER_INFO[settings.provider].name;
-  const check = KEY_CHECKS[settings.provider](settings.apiKey);
-  const doFetch: FetchLike = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
-  let res: Response;
-  try {
-    res = await doFetch(check.url, {
-      headers: check.headers,
-      signal: options.abortSignal ?? AbortSignal.timeout(15_000),
-    });
-  } catch {
-    return { ok: false, message: `${name} could not be reached. Check the network and try again.` };
-  }
-  if (res.ok) return { ok: true, message: `${name} accepts the key.` };
-  if (
-    res.status === 401 ||
-    res.status === 403 ||
-    (settings.provider === "google" && res.status === 400)
-  )
-    return { ok: false, message: `${name} refused the key.` };
-  return { ok: false, message: `${name} answered HTTP ${res.status}. Try again in a moment.` };
+  return testMediaKey(settings, options);
 }
 
 /** The bytes of a finished video, fetched when it is a URL. */
@@ -366,8 +257,7 @@ export async function downloadVideo(
   options: VideoOptions = {},
 ): Promise<{ data: Uint8Array; mediaType: string }> {
   if ("data" in output) return output;
-  const doFetch: FetchLike = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
-  const res = await doFetch(output.url, {
+  const res = await fetchOf(options)(output.url, {
     headers: output.headers ?? {},
     signal: options.abortSignal,
   });

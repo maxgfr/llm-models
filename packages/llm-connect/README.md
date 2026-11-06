@@ -23,6 +23,11 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
   [llm-models](https://github.com/maxgfr/llm-models/tree/main/packages/llm-models) lists, at
   OpenRouter, the Vercel AI Gateway, fal.ai, Google (Veo), xAI or Replicate, as jobs a server stores
   and checks later from any process.
+- **Images**: `generateImages` (`llm-connect/image`) with the image models of OpenRouter, the
+  Vercel AI Gateway, fal.ai, OpenAI, Google (Gemini), xAI or Replicate, as bytes with their media
+  type and the cost when the provider reports it.
+- **Speech**: `generateSpeechAudio` (`llm-connect/speech`) speaks a text with the speech models of
+  the AI Gateway, fal.ai, OpenAI, Google (Gemini TTS) or ElevenLabs; `listVoices` gives the voices.
 - **Speech to text**: `transcribe` with the provider's own transcription model (OpenAI, Gemini,
   Mistral, Groq), or on the device with NVIDIA Parakeet or Canary (`llm-connect/nemo`) or Whisper
   (`llm-connect/whisper`), all in one shape and timed to the word.
@@ -33,7 +38,8 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
 npm install llm-connect llm-models ai @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @ai-sdk/mistral @ai-sdk/openai-compatible
 ```
 
-For video, add the SDKs of the providers you render with (see [Video](#video)).
+For images, speech or video, add the SDKs of the providers you call (see [Images](#images),
+[Speech](#speech) and [Video](#video)).
 
 `ai` (v7), the `@ai-sdk/*` packages (v4) and `@ai-sdk/openai-compatible` (v3) are optional peers:
 install the ones your users can pick.
@@ -603,6 +609,89 @@ OpenRouter, the name in the provider's options for fal, xAI and Replicate. `prov
 a provider's own body fields. `checkVideo` answers `pending`, `completed` (the videos, and the cost
 when the provider reports it) or `error` (its message, the key scrubbed out). `VIDEO_PROVIDER_INFO`
 names each provider, its key page and its environment variable.
+
+## Images
+
+`llm-connect/image` generates through the AI SDK's `generateImage`, with the provider's own image
+model; each SDK loads on first use.
+
+```bash
+npm install llm-connect ai @ai-sdk/openai @ai-sdk/fal @ai-sdk/gateway @ai-sdk/google @ai-sdk/xai @ai-sdk/replicate
+```
+
+```typescript
+import { generateImages, testImageKey } from "llm-connect/image";
+
+const settings = { provider: "openrouter", apiKey, model: "bytedance-seed/seedream-4.5" } as const;
+await testImageKey(settings); // { ok: true, message: "OpenRouter accepts the key." }, generates nothing
+
+const { images, warnings, costUsd } = await generateImages(settings, {
+  prompt: "A lighthouse at dusk, oil painting.",
+  aspectRatio: "16:9", // or size: "1024x1024" for a model that takes pixels
+  n: 2,
+  seed: 7,
+});
+// images: [{ data: Uint8Array, mediaType: "image/png" }, …]
+```
+
+| `provider` | Through | Key |
+|------------|---------|-----|
+| `openrouter` | llm-connect itself (`POST /images`; chat completions with `modalities` for a model the Image API does not serve) | [OpenRouter key](https://openrouter.ai/settings/keys) |
+| `gateway` | `@ai-sdk/gateway` | AI Gateway key |
+| `fal` | `@ai-sdk/fal` | [fal.ai key](https://fal.ai/dashboard/keys) |
+| `openai` | `@ai-sdk/openai` | [OpenAI key](https://platform.openai.com/api-keys) |
+| `google` | `@ai-sdk/google` (Gemini image models, `gemini-*-image*`) | [Gemini API key](https://aistudio.google.com/apikey) |
+| `xai` | `@ai-sdk/xai` | [xAI key](https://console.x.ai) |
+| `replicate` | `@ai-sdk/replicate` | [Replicate token](https://replicate.com/account/api-tokens) |
+
+`n` images are asked in as many calls as the model needs (OpenRouter: one image a call, since
+its `n` is only an upper bound). `providerOptions` adds a provider's own body fields
+(`{ openai: { quality: "high" } }`). A failed call throws an error whose message never holds the
+key, with `code` and `status` as `describeError` gives them. Google's SDK serves Gemini image
+models only; an Imagen id is refused before any request. `IMAGE_PROVIDER_INFO` names each
+provider, its key page, its environment variable and its package; `loadImageModel` gives the
+AI SDK model itself.
+
+## Speech
+
+`llm-connect/speech` speaks a text through the AI SDK's `generateSpeech`, with the provider's own
+speech model; each SDK loads on first use.
+
+```bash
+npm install llm-connect ai @ai-sdk/openai @ai-sdk/google @ai-sdk/elevenlabs @ai-sdk/fal @ai-sdk/gateway
+```
+
+```typescript
+import { generateSpeechAudio, listVoices, testSpeechKey } from "llm-connect/speech";
+
+const settings = { provider: "elevenlabs", apiKey, model: "eleven_multilingual_v2" } as const;
+await testSpeechKey(settings); // { ok: true, message: "ElevenLabs accepts the key." }
+
+const voices = await listVoices(settings); // [{ id, name, language?, gender?, description? }] or null
+const { audio, warnings } = await generateSpeechAudio(settings, {
+  text: "Bonjour, et bienvenue.",
+  voice: voices?.[0]?.id,
+  language: "fr",
+});
+// audio: { data: Uint8Array, mediaType: "audio/mpeg" }
+```
+
+| `provider` | Through | Voices (`listVoices`) | Key |
+|------------|---------|-----------------------|-----|
+| `openai` | `@ai-sdk/openai` | the 13 built-in voices (9 for `tts-1`, `tts-1-hd`) | [OpenAI key](https://platform.openai.com/api-keys) |
+| `google` | `@ai-sdk/google` (Gemini TTS) | the 30 prebuilt voices | [Gemini API key](https://aistudio.google.com/apikey) |
+| `elevenlabs` | `@ai-sdk/elevenlabs` | the account's voices (`GET /v2/voices`) | [ElevenLabs key](https://elevenlabs.io/app/settings/api-keys) |
+| `gateway` | `@ai-sdk/gateway` | OpenAI's or Gemini's for `openai/*` and `google/*` models, else `null` | AI Gateway key |
+| `fal` | `@ai-sdk/fal` | `null` | [fal.ai key](https://fal.ai/dashboard/keys) |
+
+`null` means there is no list to give: the model speaks with its own default voice unless
+`voice` names one. `instructions`, `speed`, `language` and `format` go to the models that take
+them; a setting a model ignores comes back in `warnings`. The media type is read from the audio
+itself. `SPEECH_PROVIDER_INFO` names each provider; `loadSpeechModel` gives the AI SDK model.
+
+`testImageKey`, `testSpeechKey` and `testVideoKey` are one check, `testMediaKey`: one free `GET`
+per provider (OpenRouter `/key`, AI Gateway `/credits`, fal.ai pricing, OpenAI `/models`, Gemini
+`/models`, xAI `/api-key`, Replicate `/account`, ElevenLabs `/user`), the key always in a header.
 
 ## Speech to text
 
