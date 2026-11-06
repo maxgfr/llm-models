@@ -1,0 +1,120 @@
+{
+  "models": [
+    {
+      "endpoint_id": "elevenlabs/tts/eleven-v4",
+      "metadata": {
+        "display_name": "Eleven v4",
+        "category": "text-to-speech",
+        "description": "Generate expressive speech with Eleven v4 from ElevenLabs. Control delivery with audio tags, voice stability, similarity settings, and IPA pronunciation.",
+        "status": "active",
+        "tags": [
+          "audio",
+          "text-to-speech",
+          "voiceover"
+        ],
+        "updated_at": "2026-10-02T19:10:00.967Z",
+        "is_favorited": null,
+        "thumbnail_url": "https://v3b.fal.media/files/b/0aac4241/SUZvoStueCW3Z6uEtzMiA.jpg",
+        "model_url": "https://fal.run/elevenlabs/tts/eleven-v4",
+        "license_type": "commercial",
+        "date": "2026-09-28T16:35:18.269Z",
+        "group": {
+          "key": "eleven-v4",
+          "label": "Eleven V4"
+        },
+        "highlighted": false,
+        "kind": "inference",
+        "stream_url": "https://fal.run/elevenlabs/tts/eleven-v4/stream",
+        "pinned": false
+      },
+      "retires_at": null,
+      "replacement": null
+    },
+    {
+      "endpoint_id": "fal-ai/minimax/speech-2.8-hd",
+      "metadata": {
+        "display_name": "MiniMax Speech 2.8 [HD]",
+        "category": "text-to-speech",
+        "description": "Generate speech from text prompts and different voices using the MiniMax Speech-2.8 HD model, which leverages advanced AI techniques to create high-quality text-to-speech.",
+        "status": "active",
+        "tags": [],
+        "updated_at": "2026-05-07T21:20:34.572Z",
+        "is_favorited": null,
+        "thumbnail_url": "https://v3b.fal.media/files/b/0a8d0e4a/5FhhsQ0BicVC_DZ_BDLGL_895a8e6af34848f8844c20244c3e4672.jpg",
+        "model_url": "https://fal.run/fal-ai/minimax/speech-2.8-hd",
+        "license_type": "commercial",
+        "date": "2026-02-04T00:13:29.621Z",
+        "group": {
+          "key": "minimax-speech",
+          "label": "Text To Speech 2.8 HD"
+        },
+        "highlighted": false,
+        "kind": "inference",
+        "stream_url": "https://fal.run/fal-ai/minimax/speech-2.8-hd/stream",
+        "pinned": false
+      },
+      "retires_at": null,
+      "replacement": null
+    },
+    {
+      "endpoint_id": "google/gemini-3.8-flash-tts",
+      "metadata": {
+        "display_name": "Gemini 3.8 Flash TTS",
+        "category": "text-to-speech",
+        "description": "Generate expressive speech with Gemini 3.8 Flash TTS. Choose from 30 voices, direct delivery with style instructions, and create single-speaker narration or two-speaker dialogue.",
+        "status": "active",
+        "tags": [
+          "text-to-speech",
+          "audio",
+          "dialogue",
+          "voiceover"
+        ],
+        "updated_at": "2026-09-30T01:19:34.727Z",
+        "is_favorited": null,
+        "thumbnail_url": "https://v3b.fal.media/files/b/0aabd875/3gAgS2GOPVAkwRanZZpN7.jpg",
+        "model_url": "https://fal.run/google/gemini-3.8-flash-tts",
+        "license_type": "commercial",
+        "date": "2026-09-25T12:38:25.540Z",
+        "group": {
+          "key": "gemini-38",
+          "label": "Flash"
+        },
+        "highlighted": false,
+        "kind": "inference",
+        "pinned": false
+      },
+      "retires_at": null,
+      "replacement": null
+    },
+    {
+      "endpoint_id": "fal-ai/maya",
+      "metadata": {
+        "display_name": "Maya1",
+        "category": "text-to-speech",
+        "description": "Maya1 is a state-of-the-art speech model by Maya Research for expressive voice generation, built to capture real human emotion and precise voice design.",
+        "status": "deprecated",
+        "tags": [
+          "text-to-speech",
+          "tts"
+        ],
+        "updated_at": "2026-11-06T00:21:41.407Z",
+        "is_favorited": null,
+        "thumbnail_url": "https://v3b.fal.media/files/b/panda/w_fnH4AqLcG0s0HRVYhQK_755e9d6c2502409fa7cf87f768925dd4.jpg",
+        "model_url": "https://fal.run/fal-ai/maya",
+        "license_type": "commercial",
+        "date": "2025-11-15T01:00:12.000Z",
+        "group": {
+          "key": "maya",
+          "label": "tts"
+        },
+        "highlighted": false,
+        "kind": "inference",
+        "pinned": false
+      },
+      "retires_at": null,
+      "replacement": null
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}

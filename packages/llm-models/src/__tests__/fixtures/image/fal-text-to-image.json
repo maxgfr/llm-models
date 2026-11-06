@@ -1,0 +1,113 @@
+{
+  "models": [
+    {
+      "endpoint_id": "fal-ai/flux/schnell",
+      "metadata": {
+        "display_name": "FLUX.1 [schnell]",
+        "category": "text-to-image",
+        "description": "FLUX.1 [schnell] is a 12 billion parameter flow transformer that generates high-quality images from text in 1 to 4 steps, suitable for personal and commercial use.",
+        "status": "active",
+        "tags": [],
+        "updated_at": "2026-06-24T23:02:10.109Z",
+        "is_favorited": null,
+        "thumbnail_url": "https://v3b.fal.media/files/b/0a9af64d/GxvCUPd3gO-MSYcy06g0x_1641cfe028c2429b8e12e4fc320eb0a8.jpg",
+        "model_url": "https://fal.run/fal-ai/flux/schnell",
+        "github_url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "license_type": "commercial",
+        "date": "2024-11-25T00:00:00.000Z",
+        "group": {
+          "key": "flux-1",
+          "label": "Text to Image [schnell]"
+        },
+        "highlighted": false,
+        "kind": "inference",
+        "pinned": false
+      },
+      "retires_at": null,
+      "replacement": null
+    },
+    {
+      "endpoint_id": "fal-ai/nano-banana-pro",
+      "metadata": {
+        "display_name": "Nano Banana Pro",
+        "category": "text-to-image",
+        "description": "Nano Banana Pro is Google's new state-of-the-art image generation and editing model",
+        "status": "active",
+        "tags": [
+          "realism",
+          "typography"
+        ],
+        "updated_at": "2026-10-20T21:51:06.977Z",
+        "is_favorited": null,
+        "thumbnail_url": "https://v3b.fal.media/files/b/0a8691ce/SR0_u1zPJbx8jCIO6bJR0_8c83f0d66bbd48f3b55f825117941f84.jpg",
+        "model_url": "https://fal.run/fal-ai/nano-banana-pro",
+        "license_type": "commercial",
+        "date": "2025-11-20T14:24:45.001Z",
+        "group": {
+          "key": "Nano-Banana-Pro",
+          "label": "Text to Image"
+        },
+        "highlighted": false,
+        "kind": "inference",
+        "pinned": false
+      },
+      "retires_at": null,
+      "replacement": null
+    },
+    {
+      "endpoint_id": "fal-ai/nano-banana-2",
+      "metadata": {
+        "display_name": "Nano Banana 2",
+        "category": "text-to-image",
+        "description": "Nano Banana 2 is Google's new state-of-the-art fast image generation and editing model",
+        "status": "active",
+        "tags": [],
+        "updated_at": "2026-10-20T22:20:27.165Z",
+        "is_favorited": null,
+        "thumbnail_url": "https://v3b.fal.media/files/b/0a900b9e/ptbZcVWIQ_fXGGHfv8Zez_0ea5ca41bdf143a29e21e30a53120672.jpg",
+        "model_url": "https://fal.run/fal-ai/nano-banana-2",
+        "license_type": "commercial",
+        "date": "2026-02-26T16:08:01.361Z",
+        "group": {
+          "key": "nano-banana-2",
+          "label": "Text to Image"
+        },
+        "highlighted": false,
+        "kind": "inference",
+        "pinned": false
+      },
+      "retires_at": null,
+      "replacement": null
+    },
+    {
+      "endpoint_id": "fal-ai/flux-control-lora-depth",
+      "metadata": {
+        "display_name": "FLUX.1 [dev] Control LoRA Depth",
+        "category": "text-to-image",
+        "description": "FLUX Control LoRA Depth is a high-performance endpoint that uses a control image to transfer structure to the generated image, using a depth map.",
+        "status": "deprecated",
+        "tags": [
+          "lora",
+          "style transfer"
+        ],
+        "updated_at": "2026-11-06T00:21:37.369Z",
+        "is_favorited": null,
+        "thumbnail_url": "https://storage.googleapis.com/falserverless/gallery/control-lora-depth.jpeg",
+        "model_url": "https://fal.run/fal-ai/flux-control-lora-depth",
+        "license_type": "commercial",
+        "date": "2025-02-11T00:00:00.000Z",
+        "group": {
+          "key": "flux-control-lora-depth",
+          "label": "Text to Image"
+        },
+        "highlighted": false,
+        "kind": "inference",
+        "pinned": false
+      },
+      "retires_at": null,
+      "replacement": null
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}

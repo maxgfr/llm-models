@@ -25,10 +25,18 @@
       "types": "./build/video.d.ts",
       "default": "./build/video.js"
     },
+    "./image": {
+      "types": "./build/image.d.ts",
+      "default": "./build/image.js"
+    },
+    "./speech": {
+      "types": "./build/speech.d.ts",
+      "default": "./build/speech.js"
+    },
     "./package.json": "./package.json",
     "./*": "./*"
   },
-  "description": "Fetch latest LLM and video models from OpenRouter, models.dev, the AI Gateway and fal.ai, in Node.js or the browser",
+  "description": "Fetch latest LLM, video, image and speech models from OpenRouter, models.dev, the AI Gateway, fal.ai and ElevenLabs, in Node.js or the browser",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/maxgfr/llm-models.git",
@@ -65,12 +73,17 @@
     "webgpu",
     "webllm",
     "video",
-    "text-to-video"
+    "text-to-video",
+    "image",
+    "text-to-image",
+    "speech",
+    "text-to-speech",
+    "tts"
   ],
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build src/index.ts --outdir build --target node && bun build src/browser.ts --outdir build --target browser && bun build src/catalog.ts --outdir build --target browser && bun build src/video.ts --outdir build --target browser",
+    "build": "bun build src/index.ts --outdir build --target node && bun build src/browser.ts --outdir build --target browser && bun build src/catalog.ts --outdir build --target browser && bun build src/video.ts --outdir build --target browser && bun build src/image.ts --outdir build --target browser && bun build src/speech.ts --outdir build --target browser",
     "build:types": "tsc --emitDeclarationOnly",
     "build:all": "bun run build && bun run build:types",
     "test": "bun test",

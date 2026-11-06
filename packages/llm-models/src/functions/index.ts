@@ -19,6 +19,14 @@ export { compareModels } from "./compare";
 export { cheapestModels, estimateCost } from "./cost";
 export { diffModels } from "./diff";
 export { formatFields, parseFieldList, readField } from "./fields";
+export type { ListImageModelsOptions } from "./image";
+export {
+  describeFalImageModel,
+  describeOpenApiImageInput,
+  enrichImageModel,
+  gatewayImagePrices,
+  listImageModels,
+} from "./image";
 export { latestModels, pickTiers } from "./latest";
 export { fetchUnifiedData, fetchUnifiedModels, mergeModels } from "./normalize";
 export { getProvider, listProviders } from "./provider";
@@ -26,6 +34,12 @@ export { QueryBuilder, query } from "./query";
 export { listUseCases, recommendModels } from "./recommend";
 export { findModel, pickBestModel, providersForEndpoint, resolveModel } from "./resolve";
 export { filterModels, findModels, sortModels } from "./search";
+export type { ListSpeechModelsOptions } from "./speech";
+export {
+  describeFalSpeechModel,
+  describeOpenApiSpeechInput,
+  listSpeechModels,
+} from "./speech";
 export { getStats } from "./stats";
 export type { ListVideoModelsOptions } from "./video";
 export {

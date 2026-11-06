@@ -41,14 +41,25 @@ import { compareModels } from "./functions/compare";
 import { cheapestModels, estimateCost, projectCost } from "./functions/cost";
 import { diffModels } from "./functions/diff";
 import { formatFields, parseFieldList } from "./functions/fields";
+import { listImageModels } from "./functions/image";
 import { latestModels, TIERS, type Tier } from "./functions/latest";
 import { fetchUnifiedModels } from "./functions/normalize";
 import { getProvider, listProviders } from "./functions/provider";
 import { listUseCases, recommendModels } from "./functions/recommend";
 import { findModel, resolveModel } from "./functions/resolve";
 import { filterModels, sortModels } from "./functions/search";
+import { listSpeechModels } from "./functions/speech";
 import { getStats } from "./functions/stats";
 import { listVideoModels } from "./functions/video";
+import {
+  filterImageModels,
+  IMAGE_OPERATIONS,
+  IMAGE_PROVIDERS,
+  type ImageModel,
+  type ImageOperation,
+  type ImageProviderId,
+  imagePrice,
+} from "./image";
 import { setVerbose } from "./log";
 import {
   BrowserModelNeedSchema,
@@ -57,6 +68,13 @@ import {
   ModelSortFieldSchema,
   OutputFormatSchema,
 } from "./schemas/functions";
+import {
+  filterSpeechModels,
+  SPEECH_PROVIDERS,
+  type SpeechModel,
+  type SpeechProviderId,
+  speechPrice,
+} from "./speech";
 import type {
   BrowserModel,
   BrowserModelNeed,
@@ -182,6 +200,64 @@ function videoModelRow(m: VideoModel): string[] {
     m.resolutions?.join(" ") ?? "-",
     m.audio == null ? "-" : m.audio ? "yes" : "no",
     price == null ? "-" : price.toFixed(3),
+  ];
+}
+
+const IMAGE_MODEL_HEADERS = [
+  "Provider",
+  "ID",
+  "Name",
+  "Does",
+  "Formats",
+  "Sizes",
+  "Max n",
+  "$/image",
+];
+
+/** A list cut to its first `max` items, with how many more there are. */
+const few = (values: readonly string[] | null, max = 6) =>
+  !values?.length
+    ? "-"
+    : values.length > max
+      ? `${values.slice(0, max).join(" ")} +${values.length - max}`
+      : values.join(" ");
+
+function imageModelRow(m: ImageModel): string[] {
+  const price = imagePrice(m);
+  return [
+    m.provider,
+    m.id,
+    m.name,
+    m.operations.map((o) => (o === "text-to-image" ? "t2i" : "edit")).join(" ") || "-",
+    few(m.aspectRatios),
+    few(m.sizes, 3),
+    m.maxImagesPerCall == null ? "-" : String(m.maxImagesPerCall),
+    price == null ? "-" : price.toFixed(3),
+  ];
+}
+
+const SPEECH_MODEL_HEADERS = [
+  "Provider",
+  "ID",
+  "Name",
+  "Voices",
+  "Languages",
+  "Formats",
+  "Style",
+  "$/1M chars",
+];
+
+function speechModelRow(m: SpeechModel): string[] {
+  const price = speechPrice(m, 1_000_000);
+  return [
+    m.provider,
+    m.id,
+    m.name,
+    m.voices == null ? "-" : String(m.voices.length),
+    m.languages == null ? "-" : String(m.languages.length),
+    few(m.formats),
+    m.instructions == null ? "-" : m.instructions ? "yes" : "no",
+    price == null ? "-" : price.toFixed(2),
   ];
 }
 
@@ -1288,6 +1364,86 @@ export function createProgram(): Command {
         });
         if (fmt === "table") console.log(dim(`${models.length} video models\n`));
         outputFormatted(fmt, VIDEO_MODEL_HEADERS, models.map(videoModelRow), models);
+      },
+    );
+
+  // --- Image command ---
+
+  program
+    .command("image")
+    .alias("images")
+    .description(
+      "Image models from OpenRouter, the AI Gateway, fal.ai, OpenAI, Google and xAI (and Replicate with a token)",
+    )
+    .argument("[query]", "Keep the models whose name or id holds this text")
+    .addOption(choice("--provider <id>", "List one provider only", IMAGE_PROVIDERS))
+    .addOption(choice("--operation <op>", "Keep the models that do this", IMAGE_OPERATIONS))
+    .option(
+      "--replicate-token <token>",
+      "A Replicate token, to list its collection (or REPLICATE_API_TOKEN)",
+    )
+    .option("--json", "Output raw JSON")
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
+    .action(
+      async (
+        query: string | undefined,
+        options: {
+          provider?: ImageProviderId;
+          operation?: ImageOperation;
+          replicateToken?: string;
+          json?: boolean;
+          format?: OutputFormat;
+        },
+      ) => {
+        const fmt = resolveFormat(options);
+        const all = await listImageModels({
+          ...(options.provider ? { providers: [options.provider] } : {}),
+          replicateApiToken: options.replicateToken ?? process.env.REPLICATE_API_TOKEN,
+        });
+        const models = filterImageModels(all, {
+          provider: options.provider,
+          query,
+          operation: options.operation,
+        });
+        if (fmt === "table") console.log(dim(`${models.length} image models\n`));
+        outputFormatted(fmt, IMAGE_MODEL_HEADERS, models.map(imageModelRow), models);
+      },
+    );
+
+  // --- Speech command ---
+
+  program
+    .command("speech")
+    .alias("tts")
+    .description(
+      "Text-to-speech models from the AI Gateway, fal.ai, OpenAI and Google (and ElevenLabs with a key), with their voices",
+    )
+    .argument("[query]", "Keep the models whose name or id holds this text")
+    .addOption(choice("--provider <id>", "List one provider only", SPEECH_PROVIDERS))
+    .option(
+      "--elevenlabs-key <key>",
+      "An ElevenLabs key, to list its models and voices (or ELEVENLABS_API_KEY)",
+    )
+    .option("--json", "Output raw JSON")
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
+    .action(
+      async (
+        query: string | undefined,
+        options: {
+          provider?: SpeechProviderId;
+          elevenlabsKey?: string;
+          json?: boolean;
+          format?: OutputFormat;
+        },
+      ) => {
+        const fmt = resolveFormat(options);
+        const all = await listSpeechModels({
+          ...(options.provider ? { providers: [options.provider] } : {}),
+          elevenLabsApiKey: options.elevenlabsKey ?? process.env.ELEVENLABS_API_KEY,
+        });
+        const models = filterSpeechModels(all, { provider: options.provider, query });
+        if (fmt === "table") console.log(dim(`${models.length} speech models\n`));
+        outputFormatted(fmt, SPEECH_MODEL_HEADERS, models.map(speechModelRow), models);
       },
     );
 

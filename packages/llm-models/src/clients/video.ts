@@ -29,7 +29,7 @@ const FAL_MAX_PAGES = 8;
 export const FAL_VIDEO_CATEGORIES = ["text-to-video", "image-to-video"] as const;
 
 /** Keep the entries that match `schema`, and say how many were dropped. */
-function each<T>(entries: unknown[], schema: z.ZodType<T>, label: string): T[] {
+export function each<T>(entries: unknown[], schema: z.ZodType<T>, label: string): T[] {
   const kept: T[] = [];
   for (const entry of entries) {
     const parsed = schema.safeParse(entry);
@@ -40,7 +40,7 @@ function each<T>(entries: unknown[], schema: z.ZodType<T>, label: string): T[] {
   return kept;
 }
 
-function listOf(json: unknown, key: string, label: string): unknown[] {
+export function listOf(json: unknown, key: string, label: string): unknown[] {
   const list = (json as Record<string, unknown> | null)?.[key];
   if (!Array.isArray(list)) throw new Error(`${label} API returned no "${key}" list`);
   return list;
@@ -77,12 +77,12 @@ export async function fetchGatewayVideoModels(
   return models;
 }
 
-/** fal.ai's active video models of `categories`, in fal's own order. No key needed. */
-export async function fetchFalVideoModels(
-  options: FetchOptions & { categories?: readonly string[] } = {},
+/** fal.ai's active models of `categories`, in fal's own order, each tagged with its category. No key needed. */
+export async function fetchFalCategoryModels(
+  categories: readonly string[],
+  options: FetchOptions = {},
 ): Promise<FalModel[]> {
-  const categories = options.categories ?? FAL_VIDEO_CATEGORIES;
-  const cacheKey = `fal-videos-${[...categories].join("+")}`;
+  const cacheKey = `fal-${[...categories].join("+")}`;
   const cached = readCache<FalModel[]>(cacheKey);
   if (cached) return cached;
   const models: FalModel[] = [];
@@ -108,6 +108,14 @@ export async function fetchFalVideoModels(
   return models;
 }
 
+/** fal.ai's active video models of `categories`, in fal's own order. No key needed. */
+export async function fetchFalVideoModels(
+  options: FetchOptions & { categories?: readonly string[] } = {},
+): Promise<FalModel[]> {
+  const { categories = FAL_VIDEO_CATEGORIES, ...fetchOptions } = options;
+  return fetchFalCategoryModels(categories, fetchOptions);
+}
+
 /** One fal.ai endpoint with its OpenAPI schema, which holds its settings. No key needed. */
 export async function fetchFalModelSchema(
   endpoint: string,
@@ -125,14 +133,27 @@ export async function fetchGoogleVideoModels(
   apiKey: string,
   options: FetchOptions = {},
 ): Promise<GoogleModel[]> {
+  return fetchGoogleModels(
+    apiKey,
+    (m) =>
+      Boolean(m.supportedGenerationMethods?.includes("predictLongRunning") && /veo/i.test(m.name)),
+    options,
+  );
+}
+
+/** The Gemini API's models the key can call that `keep` keeps (every page read). */
+export async function fetchGoogleModels(
+  apiKey: string,
+  keep: (model: GoogleModel) => boolean,
+  options: FetchOptions = {},
+): Promise<GoogleModel[]> {
   const models: GoogleModel[] = [];
   let pageToken: string | undefined;
   for (let page = 0; page < 5; page++) {
     const url = `${GOOGLE_MODELS_URL}?pageSize=1000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`;
     const json = await fetchJson(url, "Gemini", options, { "x-goog-api-key": apiKey });
     for (const m of each(listOf(json, "models", "Gemini"), GoogleModelSchema, "Gemini")) {
-      if (m.supportedGenerationMethods?.includes("predictLongRunning") && /veo/i.test(m.name))
-        models.push(m);
+      if (keep(m)) models.push(m);
     }
     pageToken = (json as { nextPageToken?: string }).nextPageToken;
     if (!pageToken) break;
@@ -145,7 +166,16 @@ export async function fetchReplicateVideoModels(
   apiToken: string,
   options: FetchOptions = {},
 ): Promise<ReplicateModel[]> {
-  const json = await fetchJson(REPLICATE_COLLECTION_URL, "Replicate", options, {
+  return fetchReplicateCollection(REPLICATE_COLLECTION_URL, apiToken, options);
+}
+
+/** The models of a Replicate collection (`url`), with each one's input schema. Needs a token. */
+export async function fetchReplicateCollection(
+  url: string,
+  apiToken: string,
+  options: FetchOptions = {},
+): Promise<ReplicateModel[]> {
+  const json = await fetchJson(url, "Replicate", options, {
     Authorization: `Bearer ${apiToken}`,
   });
   return each(listOf(json, "models", "Replicate"), ReplicateModelSchema, "Replicate");

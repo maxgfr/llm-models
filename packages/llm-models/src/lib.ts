@@ -14,8 +14,22 @@ export {
   normalizeModality,
 } from "./catalog";
 export type { FetchOptions } from "./clients/http";
+export {
+  fetchFalImageModels,
+  fetchGatewayImageModels,
+  fetchGoogleImageModels,
+  fetchOpenAIImageModels,
+  fetchOpenRouterImageModels,
+  fetchReplicateImageModels,
+} from "./clients/image";
 export { fetchModelsDevModels } from "./clients/models-dev";
 export { fetchOpenRouterModels } from "./clients/openrouter";
+export {
+  fetchElevenLabsModels,
+  fetchElevenLabsVoices,
+  fetchFalSpeechModels,
+  fetchGatewaySpeechModels,
+} from "./clients/speech";
 export {
   fetchFalVideoModels,
   fetchGatewayVideoModels,
@@ -30,6 +44,7 @@ export type {
   ProbeManyOptions,
 } from "./functions/browser";
 export type { BuildSlimCatalogOptions, SlimCatalogOptions } from "./functions/catalog";
+export type { ListImageModelsOptions } from "./functions/image";
 export {
   BROWSER_REQUIRED_HEADERS,
   browserModelCatalog,
@@ -39,9 +54,14 @@ export {
   DEFAULT_BASE_URLS,
   DEFAULT_PROBE_ORIGIN,
   describeBrowserModel,
+  describeFalImageModel,
+  describeFalSpeechModel,
   describeFalVideoModel,
+  describeOpenApiImageInput,
+  describeOpenApiSpeechInput,
   describeOpenApiVideoInput,
   diffModels,
+  enrichImageModel,
   enrichVideoModel,
   estimateCost,
   fetchUnifiedData,
@@ -50,11 +70,14 @@ export {
   findModel,
   findModels,
   formatFields,
+  gatewayImagePrices,
   getProvider,
   getStats,
   latestModels,
   listBrowserModels,
+  listImageModels,
   listProviders,
+  listSpeechModels,
   listUseCases,
   listVideoModels,
   mergeModels,
@@ -77,7 +100,16 @@ export {
   videoMatchKey,
 } from "./functions/index";
 export type { ProviderOptions } from "./functions/provider";
+export type { ListSpeechModelsOptions } from "./functions/speech";
 export type { ListVideoModelsOptions } from "./functions/video";
+export type { ImageModel, ImageOperation, ImagePrice, ImageProviderId } from "./image";
+export {
+  filterImageModels,
+  IMAGE_OPERATIONS,
+  IMAGE_PROVIDERS,
+  imagePrice,
+  rendersImageFromText,
+} from "./image";
 export {
   BrowserModelCatalogSchema,
   BrowserModelNeedSchema,
@@ -114,6 +146,14 @@ export {
   OpenRouterResponseSchema,
   OpenRouterTopProviderSchema,
 } from "./schemas/openrouter";
+export type { SpeechModel, SpeechPrice, SpeechProviderId, SpeechVoice } from "./speech";
+export {
+  filterSpeechModels,
+  GEMINI_VOICES,
+  OPENAI_VOICES,
+  SPEECH_PROVIDERS,
+  speechPrice,
+} from "./speech";
 export type {
   BrowserModel,
   BrowserModelCatalog,

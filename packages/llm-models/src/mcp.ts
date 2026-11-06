@@ -4,15 +4,19 @@ import { z } from "zod";
 import pkg from "../package.json";
 import { compareModels } from "./functions/compare";
 import { cheapestModels, estimateCost } from "./functions/cost";
+import { listImageModels } from "./functions/image";
 import { latestModels } from "./functions/latest";
 import { fetchUnifiedModels } from "./functions/normalize";
 import { getProvider, listProviders } from "./functions/provider";
 import { listUseCases, recommendModels } from "./functions/recommend";
 import { findModel, resolveModel } from "./functions/resolve";
 import { findModels } from "./functions/search";
+import { listSpeechModels } from "./functions/speech";
 import { getStats } from "./functions/stats";
 import { listVideoModels } from "./functions/video";
+import { filterImageModels, IMAGE_OPERATIONS, IMAGE_PROVIDERS } from "./image";
 import { CapabilityEnum, ModelFilterSchema, ModelSortFieldSchema } from "./schemas/functions";
+import { filterSpeechModels, SPEECH_PROVIDERS } from "./speech";
 import { filterVideoModels, VIDEO_OPERATIONS, VIDEO_PROVIDERS } from "./video";
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
@@ -235,6 +239,43 @@ export function createMcpServer(): McpServer {
     async ({ provider, operation, search, limit: max }) => {
       const all = await listVideoModels(provider ? { providers: [provider] } : {});
       const found = filterVideoModels(all, { provider, operation, query: search });
+      return json(max === 0 ? found : found.slice(0, max ?? 20));
+    },
+  );
+
+  server.registerTool(
+    "list_image_models",
+    {
+      description:
+        "List image generation models (OpenRouter, AI Gateway, fal.ai, OpenAI, Google, xAI) with their formats, sizes, images per call, seed and per-image prices",
+      inputSchema: {
+        provider: z.enum(IMAGE_PROVIDERS).optional(),
+        operation: z.enum(IMAGE_OPERATIONS).optional(),
+        search: z.string().optional().describe("Text the model's name or id holds"),
+        limit,
+      },
+    },
+    async ({ provider, operation, search, limit: max }) => {
+      const all = await listImageModels(provider ? { providers: [provider] } : {});
+      const found = filterImageModels(all, { provider, operation, query: search });
+      return json(max === 0 ? found : found.slice(0, max ?? 20));
+    },
+  );
+
+  server.registerTool(
+    "list_speech_models",
+    {
+      description:
+        "List text-to-speech models (AI Gateway, fal.ai, OpenAI, Google) with their voices, languages, audio formats, style instructions and per-character prices",
+      inputSchema: {
+        provider: z.enum(SPEECH_PROVIDERS).optional(),
+        search: z.string().optional().describe("Text the model's name or id holds"),
+        limit,
+      },
+    },
+    async ({ provider, search, limit: max }) => {
+      const all = await listSpeechModels(provider ? { providers: [provider] } : {});
+      const found = filterSpeechModels(all, { provider, query: search });
       return json(max === 0 ? found : found.slice(0, max ?? 20));
     },
   );

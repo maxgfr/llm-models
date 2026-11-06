@@ -148,12 +148,12 @@ export function fromGateway(m: GatewayVideoModel): VideoModel {
   };
 }
 
-type Json = Record<string, unknown>;
-const isObject = (v: unknown): v is Json =>
+export type Json = Record<string, unknown>;
+export const isObject = (v: unknown): v is Json =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** The input properties of an OpenAPI 3 schema (`$ref`s and `allOf` followed), and the required ones. */
-function inputProperties(
+export function inputProperties(
   openapi: unknown,
 ): { props: Record<string, Json>; required: string[] } | null {
   if (!isObject(openapi)) return null;
@@ -419,6 +419,16 @@ export function enrichVideoModel(model: VideoModel, known: readonly VideoModel[]
   return filled;
 }
 
+/** The list `run` gives, or none when it fails (with `--verbose`, logged): one source down must not take the others with it. */
+export async function settle<T>(label: string, run: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await run();
+  } catch (error) {
+    debug(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+    return [];
+  }
+}
+
 export interface ListVideoModelsOptions extends FetchOptions {
   /** The services to list (default: every one that needs no key, plus those given a key). */
   providers?: readonly VideoProviderId[];
@@ -442,14 +452,6 @@ export async function listVideoModels(options: ListVideoModelsOptions = {}): Pro
       VIDEO_PROVIDERS.filter((p) => p !== "replicate" || options.replicateApiToken),
   );
   const fetchOptions: FetchOptions = options.fetch ? { fetch: options.fetch } : {};
-  const settle = async <T>(label: string, run: () => Promise<T[]>): Promise<T[]> => {
-    try {
-      return await run();
-    } catch (error) {
-      debug(`${label}: ${error instanceof Error ? error.message : String(error)}`);
-      return [];
-    }
-  };
   // The aggregators also fill the direct providers' settings.
   const needsAggregators =
     wanted.has("openrouter") || wanted.has("gateway") || wanted.has("xai") || wanted.has("google");

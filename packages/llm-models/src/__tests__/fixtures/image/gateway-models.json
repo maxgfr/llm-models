@@ -1,0 +1,516 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "bfl/flux-3-image",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1791158400,
+      "owned_by": "bfl",
+      "name": "FLUX 3 Image",
+      "description": "FLUX 3 Image is Black Forest Labs’ image generation and editing model. It supports text-to-image generation, editing with up to 10 reference images, and layouts specified with bounding boxes, across five resolution classes from 768 × 768 to 4K.",
+      "context_window": 0,
+      "max_tokens": 0,
+      "type": "image",
+      "zdr": "none",
+      "no_training": "none",
+      "tags": [
+        "image-generation"
+      ],
+      "supported_specifications": [
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "image"
+        ]
+      },
+      "pricing": {
+        "image": "0.048",
+        "image_dimension_quality_pricing": [
+          {
+            "size": "768x768",
+            "cost": "0.041"
+          },
+          {
+            "size": "1024x1024",
+            "cost": "0.048"
+          },
+          {
+            "size": "1536x1536",
+            "cost": "0.07"
+          },
+          {
+            "size": "2048x2048",
+            "cost": "0.1"
+          },
+          {
+            "size": "4096x4096",
+            "cost": "0.607"
+          }
+        ]
+      }
+    },
+    {
+      "id": "google/gemini-3-pro-image",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1756684800,
+      "owned_by": "google",
+      "name": "Nano Banana Pro (Gemini 3 Pro Image)",
+      "description": "Nano Banana Pro (Gemini 3 Pro Image) builds on Nano Banana's generation capabilities into a new era of studio-quality, functional design to help you create and edit high-fidelity, production-ready visuals with unparalleled precision and control. Improvements include enhanced world knowledge and reasoning, dynamic text and translation, and studio level controls.",
+      "context_window": 65536,
+      "max_tokens": 32768,
+      "type": "language",
+      "zdr": "some",
+      "no_training": "all",
+      "tags": [
+        "image-generation",
+        "web-search",
+        "implicit-caching",
+        "vision",
+        "structured-output"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text",
+          "image"
+        ]
+      },
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "stop",
+        "reasoning",
+        "include_reasoning",
+        "response_format",
+        "structured_outputs"
+      ],
+      "temperature": true,
+      "reasoning_options": [
+        {
+          "type": "effort",
+          "values": [
+            "low",
+            "high"
+          ]
+        }
+      ],
+      "knowledge": "2025-01",
+      "pricing": {
+        "input": "0.000002",
+        "output": "0.000012",
+        "input_cache_read": "0.0000002",
+        "image_dimension_quality_pricing": [
+          {
+            "size": "1K",
+            "cost": "0.1344"
+          },
+          {
+            "size": "2K",
+            "cost": "0.1344"
+          },
+          {
+            "size": "4K",
+            "cost": "0.24"
+          },
+          {
+            "size": "default",
+            "cost": "0.1344"
+          }
+        ],
+        "web_search": "14",
+        "maps_search": "14",
+        "service_tiers": {
+          "flex": {
+            "input": "0.000001",
+            "output": "0.000006"
+          }
+        }
+      }
+    },
+    {
+      "id": "meta/muse-image-1.0",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1787702400,
+      "owned_by": "meta",
+      "name": "Muse Image 1.0",
+      "description": "Muse Image is the first image generation model from Meta Superintelligence Labs, it uses advanced reasoning to understand complex prompts, seamlessly blending multiple photos into high-quality creations you can download and share anywhere.\n",
+      "context_window": 0,
+      "max_tokens": 0,
+      "type": "image",
+      "zdr": "all",
+      "no_training": "all",
+      "tags": [
+        "image-generation",
+        "vision"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "image"
+        ]
+      },
+      "reasoning_options": [
+        {
+          "type": "effort",
+          "values": [
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ]
+        }
+      ],
+      "pricing": {
+        "image": "0.01"
+      }
+    },
+    {
+      "id": "openai/gpt-image-2",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1776729600,
+      "owned_by": "openai",
+      "name": "GPT Image 2",
+      "description": "GPT Image 2 is OpenAI's state-of-the-art image generation model for fast, high-quality image generation and editing. It supports flexible image sizes and high-fidelity image inputs.",
+      "context_window": 0,
+      "max_tokens": 0,
+      "type": "image",
+      "zdr": "none",
+      "no_training": "all",
+      "tags": [
+        "image-generation",
+        "implicit-caching"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "image"
+        ]
+      },
+      "pricing": {
+        "input": "0.000005",
+        "output": "0.00003",
+        "input_cache_read": "0.00000125"
+      }
+    },
+    {
+      "id": "recraft/recraft-v4",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1771286400,
+      "owned_by": "recraft",
+      "name": "Recraft V4",
+      "description": "The model delivers strong photorealism, including realistic skin rendering and natural textures, while avoiding common synthetic artifacts. It produces more distinctive lighting, composition, diverse subjects, contemporary styling, and carefully considered scene elements. For illustration, it generates original characters and forms with sophisticated and unexpected color combinations.",
+      "context_window": 0,
+      "max_tokens": 0,
+      "type": "image",
+      "zdr": "none",
+      "no_training": "none",
+      "tags": [
+        "image-generation"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "image"
+        ]
+      },
+      "pricing": {
+        "image": "0.04",
+        "image_dimension_quality_pricing": [
+          {
+            "style": "vector_illustration",
+            "cost": "0.08"
+          }
+        ]
+      }
+    },
+    {
+      "id": "spacexai/grok-imagine-image",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1769558400,
+      "owned_by": "spacexai",
+      "name": "Grok Imagine Image",
+      "description": "Generate high-quality images from text prompts with xAI's imagine API.",
+      "context_window": 0,
+      "max_tokens": 0,
+      "type": "image",
+      "zdr": "all",
+      "no_training": "all",
+      "tags": [
+        "image-generation"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "image"
+        ]
+      },
+      "reasoning_options": [
+        {
+          "type": "toggle"
+        },
+        {
+          "type": "effort",
+          "values": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      ],
+      "pricing": {
+        "image": "0.02"
+      }
+    },
+    {
+      "id": "spacexai/grok-imagine-image-2.0",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1786060800,
+      "owned_by": "spacexai",
+      "name": "Grok Imagine Image 2.0",
+      "description": "",
+      "context_window": 0,
+      "max_tokens": 0,
+      "type": "image",
+      "zdr": "all",
+      "no_training": "all",
+      "tags": [
+        "image-generation"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "image"
+        ]
+      },
+      "reasoning_options": [
+        {
+          "type": "toggle"
+        },
+        {
+          "type": "effort",
+          "values": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      ],
+      "pricing": {
+        "image": "0.06",
+        "image_dimension_quality_pricing": [
+          {
+            "quality": "low",
+            "cost": "0.04"
+          },
+          {
+            "size": "2048x2048",
+            "cost": "0.08"
+          },
+          {
+            "size": "2048x2048",
+            "quality": "low",
+            "cost": "0.06"
+          }
+        ]
+      }
+    },
+    {
+      "id": "alibaba/qwen-3-14b",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1745798400,
+      "owned_by": "alibaba",
+      "name": "Qwen3-14B",
+      "description": "Qwen3 is the latest generation of large language models in Qwen series, offering a comprehensive suite of dense and mixture-of-experts (MoE) models. Built upon extensive training, Qwen3 delivers groundbreaking advancements in reasoning, instruction-following, agent capabilities, and multilingual support",
+      "context_window": 40960,
+      "max_tokens": 16384,
+      "type": "language",
+      "zdr": "none",
+      "no_training": "all",
+      "tags": [
+        "reasoning",
+        "tool-use",
+        "structured-output",
+        "open-weights"
+      ],
+      "supported_specifications": [
+        "v2",
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "supported_parameters": [
+        "max_tokens",
+        "temperature",
+        "stop",
+        "tools",
+        "tool_choice",
+        "reasoning",
+        "include_reasoning",
+        "response_format",
+        "structured_outputs"
+      ],
+      "temperature": true,
+      "reasoning_options": [
+        {
+          "type": "toggle"
+        }
+      ],
+      "knowledge": "2025-04",
+      "pricing": {
+        "input": "0.00000012",
+        "output": "0.00000024"
+      }
+    },
+    {
+      "id": "alibaba/wan-v2.5-t2v-preview",
+      "object": "model",
+      "created": 1755815280,
+      "released": 1758672000,
+      "owned_by": "alibaba",
+      "name": "Wan v2.5 Text-to-Video Preview",
+      "description": "",
+      "context_window": 0,
+      "max_tokens": 0,
+      "type": "video",
+      "zdr": "all",
+      "no_training": "all",
+      "supported_specifications": [
+        "v3",
+        "v4"
+      ],
+      "modalities": {
+        "input": [
+          "text"
+        ],
+        "output": [
+          "video"
+        ]
+      },
+      "video_capabilities": {
+        "supported_operations": [
+          "text-to-video"
+        ],
+        "supported_resolutions": [
+          "480p",
+          "720p",
+          "1080p"
+        ],
+        "supported_aspect_ratios": [
+          "16:9",
+          "9:16",
+          "1:1",
+          "4:3",
+          "3:4"
+        ],
+        "supported_durations_seconds": [
+          5,
+          10
+        ],
+        "generate_audio": true,
+        "supported_fps": [
+          24
+        ],
+        "input_limits": {
+          "text": {
+            "max_chars": 1500
+          },
+          "audio": {
+            "max_file_size_mb": 15,
+            "supported_formats": [
+              "wav",
+              "mp3"
+            ],
+            "supported_sources": [
+              "url"
+            ],
+            "min_duration_seconds": 3,
+            "max_duration_seconds": 30
+          }
+        }
+      },
+      "pricing": {
+        "video_duration_pricing": [
+          {
+            "resolution": "480p",
+            "cost_per_second": "0.05"
+          },
+          {
+            "resolution": "720p",
+            "cost_per_second": "0.1"
+          },
+          {
+            "resolution": "1080p",
+            "cost_per_second": "0.15"
+          }
+        ]
+      }
+    }
+  ]
+}

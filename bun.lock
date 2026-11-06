@@ -21,7 +21,7 @@
     },
     "packages/llm-connect": {
       "name": "llm-connect",
-      "version": "2.8.0",
+      "version": "2.9.1",
       "dependencies": {
         "llm-models": "workspace:^",
       },
@@ -80,7 +80,7 @@
     },
     "packages/llm-models": {
       "name": "llm-models",
-      "version": "1.14.1",
+      "version": "1.15.0",
       "bin": {
         "llm-models": "build/index.js",
       },

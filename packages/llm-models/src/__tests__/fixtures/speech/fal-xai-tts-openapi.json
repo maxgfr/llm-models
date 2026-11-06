@@ -1,0 +1,214 @@
+{
+  "models": [
+    {
+      "endpoint_id": "xai/tts/v1",
+      "metadata": {
+        "display_name": "xAI Text to Speech",
+        "category": "text-to-speech",
+        "description": "Generate speech with expressive and realistic voices from xAI",
+        "status": "active",
+        "tags": [],
+        "updated_at": "2026-06-02T21:56:08.936Z",
+        "is_favorited": null,
+        "thumbnail_url": "https://v3b.fal.media/files/b/0a92763c/4toOv_gM9xUL_Zwmt4Gc8_67e9f077fc4c48e78dfa428f7d50b190.jpg",
+        "model_url": "https://fal.run/xai/tts/v1",
+        "license_type": "commercial",
+        "date": "2026-03-17T00:21:43.728Z",
+        "highlighted": false,
+        "kind": "inference",
+        "stream_url": "https://fal.run/xai/tts/v1/stream",
+        "pinned": false
+      },
+      "retires_at": null,
+      "replacement": null,
+      "openapi": {
+        "openapi": "3.1.0",
+        "info": {
+          "title": "Queue OpenAPI for fal-ai/xai-tts/v1",
+          "version": "1.0.0",
+          "description": "The OpenAPI schema for the fal-ai/xai-tts/v1 queue.",
+          "x-fal-metadata": {
+            "endpointId": "fal-ai/xai-tts/v1",
+            "playgroundUrl": "https://fal.ai/models/fal-ai/xai-tts/v1",
+            "documentationUrl": "https://fal.ai/models/fal-ai/xai-tts/v1/api",
+            "about": "Convert text to speech using xAI's TTS API.\n\nSupports xAI's built-in voices, inline speech tags for fine-grained\ndelivery control, and output formats from high-fidelity MP3 to\ntelephony-optimized μ-law."
+          }
+        },
+        "components": {
+          "securitySchemes": {
+            "apiKeyAuth": {
+              "type": "apiKey",
+              "in": "header",
+              "name": "Authorization",
+              "description": "Fal Key"
+            }
+          },
+          "schemas": {
+            "XaiTtsV1Input": {
+              "properties": {
+                "voice": {
+                  "enum": [
+                    "carina",
+                    "zagan",
+                    "helix",
+                    "orion",
+                    "luna",
+                    "iris",
+                    "altair",
+                    "zenith",
+                    "perseus",
+                    "helios",
+                    "lux",
+                    "kepler",
+                    "rigel",
+                    "cosmo",
+                    "celeste",
+                    "ursa",
+                    "sirius",
+                    "lumen",
+                    "castor",
+                    "naksh",
+                    "atlas",
+                    "aurora",
+                    "liora",
+                    "ara",
+                    "eve",
+                    "leo",
+                    "rex",
+                    "sal"
+                  ],
+                  "title": "Voice",
+                  "default": "eve",
+                  "type": "string",
+                  "description": "Built-in xAI voice to use for synthesis."
+                },
+                "enable_safety_checker": {
+                  "title": "Enable Safety Checker",
+                  "description": "Authorized callers may set false to request relaxed screening.",
+                  "default": true,
+                  "type": "boolean"
+                },
+                "output_format": {
+                  "$ref": "#/components/schemas/OutputFormat",
+                  "description": "Output format configuration. Defaults to MP3 at 24 kHz / 128 kbps."
+                },
+                "text": {
+                  "maxLength": 15000,
+                  "examples": [
+                    "Hello! This is xAI text to speech, brought to you by Fal AI."
+                  ],
+                  "title": "Text",
+                  "description": "The text to convert to speech. Maximum 15,000 characters. Supports speech tags for expressive delivery: inline tags like [laugh], [pause], [sigh] and wrapping tags like <whisper>text</whisper>, <slow>text</slow>.",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "language": {
+                  "enum": [
+                    "auto",
+                    "en",
+                    "ar-EG",
+                    "ar-SA",
+                    "ar-AE",
+                    "bn",
+                    "zh",
+                    "fr",
+                    "de",
+                    "hi",
+                    "id",
+                    "it",
+                    "ja",
+                    "ko",
+                    "pt-BR",
+                    "pt-PT",
+                    "ru",
+                    "es-MX",
+                    "es-ES",
+                    "tr",
+                    "vi"
+                  ],
+                  "title": "Language",
+                  "default": "auto",
+                  "type": "string",
+                  "description": "BCP-47 language code or 'auto' for automatic detection. Supported: en, zh, fr, de, hi, id, it, ja, ko, pt-BR, pt-PT, ru, es-MX, es-ES, tr, vi, bn, ar-EG, ar-SA, ar-AE."
+                }
+              },
+              "title": "XAITTSInput",
+              "x-fal-order-properties": [
+                "text",
+                "voice",
+                "language",
+                "output_format",
+                "enable_safety_checker"
+              ],
+              "required": [
+                "text"
+              ],
+              "type": "object",
+              "description": "Input for xAI text-to-speech generation."
+            },
+            "OutputFormat": {
+              "properties": {
+                "sample_rate": {
+                  "enum": [
+                    8000,
+                    16000,
+                    22050,
+                    24000,
+                    44100,
+                    48000
+                  ],
+                  "title": "Sample Rate",
+                  "description": "Sample rate in Hz.",
+                  "default": 24000,
+                  "type": "integer"
+                },
+                "bit_rate": {
+                  "title": "Bit Rate",
+                  "anyOf": [
+                    {
+                      "enum": [
+                        32000,
+                        64000,
+                        96000,
+                        128000,
+                        192000
+                      ],
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Bit rate in bps. Only applicable for MP3 codec. Defaults to 128000 for MP3."
+                },
+                "codec": {
+                  "enum": [
+                    "mp3",
+                    "wav",
+                    "pcm",
+                    "mulaw",
+                    "alaw"
+                  ],
+                  "title": "Codec",
+                  "description": "Audio codec. Supported: mp3, wav, pcm, mulaw, alaw.",
+                  "default": "mp3",
+                  "type": "string"
+                }
+              },
+              "title": "OutputFormat",
+              "x-fal-order-properties": [
+                "codec",
+                "sample_rate",
+                "bit_rate"
+              ],
+              "description": "Output format configuration for the TTS API.",
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}

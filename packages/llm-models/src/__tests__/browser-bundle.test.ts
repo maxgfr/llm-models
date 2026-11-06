@@ -56,6 +56,16 @@ describe("browser entry", () => {
     expect(code.length).toBeLessThan(4000);
   });
 
+  for (const entry of ["image.ts", "speech.ts"])
+    it(`bundles the ${entry.replace(".ts", "")} entry without any Node.js builtin or Zod`, async () => {
+      expect(await nodeBuiltinsIn(entry)).toEqual([]);
+      const build = await Bun.build({ entrypoints: [join(SRC, entry)], target: "browser" });
+      const code = await build.outputs[0].text();
+      expect(code).not.toContain("zod");
+      expect(code).not.toContain("import ");
+      expect(code.length).toBeLessThan(4000);
+    });
+
   it("exports the same API as the Node entry", async () => {
     const browser = await import("../browser");
     const node = await import("../index");

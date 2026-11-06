@@ -1,6 +1,6 @@
 # llm-models
 
-Fetch latest LLM models from [OpenRouter](https://openrouter.ai) and [models.dev](https://models.dev) APIs, and video models from OpenRouter, the [AI Gateway](https://vercel.com/ai-gateway), [fal.ai](https://fal.ai), xAI, Google and Replicate.
+Fetch latest LLM models from [OpenRouter](https://openrouter.ai) and [models.dev](https://models.dev) APIs, and video, image and speech (text-to-speech) models from OpenRouter, the [AI Gateway](https://vercel.com/ai-gateway), [fal.ai](https://fal.ai), OpenAI, Google, xAI, [ElevenLabs](https://elevenlabs.io) and Replicate.
 
 Validates API responses with [Zod](https://zod.dev) schemas to detect breaking changes. Provides smart wrapper functions for model discovery, comparison, cost estimation, recommendations, statistics, and provider info. Features local caching, MCP server integration, multiple output formats, and a fluent query builder API. The library also runs in the browser, can tell which providers a web page may call directly (CORS), and can pick the best model a device can run itself on WebGPU (WebLLM).
 
@@ -326,6 +326,51 @@ megapixels) are left out, so a missing price means "ask the service", never "fre
 prices are never copied onto a direct provider. [llm-connect](https://github.com/maxgfr/llm-models/tree/main/packages/llm-connect)'s
 `llm-connect/video` renders with any of them.
 
+#### Image models
+
+```bash
+llm-models image                          # every image model, all services
+llm-models image flux --provider gateway
+llm-models image --operation image-edit --json
+REPLICATE_API_TOKEN=… llm-models image --provider replicate
+```
+
+One list across the services that draw images, each model with the settings it takes and what it
+costs:
+
+| Service | Source | Key |
+|---------|--------|-----|
+| `openrouter` | `GET /api/v1/images/models`: formats, images per call, seed, editing (reference images) | none |
+| `gateway` | The AI Gateway's `GET /v1/models` (`type: "image"`): per-image prices, by size and quality | none |
+| `fal` | fal.ai's `text-to-image` and `image-to-image` (as `image-edit`) catalog (settings: `describeFalImageModel`, from the endpoint's schema) | none |
+| `openai`, `google`, `xai` | models.dev; settings filled from the same model at OpenRouter or the Gateway | none |
+| `replicate` | Its `text-to-image` collection, settings from each model's input schema | `--replicate-token` / `REPLICATE_API_TOKEN` |
+
+The library also takes an OpenAI key and a Gemini key, to list the image models each can call
+(`openaiApiKey`, `googleApiKey`). Prices are dollars per image (or per megapixel), by size and
+quality when the service says. OpenRouter bills image models by token, so its entries have no
+price; a missing price means "ask the service", never "free".
+
+#### Speech models
+
+```bash
+llm-models speech                         # every text-to-speech model, all services
+llm-models speech eleven --provider gateway
+llm-models tts --provider openai --json   # with their voices
+ELEVENLABS_API_KEY=… llm-models speech --provider elevenlabs
+```
+
+| Service | Source | Key |
+|---------|--------|-----|
+| `gateway` | The AI Gateway's `GET /v1/models` (`type: "speech"`, music and sound effects left out): per-character prices | none |
+| `fal` | fal.ai's `text-to-speech` catalog (voices, languages, formats: `describeFalSpeechModel`, from the endpoint's schema) | none |
+| `openai`, `google` | models.dev's TTS models (and OpenAI's documented ones), with the voices each maker documents | none |
+| `elevenlabs` | `GET /v1/models` (the ones that read text) and the account's `GET /v2/voices` | `--elevenlabs-key` / `ELEVENLABS_API_KEY` |
+
+The table counts each model's voices and languages; `--json` lists them. With an ElevenLabs key
+the Gateway's ElevenLabs models get the account's voices too. Prices are dollars per million
+characters read.
+
 #### Slim catalog for a web app
 
 Build the provider/model list a settings form ships (e.g. `public/models.json`), once, at build
@@ -449,7 +494,7 @@ Start an MCP (Model Context Protocol) server for AI agent integration:
 llm-models mcp
 ```
 
-Exposes 12 tools:
+Exposes 14 tools:
 
 | Tool | Purpose |
 |------|---------|
@@ -465,6 +510,8 @@ Exposes 12 tools:
 | `list_providers` | Providers with model counts (without their model lists) |
 | `get_stats` | Market statistics |
 | `list_video_models` | Video models with their settings and prices, like `video` |
+| `list_image_models` | Image models with their settings and prices, like `image` |
+| `list_speech_models` | Text-to-speech models with their voices and prices, like `speech` |
 
 Enum parameters (capability, status, sort, use case) are validated, so a typo is an error rather
 than an empty result.
@@ -820,6 +867,43 @@ means the source does not say. `llm-models/video` holds the types and helpers al
 an app bundle. `describeFalVideoModel(endpoint)` reads one fal.ai endpoint's settings from its
 schema, and `describeOpenApiVideoInput(schema)` does it for any OpenAPI input schema.
 
+### Image models
+
+```typescript
+import { listImageModels } from "llm-models";
+import { filterImageModels, imagePrice } from "llm-models/image";
+
+const models = await listImageModels({ replicateApiToken, openaiApiKey, googleApiKey }); // all optional
+const flux = filterImageModels(models, { provider: "gateway", query: "flux-3-image" })[0];
+imagePrice(flux); // 0.048, one 1024x1024 image
+imagePrice(flux, { size: "2048x2048" }); // 0.1
+filterImageModels(models, { operation: "image-edit" }); // the models that change an image
+```
+
+An `ImageModel` is `{ provider, id, name, owner, description?, operations, inputs, aspectRatios,
+sizes, maxImagesPerCall, seed, prices, maxPromptChars?, released? }`; `null` means the source does
+not say. `llm-models/image` holds the types and helpers alone (no Zod), for an app bundle.
+`describeFalImageModel(endpoint)` reads one fal.ai endpoint's settings from its schema, and
+`describeOpenApiImageInput(schema)` does it for any OpenAPI input schema.
+
+### Speech models
+
+```typescript
+import { listSpeechModels } from "llm-models";
+import { filterSpeechModels, GEMINI_VOICES, speechPrice } from "llm-models/speech";
+
+const models = await listSpeechModels({ elevenLabsApiKey }); // optional
+const eleven = filterSpeechModels(models, { provider: "gateway", query: "eleven-v4" })[0];
+speechPrice(eleven, 10_000); // 0.4, dollars for 10,000 characters
+GEMINI_VOICES[0]; // { id: "Zephyr", name: "Zephyr", description: "Bright" }
+```
+
+A `SpeechModel` is `{ provider, id, name, owner, description?, voices, languages, formats,
+instructions, prices, maxChars?, released? }`; `instructions` says whether it takes free-text style
+instructions. `OPENAI_VOICES` and `GEMINI_VOICES` are the voices each maker documents.
+`describeFalSpeechModel(endpoint)` reads one fal.ai endpoint's voices, languages and formats from
+its schema.
+
 ### Raw API Access
 
 ```typescript
@@ -893,6 +977,14 @@ Use llm-models in CI/CD to check model costs and status:
 - **Video models**: OpenRouter's https://openrouter.ai/api/v1/videos/models, the AI Gateway's
   https://ai-gateway.vercel.sh/v1/models, fal.ai's https://api.fal.ai/v1/models, the Gemini API's
   model list and Replicate's `text-to-video` collection (see [Video models](#video-models))
+- **Image models**: OpenRouter's https://openrouter.ai/api/v1/images/models, the AI Gateway's
+  model list (`type: "image"`), fal.ai's `text-to-image` and `image-to-image` catalog, models.dev,
+  OpenAI's and the Gemini API's model lists and Replicate's `text-to-image` collection (see
+  [Image models](#image-models))
+- **Speech models**: the AI Gateway's model list (`type: "speech"`), fal.ai's `text-to-speech`
+  catalog, models.dev, OpenAI's and Google's documented voices, ElevenLabs'
+  https://api.elevenlabs.io/v1/models and https://api.elevenlabs.io/v2/voices (see
+  [Speech models](#speech-models))
 - **WebLLM prebuilt models** (browser models): the `@mlc-ai/web-llm` npm package's
   `prebuiltAppConfig` and the models' Hugging Face repos, captured at build time (see
   [Browser models](#browser-models-webgpu))
