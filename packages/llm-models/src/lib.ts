@@ -16,6 +16,13 @@ export {
 export type { FetchOptions } from "./clients/http";
 export { fetchModelsDevModels } from "./clients/models-dev";
 export { fetchOpenRouterModels } from "./clients/openrouter";
+export {
+  fetchFalVideoModels,
+  fetchGatewayVideoModels,
+  fetchGoogleVideoModels,
+  fetchOpenRouterVideoModels,
+  fetchReplicateVideoModels,
+} from "./clients/video";
 export { getProfile, listProfiles, loadConfig } from "./config-core";
 export type {
   BrowserProbeOptions,
@@ -32,7 +39,10 @@ export {
   DEFAULT_BASE_URLS,
   DEFAULT_PROBE_ORIGIN,
   describeBrowserModel,
+  describeFalVideoModel,
+  describeOpenApiVideoInput,
   diffModels,
+  enrichVideoModel,
   estimateCost,
   fetchUnifiedData,
   fetchUnifiedModels,
@@ -46,7 +56,9 @@ export {
   listBrowserModels,
   listProviders,
   listUseCases,
+  listVideoModels,
   mergeModels,
+  openRouterPrices,
   parseFieldList,
   pickBestModel,
   pickTiers,
@@ -62,8 +74,10 @@ export {
   resolveModel,
   slimCatalog,
   sortModels,
+  videoMatchKey,
 } from "./functions/index";
 export type { ProviderOptions } from "./functions/provider";
+export type { ListVideoModelsOptions } from "./functions/video";
 export {
   BrowserModelCatalogSchema,
   BrowserModelNeedSchema,
@@ -124,3 +138,18 @@ export type {
   ProviderInfo,
   UnifiedModel,
 } from "./types";
+export type {
+  VideoModel,
+  VideoOperation,
+  VideoPrice,
+  VideoProviderId,
+} from "./video";
+export {
+  filterVideoModels,
+  rendersFromText,
+  shortSide,
+  VIDEO_OPERATIONS,
+  VIDEO_PROVIDERS,
+  videoPricePerSecond,
+  videoSize,
+} from "./video";

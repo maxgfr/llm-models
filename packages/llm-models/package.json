@@ -21,10 +21,14 @@
       "types": "./build/catalog.d.ts",
       "default": "./build/catalog.js"
     },
+    "./video": {
+      "types": "./build/video.d.ts",
+      "default": "./build/video.js"
+    },
     "./package.json": "./package.json",
     "./*": "./*"
   },
-  "description": "Fetch latest LLM models from OpenRouter and models.dev APIs, in Node.js or the browser",
+  "description": "Fetch latest LLM and video models from OpenRouter, models.dev, the AI Gateway and fal.ai, in Node.js or the browser",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/maxgfr/llm-models.git",
@@ -59,12 +63,14 @@
     "browser",
     "cors",
     "webgpu",
-    "webllm"
+    "webllm",
+    "video",
+    "text-to-video"
   ],
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build src/index.ts --outdir build --target node && bun build src/browser.ts --outdir build --target browser && bun build src/catalog.ts --outdir build --target browser",
+    "build": "bun build src/index.ts --outdir build --target node && bun build src/browser.ts --outdir build --target browser && bun build src/catalog.ts --outdir build --target browser && bun build src/video.ts --outdir build --target browser",
     "build:types": "tsc --emitDeclarationOnly",
     "build:all": "bun run build && bun run build:types",
     "test": "bun test",

@@ -48,6 +48,14 @@ describe("browser entry", () => {
     expect(code.length).toBeLessThan(2000);
   });
 
+  it("bundles the video entry without any Node.js builtin or Zod", async () => {
+    expect(await nodeBuiltinsIn("video.ts")).toEqual([]);
+    const build = await Bun.build({ entrypoints: [join(SRC, "video.ts")], target: "browser" });
+    const code = await build.outputs[0].text();
+    expect(code).not.toContain("zod");
+    expect(code.length).toBeLessThan(4000);
+  });
+
   it("exports the same API as the Node entry", async () => {
     const browser = await import("../browser");
     const node = await import("../index");

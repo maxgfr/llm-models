@@ -23,19 +23,20 @@ export interface FetchOptions {
 }
 
 /**
- * GET a JSON document. Gives up after 15s so a stalled API cannot hang the
+ * GET a JSON document (with `headers`, e.g. a key). Gives up after 15s so a stalled API cannot hang the
  * CLI (or an MCP client) forever; `label` names the API in error messages.
  */
 export async function fetchJson(
   url: string,
   label: string,
   options: FetchOptions = {},
+  headers: Record<string, string> = {},
 ): Promise<unknown> {
   const doFetch = options.fetch ?? fetch;
   let response: Response;
   try {
     response = await doFetch(url, {
-      headers: requestHeaders(),
+      headers: { ...requestHeaders(), ...headers },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch (err) {

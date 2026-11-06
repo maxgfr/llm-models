@@ -1,6 +1,6 @@
 # llm-models
 
-Fetch latest LLM models from [OpenRouter](https://openrouter.ai) and [models.dev](https://models.dev) APIs.
+Fetch latest LLM models from [OpenRouter](https://openrouter.ai) and [models.dev](https://models.dev) APIs, and video models from OpenRouter, the [AI Gateway](https://vercel.com/ai-gateway), [fal.ai](https://fal.ai), xAI, Google and Replicate.
 
 Validates API responses with [Zod](https://zod.dev) schemas to detect breaking changes. Provides smart wrapper functions for model discovery, comparison, cost estimation, recommendations, statistics, and provider info. Features local caching, MCP server integration, multiple output formats, and a fluent query builder API. The library also runs in the browser, can tell which providers a web page may call directly (CORS), and can pick the best model a device can run itself on WebGPU (WebLLM).
 
@@ -299,6 +299,33 @@ llm-models provider anthropic --browser
 and `--origin` sets the page origin the probe announces (default `https://example.com`). Verdicts
 are cached like API responses; probing every provider takes about 20 seconds.
 
+#### Video models
+
+```bash
+llm-models video                          # every video model, all services
+llm-models video kling --provider openrouter
+llm-models video --operation image-to-video --json
+GEMINI_API_KEY=… REPLICATE_API_TOKEN=… llm-models video --provider google
+```
+
+One list across the services that render video, each model with the settings it takes and what
+it costs:
+
+| Service | Source | Key |
+|---------|--------|-----|
+| `openrouter` | `GET /api/v1/videos/models`: durations, formats, resolutions, sound, frames, seed, per-second prices | none |
+| `gateway` | The AI Gateway's `GET /v1/models` (`type: "video"`): the same, plus operations and the prompt limit | none |
+| `fal` | fal.ai's `text-to-video` and `image-to-video` catalog (settings: `describeFalVideoModel`, from the endpoint's schema) | none |
+| `xai`, `google` | models.dev; settings filled from the same model at OpenRouter or the Gateway | none |
+| `google` | The Gemini API's Veo models (`predictLongRunning`) | `--google-key` / `GEMINI_API_KEY` |
+| `replicate` | Its `text-to-video` collection, settings from each model's input schema | `--replicate-token` / `REPLICATE_API_TOKEN` |
+
+A source that fails is skipped (`--verbose` says why); the others still answer. Prices are
+dollars per second, by resolution and sound when the service says; SKUs billed another way (tokens,
+megapixels) are left out, so a missing price means "ask the service", never "free". An aggregator's
+prices are never copied onto a direct provider. [llm-connect](https://github.com/maxgfr/llm-models/tree/main/packages/llm-connect)'s
+`llm-connect/video` renders with any of them.
+
 #### Slim catalog for a web app
 
 Build the provider/model list a settings form ships (e.g. `public/models.json`), once, at build
@@ -422,7 +449,7 @@ Start an MCP (Model Context Protocol) server for AI agent integration:
 llm-models mcp
 ```
 
-Exposes 11 tools:
+Exposes 12 tools:
 
 | Tool | Purpose |
 |------|---------|
@@ -437,6 +464,7 @@ Exposes 11 tools:
 | `get_provider` | Provider details and models |
 | `list_providers` | Providers with model counts (without their model lists) |
 | `get_stats` | Market statistics |
+| `list_video_models` | Video models with their settings and prices, like `video` |
 
 Enum parameters (capability, status, sort, use case) are validated, so a typo is an error rather
 than an empty result.
@@ -773,6 +801,25 @@ Scores are vendor-run and read as an ordering, not a truth; every row cites its 
 `src/functions/browser-models.ts`. On the shipped catalog, 1,500 MB picks Qwen3-0.6B,
 3,000 MB Qwen3.5-2B, 4,096 MB Qwen3.5-4B and 6,000 MB Qwen3-8B.
 
+### Video models
+
+```typescript
+import { listVideoModels } from "llm-models";
+import { filterVideoModels, videoPricePerSecond, videoSize } from "llm-models/video";
+
+const models = await listVideoModels({ googleApiKey, replicateApiToken }); // both optional
+const kling = filterVideoModels(models, { provider: "openrouter", query: "kling" })[0];
+kling.durations; // [3, 4, …, 15]
+videoPricePerSecond(kling, { resolution: "720p", audio: true }); // 0.168
+videoSize("720p", "9:16"); // "720x1280", the size the AI SDK takes
+```
+
+A `VideoModel` is `{ provider, id, name, owner, description?, operations, inputs, durations,
+aspectRatios, resolutions, audio, seed, frameImages, prices, maxPromptChars?, released? }`; `null`
+means the source does not say. `llm-models/video` holds the types and helpers alone (no Zod), for
+an app bundle. `describeFalVideoModel(endpoint)` reads one fal.ai endpoint's settings from its
+schema, and `describeOpenApiVideoInput(schema)` does it for any OpenAPI input schema.
+
 ### Raw API Access
 
 ```typescript
@@ -843,6 +890,9 @@ Use llm-models in CI/CD to check model costs and status:
 
 - **OpenRouter**: https://openrouter.ai/api/v1/models
 - **models.dev**: https://models.dev/api.json
+- **Video models**: OpenRouter's https://openrouter.ai/api/v1/videos/models, the AI Gateway's
+  https://ai-gateway.vercel.sh/v1/models, fal.ai's https://api.fal.ai/v1/models, the Gemini API's
+  model list and Replicate's `text-to-video` collection (see [Video models](#video-models))
 - **WebLLM prebuilt models** (browser models): the `@mlc-ai/web-llm` npm package's
   `prebuiltAppConfig` and the models' Hugging Face repos, captured at build time (see
   [Browser models](#browser-models-webgpu))

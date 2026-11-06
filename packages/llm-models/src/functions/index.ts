@@ -27,3 +27,12 @@ export { listUseCases, recommendModels } from "./recommend";
 export { findModel, pickBestModel, providersForEndpoint, resolveModel } from "./resolve";
 export { filterModels, findModels, sortModels } from "./search";
 export { getStats } from "./stats";
+export type { ListVideoModelsOptions } from "./video";
+export {
+  describeFalVideoModel,
+  describeOpenApiVideoInput,
+  enrichVideoModel,
+  listVideoModels,
+  openRouterPrices,
+  videoMatchKey,
+} from "./video";

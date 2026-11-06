@@ -1,0 +1,39 @@
+{
+  "models": [
+    {
+      "endpoint_id": "minimax/h3-max/text-to-video",
+      "metadata": {
+        "display_name": "MiniMax H3 Max Text to Video",
+        "category": "text-to-video",
+        "description": "fal's H3 Max is a post-trained variant of MiniMax H3, tuned for stronger prompt adherence and better aesthetics while co-optimized with our custom inference stack for higher throughput with no compromises on output quality",
+        "status": "active",
+        "updated_at": "2026-10-30T18:44:30.635Z",
+        "date": "2026-08-23T17:56:01.222Z"
+      }
+    },
+    {
+      "endpoint_id": "minimax/h3-max-turbo/text-to-video",
+      "metadata": {
+        "display_name": "H3 Max Turbo Text to Video",
+        "category": "text-to-video",
+        "description": "fal's H3 Max Turbo is a post-trained variant of MiniMax H3, tuned for stronger prompt adherence and better aesthetics while co-optimized with our custom inference stack for higher throughput with no compromises on output quality",
+        "status": "active",
+        "updated_at": "2026-10-30T18:46:09.233Z",
+        "date": "2026-09-02T16:44:59.129Z"
+      }
+    },
+    {
+      "endpoint_id": "blackforestlabs/flux-3-max/text-to-video",
+      "metadata": {
+        "display_name": "FLUX 3 Max Text to Video",
+        "category": "text-to-video",
+        "description": "fal’s FLUX 3 Max is a post-trained variant of FLUX 3 Video, tuned for stronger prompt adherence and better visual quality while optimized for lower latency.",
+        "status": "active",
+        "updated_at": "2026-10-30T22:35:55.706Z",
+        "date": "2026-10-16T01:38:32.705Z"
+      }
+    }
+  ],
+  "has_more": false,
+  "next_cursor": null
+}

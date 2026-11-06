@@ -48,6 +48,7 @@ import { listUseCases, recommendModels } from "./functions/recommend";
 import { findModel, resolveModel } from "./functions/resolve";
 import { filterModels, sortModels } from "./functions/search";
 import { getStats } from "./functions/stats";
+import { listVideoModels } from "./functions/video";
 import { setVerbose } from "./log";
 import {
   BrowserModelNeedSchema,
@@ -65,6 +66,15 @@ import type {
   ModelSortField,
   UnifiedModel,
 } from "./types";
+import {
+  filterVideoModels,
+  VIDEO_OPERATIONS,
+  VIDEO_PROVIDERS,
+  type VideoModel,
+  type VideoOperation,
+  type VideoProviderId,
+  videoPricePerSecond,
+} from "./video";
 
 const CAPABILITIES = CapabilityEnum.options;
 const STATUSES = ModelFilterSchema.shape.status.unwrap().options;
@@ -146,6 +156,34 @@ const BROWSER_MODEL_HEADERS = [
   "Low-res",
   "Score",
 ];
+
+const VIDEO_MODEL_HEADERS = [
+  "Provider",
+  "ID",
+  "Name",
+  "Seconds",
+  "Formats",
+  "Resolutions",
+  "Sound",
+  "$/s",
+];
+
+const span = (values: readonly number[] | null) =>
+  !values?.length ? "-" : values.length === 1 ? String(values[0]) : `${values[0]}-${values.at(-1)}`;
+
+function videoModelRow(m: VideoModel): string[] {
+  const price = videoPricePerSecond(m, { resolution: m.resolutions?.[0] });
+  return [
+    m.provider,
+    m.id,
+    m.name,
+    span(m.durations),
+    m.aspectRatios?.join(" ") ?? "-",
+    m.resolutions?.join(" ") ?? "-",
+    m.audio == null ? "-" : m.audio ? "yes" : "no",
+    price == null ? "-" : price.toFixed(3),
+  ];
+}
 
 function browserModelRow(m: BrowserModel): string[] {
   return [
@@ -1204,6 +1242,52 @@ export function createProgram(): Command {
           );
         }
         outputFormatted(fmt, BROWSER_MODEL_HEADERS, models.map(browserModelRow), models);
+      },
+    );
+
+  // --- Video command ---
+
+  program
+    .command("video")
+    .alias("videos")
+    .description(
+      "Video models from OpenRouter, the AI Gateway, fal.ai, xAI and Google (and Replicate with a token)",
+    )
+    .argument("[query]", "Keep the models whose name or id holds this text")
+    .addOption(choice("--provider <id>", "List one provider only", VIDEO_PROVIDERS))
+    .addOption(choice("--operation <op>", "Keep the models that do this", VIDEO_OPERATIONS))
+    .option("--google-key <key>", "A Gemini API key, to list its Veo models (or GEMINI_API_KEY)")
+    .option(
+      "--replicate-token <token>",
+      "A Replicate token, to list its collection (or REPLICATE_API_TOKEN)",
+    )
+    .option("--json", "Output raw JSON")
+    .addOption(choice("--format <fmt>", "Output format", FORMATS))
+    .action(
+      async (
+        query: string | undefined,
+        options: {
+          provider?: VideoProviderId;
+          operation?: VideoOperation;
+          googleKey?: string;
+          replicateToken?: string;
+          json?: boolean;
+          format?: OutputFormat;
+        },
+      ) => {
+        const fmt = resolveFormat(options);
+        const all = await listVideoModels({
+          ...(options.provider ? { providers: [options.provider] } : {}),
+          googleApiKey: options.googleKey ?? process.env.GEMINI_API_KEY,
+          replicateApiToken: options.replicateToken ?? process.env.REPLICATE_API_TOKEN,
+        });
+        const models = filterVideoModels(all, {
+          provider: options.provider,
+          query,
+          operation: options.operation,
+        });
+        if (fmt === "table") console.log(dim(`${models.length} video models\n`));
+        outputFormatted(fmt, VIDEO_MODEL_HEADERS, models.map(videoModelRow), models);
       },
     );
 

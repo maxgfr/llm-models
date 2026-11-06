@@ -11,7 +11,9 @@ import { listUseCases, recommendModels } from "./functions/recommend";
 import { findModel, resolveModel } from "./functions/resolve";
 import { findModels } from "./functions/search";
 import { getStats } from "./functions/stats";
+import { listVideoModels } from "./functions/video";
 import { CapabilityEnum, ModelFilterSchema, ModelSortFieldSchema } from "./schemas/functions";
+import { filterVideoModels, VIDEO_OPERATIONS, VIDEO_PROVIDERS } from "./video";
 
 type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
 
@@ -216,6 +218,25 @@ export function createMcpServer(): McpServer {
     },
     async ({ use_case, max_cost, min_context, limit }) =>
       json(await recommendModels(use_case, { maxCost: max_cost, minContext: min_context, limit })),
+  );
+
+  server.registerTool(
+    "list_video_models",
+    {
+      description:
+        "List video generation models (OpenRouter, AI Gateway, fal.ai, xAI, Google) with their durations, formats, resolutions, sound and per-second prices",
+      inputSchema: {
+        provider: z.enum(VIDEO_PROVIDERS).optional(),
+        operation: z.enum(VIDEO_OPERATIONS).optional(),
+        search: z.string().optional().describe("Text the model's name or id holds"),
+        limit,
+      },
+    },
+    async ({ provider, operation, search, limit: max }) => {
+      const all = await listVideoModels(provider ? { providers: [provider] } : {});
+      const found = filterVideoModels(all, { provider, operation, query: search });
+      return json(max === 0 ? found : found.slice(0, max ?? 20));
+    },
   );
 
   return server;

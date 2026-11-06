@@ -96,7 +96,7 @@ function text(result: Awaited<ReturnType<Client["callTool"]>>): string {
 }
 
 describe("MCP server", () => {
-  it("lists all 11 tools", async () => {
+  it("lists all 12 tools", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
       "cheapest_models",
@@ -108,6 +108,7 @@ describe("MCP server", () => {
       "get_stats",
       "latest_models",
       "list_providers",
+      "list_video_models",
       "recommend_models",
       "resolve_model",
     ]);

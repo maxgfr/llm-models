@@ -44,9 +44,11 @@ From `packages/llm-models`:
   - `index.ts` - Node entry point (CLI + library export); loads `cache.ts` and `config.ts` for their disk-backed stores
   - `browser.ts` - browser entry point (package.json `browser` / exports `browser` condition): same API, memory cache, no config file
   - `lib.ts` - the library API both entries re-export; nothing reachable from it may import a Node builtin (`browser-bundle.test.ts`)
+  - `video.ts` - entry `llm-models/video`: `VideoModel` types, `videoPricePerSecond`, `videoSize`,
+    `filterVideoModels`, `rendersFromText`. Plain TypeScript, no Zod and no other import
   - `catalog.ts` - entry `llm-models/catalog`: slim catalog types (`SlimCatalog`…), `defaultModelOf`,
     `filterCatalogModels`, `CALLABLE_NPM`. Plain TypeScript, no Zod and no other import: app bundles load it
-  - `cli.ts` - CLI commands (Commander.js, 19 commands); `createProgram()` builds, `runCommand()` parses
+  - `cli.ts` - CLI commands (Commander.js, 20 commands); `createProgram()` builds, `runCommand()` parses
   - `format.ts` - CLI formatting utilities (table, cost, context, CSV, markdown)
   - `types.ts` - Zod-inferred type exports
   - `cache-core.ts` - Cache logic over a pluggable `CacheStore` (memory by default), TTL, enabled flag; no Node APIs
@@ -56,13 +58,15 @@ From `packages/llm-models`:
   - `config-core.ts` - `loadConfig`/`getProfile`/`listProfiles` over a pluggable loader (none by default); no Node APIs
   - `config.ts` - Node only: config file loading (~/.config/llm-models/, .llm-modelsrc), validated by `LlmModelsConfigSchema`; installs itself on import
   - `completions.ts` - Shell completions (bash, zsh, fish) generated from the Commander program
-  - `mcp.ts` - MCP server (11 tools for AI agent integration); `createMcpServer()` is testable in memory
+  - `mcp.ts` - MCP server (12 tools for AI agent integration); `createMcpServer()` is testable in memory
   - `schemas/openrouter.ts` - Zod schemas for OpenRouter API
   - `schemas/models-dev.ts` - Zod schemas for models.dev API
   - `schemas/functions.ts` - Zod schemas for unified types (UnifiedModel, ProviderInfo, config, etc.)
   - `clients/http.ts` - fetchJson: 15s timeout, User-Agent
   - `clients/openrouter.ts` - OpenRouter fetch + per-entry tolerant parse + cache
   - `clients/models-dev.ts` - models.dev fetch + per-model tolerant parse + cache
+  - `clients/video.ts` - video lists: OpenRouter videos, AI Gateway, fal.ai (paged), Gemini (key), Replicate (token)
+  - `schemas/video.ts` - Zod schemas of those lists
   - `functions/normalize.ts` - Cross-source normalization + merge into UnifiedModel (exact, then loose 1:1 ids)
   - `functions/resolve.ts` - resolveModel (endpoint/provider-scoped lookup); findModel (lookup for info/compare/cost)
   - `functions/latest.ts` - latestModels/pickTiers: newest flagship + fast model per tier for an endpoint
@@ -76,6 +80,8 @@ From `packages/llm-models`:
     from @mlc-ai/web-llm's npm tarball (`prebuiltAppConfig`) and each model's HF tensor-cache.json;
     never edit by hand, never import @mlc-ai/web-llm at runtime
   - `functions/browser.ts` - probeBrowserSupport (CORS preflight + GET fallback), DEFAULT_BASE_URLS, BROWSER_REQUIRED_HEADERS
+  - `functions/video.ts` - listVideoModels: each source into `VideoModel`, direct providers filled from
+    their OpenRouter/Gateway twin (never their prices); describeOpenApiVideoInput for fal/Replicate schemas
   - `functions/cost.ts` - estimateCost, cheapestModels
   - `functions/catalog.ts` - slimCatalog/buildSlimCatalog: the catalog `llm-models catalog` writes for web apps
   - `functions/stats.ts` - getStats (aggregate market statistics)
