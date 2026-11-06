@@ -1,6 +1,6 @@
 {
   "name": "llm-connect",
-  "version": "2.9.0",
+  "version": "2.9.1",
   "description": "Connect a web app to any LLM provider through the AI SDK: provider registry, model creation, connection test, a settings store, video rendering as durable jobs (OpenRouter, AI Gateway, fal.ai, Google, xAI, Replicate) and speech-to-text (provider models, or NVIDIA Parakeet, Canary and Whisper in the page), with a React adapter",
   "author": "maxgfr",
   "license": "MIT",
