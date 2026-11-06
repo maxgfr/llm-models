@@ -121,6 +121,8 @@ Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v7, `@a
 - `src/react.ts` - entry `llm-connect/react`: `useLlmSettings`, `useLlmStore`, `useKeyVault`
 - `src/transcript.ts` - `Transcript` (text, segments, words, `wordTimings`), `toTranscript` (words ↔ segments: rebuilds segments at sentence ends and pauses, estimates words inside segments), `toWebVtt`
 - `src/transcription.ts` - `transcribe` over the AI SDK's `transcribe` with the provider's transcription model (OpenAI `whisper-1`, Gemini, Mistral Voxtral, Groq, named model on a custom endpoint; none for Anthropic), `transcriptionProblem`, `transcriptionTargetOf`, `loadTranscriptionModel`; sends the blob's own media type through `download`, reads raw `words` when a server also sends segments
+- `src/video.ts` - entry `llm-connect/video`: `startVideo` / `checkVideo` (AI SDK `doStart`/`doStatus`, jobs stored as JSON), `loadVideoModel` (each `@ai-sdk/*` imported on use), `videoCallOptions` (resolution per provider), `testVideoKey`, `downloadVideo`, `VIDEO_PROVIDER_INFO`
+- `src/video-openrouter.ts` - OpenRouter's `/videos` API as a video model with `doStart`/`doStatus`
 - `src/whisper.ts` - entry `llm-connect/whisper`: `loadWhisper` (transformers.js, optional peer, imported on use; WebGPU or wasm; presets fast/balanced/accurate on onnx-community `_timestamped` models), `decodeAudio` (page only: OfflineAudioContext), `fromAsrOutput`
 
 Conventions:

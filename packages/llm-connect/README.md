@@ -19,6 +19,10 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
   accepts (sampling, prefill, tools, web search), Claude's adaptive thinking, stateless OpenAI
   Responses calls, headers that pass a browser's CORS preflight, and errors classified without
   the key.
+- **Video**: `startVideo` / `checkVideo` (`llm-connect/video`) render with any video model
+  [llm-models](https://github.com/maxgfr/llm-models/tree/main/packages/llm-models) lists, at
+  OpenRouter, the Vercel AI Gateway, fal.ai, Google (Veo), xAI or Replicate, as jobs a server stores
+  and checks later from any process.
 - **Speech to text**: `transcribe` with the provider's own transcription model (OpenAI, Gemini,
   Mistral, Groq), or on the device with NVIDIA Parakeet or Canary (`llm-connect/nemo`) or Whisper
   (`llm-connect/whisper`), all in one shape and timed to the word.
@@ -28,6 +32,8 @@ a key (or point at Ollama / LM Studio), test the connection, save, then call the
 ```bash
 npm install llm-connect llm-models ai @ai-sdk/openai @ai-sdk/anthropic @ai-sdk/google @ai-sdk/mistral @ai-sdk/openai-compatible
 ```
+
+For video, add the SDKs of the providers you render with (see [Video](#video)).
 
 `ai` (v7), the `@ai-sdk/*` packages (v4) and `@ai-sdk/openai-compatible` (v3) are optional peers:
 install the ones your users can pick.
@@ -547,6 +553,56 @@ reads the names older settings stored), `toLanguageCode(value)` migrates them, a
 ```ts
 const system = `Answer in ${languageName(settings.language)}.`;
 ```
+
+## Video
+
+`llm-connect/video` renders through the AI SDK's start/status flow: `startVideo` answers as soon as
+the provider has the job, and the job is plain JSON a server stores; `checkVideo` asks once where it
+stands, from any process, as often as you like. A render survives a restart; nothing waits on an
+open connection.
+
+```bash
+npm install llm-connect llm-models ai @ai-sdk/fal @ai-sdk/gateway @ai-sdk/google @ai-sdk/xai @ai-sdk/replicate
+```
+
+```typescript
+import { listVideoModels } from "llm-models";
+import { checkVideo, downloadVideo, startVideo, testVideoKey } from "llm-connect/video";
+
+const settings = { provider: "openrouter", apiKey, model: "kwaivgi/kling-v3.0-pro" } as const;
+await testVideoKey(settings); // { ok: true, message: "OpenRouter accepts the key." }, renders nothing
+
+const job = await startVideo(settings, {
+  prompt: "Dawn over a harbour, slow dolly-in.",
+  aspectRatio: "9:16", // the model's aspectRatios, resolutions and durations, from listVideoModels
+  resolution: "720p",
+  durationS: 5,
+  audio: true,
+});
+await db.save(job); // { provider, model, operation, warnings }
+
+// Later, anywhere:
+const status = await checkVideo(settings, job);
+if (status.status === "completed") {
+  const { data } = await downloadVideo(status.videos[0]); // sends the key when the URL needs it
+}
+```
+
+| `provider` | Through | Key |
+|------------|---------|-----|
+| `openrouter` | llm-connect itself (`POST /videos`, `GET /videos/{id}`) | [OpenRouter key](https://openrouter.ai/settings/keys) |
+| `gateway` | `@ai-sdk/gateway` | AI Gateway key |
+| `fal` | `@ai-sdk/fal` | [fal.ai key](https://fal.ai/dashboard/keys) |
+| `google` | `@ai-sdk/google` (Veo) | [Gemini API key](https://aistudio.google.com/apikey) |
+| `xai` | `@ai-sdk/xai` | [xAI key](https://console.x.ai) |
+| `replicate` | `@ai-sdk/replicate` | [Replicate token](https://replicate.com/account/api-tokens) |
+
+Each SDK loads on first use. A request speaks llm-models' words (`resolution: "720p"`); llm-connect
+passes it the way each provider takes it: a `WxH` size to the Gateway, the name to Google and
+OpenRouter, the name in the provider's options for fal, xAI and Replicate. `providerOptions` adds
+a provider's own body fields. `checkVideo` answers `pending`, `completed` (the videos, and the cost
+when the provider reports it) or `error` (its message, the key scrubbed out). `VIDEO_PROVIDER_INFO`
+names each provider, its key page and its environment variable.
 
 ## Speech to text
 
