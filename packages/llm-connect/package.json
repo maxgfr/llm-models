@@ -1,7 +1,7 @@
 {
   "name": "llm-connect",
   "version": "2.9.1",
-  "description": "Connect a web app to any LLM provider through the AI SDK: provider registry, model creation, connection test, a settings store, video rendering as durable jobs (OpenRouter, AI Gateway, fal.ai, Google, xAI, Replicate) and speech-to-text (provider models, or NVIDIA Parakeet, Canary and Whisper in the page), with a React adapter",
+  "description": "Connect a web app to any LLM provider through the AI SDK: provider registry, model creation, connection test, a settings store, image generation (OpenRouter, AI Gateway, fal.ai, OpenAI, Google, xAI, Replicate), text-to-speech (AI Gateway, fal.ai, OpenAI, Google, ElevenLabs), video rendering as durable jobs (OpenRouter, AI Gateway, fal.ai, Google, xAI, Replicate) and speech-to-text (provider models, or NVIDIA Parakeet, Canary and Whisper in the page), with a React adapter",
   "author": "maxgfr",
   "license": "MIT",
   "type": "module",
@@ -31,6 +31,14 @@
     "./video": {
       "types": "./build/video.d.ts",
       "default": "./build/video.js"
+    },
+    "./image": {
+      "types": "./build/image.d.ts",
+      "default": "./build/image.js"
+    },
+    "./speech": {
+      "types": "./build/speech.d.ts",
+      "default": "./build/speech.js"
     },
     "./providers/*": {
       "types": "./build/providers/*.d.ts",
@@ -74,7 +82,12 @@
     "canary",
     "nvidia",
     "video",
-    "text-to-video"
+    "text-to-video",
+    "image-generation",
+    "text-to-image",
+    "text-to-speech",
+    "tts",
+    "elevenlabs"
   ],
   "scripts": {
     "build": "rm -rf build && tsc",
@@ -99,6 +112,7 @@
     "@ai-sdk/gateway": "^4.0.0",
     "@ai-sdk/replicate": "^3.0.0",
     "@ai-sdk/xai": "^5.0.0",
+    "@ai-sdk/elevenlabs": "^3.0.0",
     "react": ">=18",
     "@huggingface/transformers": "^4.0.0",
     "onnxruntime-web": ">=1.22.0"
@@ -142,10 +156,14 @@
     },
     "@ai-sdk/xai": {
       "optional": true
+    },
+    "@ai-sdk/elevenlabs": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^4.0.82",
+    "@ai-sdk/elevenlabs": "^3.0.80",
     "@ai-sdk/fal": "^3.0.76",
     "@ai-sdk/gateway": "^4.0.136",
     "@ai-sdk/google": "^4.0.99",

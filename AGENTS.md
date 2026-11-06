@@ -123,6 +123,11 @@ Bring-your-own-key LLM settings for web apps, on top of the AI SDK (`ai` v7, `@a
 - `src/transcription.ts` - `transcribe` over the AI SDK's `transcribe` with the provider's transcription model (OpenAI `whisper-1`, Gemini, Mistral Voxtral, Groq, named model on a custom endpoint; none for Anthropic), `transcriptionProblem`, `transcriptionTargetOf`, `loadTranscriptionModel`; sends the blob's own media type through `download`, reads raw `words` when a server also sends segments
 - `src/video.ts` - entry `llm-connect/video`: `startVideo` / `checkVideo` (AI SDK `doStart`/`doStatus`, jobs stored as JSON), `loadVideoModel` (each `@ai-sdk/*` imported on use), `videoCallOptions` (resolution per provider), `testVideoKey`, `downloadVideo`, `VIDEO_PROVIDER_INFO`
 - `src/video-openrouter.ts` - OpenRouter's `/videos` API as a video model with `doStart`/`doStatus`
+- `src/media.ts` - what the media entries share: `MEDIA_PROVIDER_INFO` (name, key page, env, package for OpenRouter, Gateway, fal, OpenAI, Google, xAI, Replicate, ElevenLabs), `MediaOptions`, `mediaFailure` (key scrubbed), `warningText`, `missingPackage`
+- `src/media-keys.ts` - `testMediaKey`: one free GET per provider, the key in a header (`testVideoKey`, `testImageKey`, `testSpeechKey` call it)
+- `src/image.ts` - entry `llm-connect/image`: `generateImages` (AI SDK `generateImage`, `n` split per model, cost summed), `loadImageModel` (each `@ai-sdk/*` imported on use; Google: Gemini image models only), `IMAGE_PROVIDER_INFO`, `testImageKey`
+- `src/image-openrouter.ts` - OpenRouter's Image API (`POST /images`) as an image model, one image a call; a 404 falls back to chat completions with `modalities: ["image", "text"]` (data URLs in `message.images`)
+- `src/speech.ts` - entry `llm-connect/speech`: `generateSpeechAudio` (AI SDK `generateSpeech`, media type from the bytes), `loadSpeechModel` (Gateway, fal, OpenAI, Google Gemini TTS, ElevenLabs with a rebased fetch for `baseUrl`), `listVoices` (OpenAI and Gemini documented voices, ElevenLabs `GET /v2/voices`, null otherwise), `testSpeechKey`
 - `src/whisper.ts` - entry `llm-connect/whisper`: `loadWhisper` (transformers.js, optional peer, imported on use; WebGPU or wasm; presets fast/balanced/accurate on onnx-community `_timestamped` models), `decodeAudio` (page only: OfflineAudioContext), `fromAsrOutput`
 
 Conventions:
