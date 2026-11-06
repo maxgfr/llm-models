@@ -185,6 +185,38 @@ describe("AI SDK video providers", () => {
     expect(xai.calls[0]!.url).toBe("https://api.x.ai/v1/videos/req-9");
   });
 
+  it("moves Google's key out of the video URL into a header", async () => {
+    const google = fakeFetch(() => ({
+      body: {
+        name: "models/veo-3.1-fast-generate-preview/operations/op-1",
+        done: true,
+        response: {
+          generateVideoResponse: {
+            generatedSamples: [
+              {
+                video: {
+                  uri: "https://generativelanguage.googleapis.com/v1beta/files/f1:download?alt=media",
+                },
+              },
+            ],
+          },
+        },
+      },
+    }));
+    const status = await checkVideo(
+      { provider: "google", apiKey: "g-secret", model: "veo-3.1-fast-generate-preview" },
+      { operation: { operationName: "models/veo-3.1-fast-generate-preview/operations/op-1" } },
+      { fetch: google.fetch },
+    );
+    expect(status.status).toBe("completed");
+    const video = (status as { videos: { url: string; headers?: Record<string, string> }[] })
+      .videos[0];
+    expect(video?.url).toBe(
+      "https://generativelanguage.googleapis.com/v1beta/files/f1:download?alt=media",
+    );
+    expect(video?.headers).toEqual({ "x-goog-api-key": "g-secret" });
+  });
+
   it("sizes the resolution for the Gateway and names it for the others", () => {
     const request = { prompt: "x", aspectRatio: "9:16", resolution: "1080p" };
     expect(videoCallOptions("gateway", request).resolution).toBe("1080x1920");

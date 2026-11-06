@@ -264,22 +264,36 @@ export async function checkVideo(
     return { status: "error", message: scrubSecret(result.error, settings.apiKey) };
   const cost = (result.providerMetadata?.[settings.provider] as { cost?: unknown } | undefined)
     ?.cost;
-  const base = (settings.baseUrl ?? OPENROUTER_API).replace(/\/+$/, "");
   const videos: VideoOutput[] = result.videos.map((v) => {
-    if (v.type === "url") {
-      // OpenRouter's content endpoint needs the key; a signed URL does not.
-      const needsKey = settings.provider === "openrouter" && v.url.startsWith(base);
-      return {
-        url: v.url,
-        mediaType: v.mediaType,
-        ...(needsKey ? { headers: { authorization: `Bearer ${settings.apiKey}` } } : {}),
-      };
-    }
+    if (v.type === "url") return keyedUrl(settings, v.url, v.mediaType);
     const data =
       v.type === "base64" ? Uint8Array.from(atob(v.data), (c) => c.charCodeAt(0)) : v.data;
     return { data, mediaType: v.mediaType };
   });
   return { status: "completed", videos, ...(typeof cost === "number" ? { costUsd: cost } : {}) };
+}
+
+/**
+ * A video URL that never carries the key: Google's SDK appends `?key=` to its
+ * download URL, which would end up wherever the app stores or logs it; it goes
+ * in a header instead. OpenRouter's content endpoint needs the key too; a
+ * signed URL needs none.
+ */
+function keyedUrl(settings: VideoSettings, raw: string, mediaType: string): VideoOutput {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return { url: raw, mediaType };
+  }
+  if (settings.provider === "google" && url.searchParams.has("key")) {
+    url.searchParams.delete("key");
+    return { url: url.toString(), mediaType, headers: { "x-goog-api-key": settings.apiKey } };
+  }
+  const base = (settings.baseUrl ?? OPENROUTER_API).replace(/\/+$/, "");
+  if (settings.provider === "openrouter" && raw.startsWith(base))
+    return { url: raw, mediaType, headers: { authorization: `Bearer ${settings.apiKey}` } };
+  return { url: raw, mediaType };
 }
 
 /** A key check that renders nothing: one free request per provider. */
