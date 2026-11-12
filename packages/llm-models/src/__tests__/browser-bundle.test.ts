@@ -69,7 +69,9 @@ describe("browser entry", () => {
   it("exports the same API as the Node entry", async () => {
     const browser = await import("../browser");
     const node = await import("../index");
-    expect(Object.keys(browser).sort()).toEqual(Object.keys(node).sort());
+    // runCommand starts the CLI (bin/llm-models.js, src/bin.ts): Node only, by design.
+    const nodeApi = Object.keys(node).filter((key) => key !== "runCommand");
+    expect(Object.keys(browser).sort()).toEqual(nodeApi.sort());
   });
 });
 

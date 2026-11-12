@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 describe("CLI", () => {
   it("should show version with --version", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "--version"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "--version"], {
       cwd: import.meta.dir.replace("/src/__tests__", ""),
       stdout: "pipe",
       stderr: "pipe",
@@ -13,7 +13,7 @@ describe("CLI", () => {
   });
 
   it("should show help with --help", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "--help"], {
       cwd: import.meta.dir.replace("/src/__tests__", ""),
       stdout: "pipe",
       stderr: "pipe",
@@ -25,7 +25,7 @@ describe("CLI", () => {
   });
 
   it("should show openrouter help", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "openrouter", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "openrouter", "--help"], {
       cwd: import.meta.dir.replace("/src/__tests__", ""),
       stdout: "pipe",
       stderr: "pipe",
@@ -38,7 +38,7 @@ describe("CLI", () => {
   });
 
   it("should show models-dev help", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "models-dev", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "models-dev", "--help"], {
       cwd: import.meta.dir.replace("/src/__tests__", ""),
       stdout: "pipe",
       stderr: "pipe",

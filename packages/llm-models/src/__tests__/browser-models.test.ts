@@ -264,7 +264,7 @@ describe("ranking rules", () => {
 describe("browser-models CLI", () => {
   const cwd = import.meta.dir.replace("/src/__tests__", "");
   async function run(...args: string[]) {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", ...args], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", ...args], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",

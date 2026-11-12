@@ -41,7 +41,10 @@ From `packages/llm-models`:
 
 ## Project structure (`packages/llm-models`)
 - `src/` - source code
-  - `index.ts` - Node entry point (CLI + library export); loads `cache.ts` and `config.ts` for their disk-backed stores
+  - `index.ts` - Node library entry; loads `cache.ts` and `config.ts` for their disk-backed stores and exports
+    `runCommand`, but never starts the CLI on import (a bundling program is its own entry point)
+  - `bin.ts` - CLI entry for `bun run` and the compiled binaries; npm installs `bin/llm-models.js` (calls
+    `runCommand` from `build/index.js`)
   - `browser.ts` - browser entry point (package.json `browser` / exports `browser` condition): same API, memory cache, no config file
   - `lib.ts` - the library API both entries re-export; nothing reachable from it may import a Node builtin (`browser-bundle.test.ts`)
   - `video.ts` - entry `llm-models/video`: `VideoModel` types, `videoPricePerSecond`, `videoSize`,

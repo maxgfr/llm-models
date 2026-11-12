@@ -4,7 +4,7 @@ const cwd = import.meta.dir.replace("/src/__tests__", "");
 
 describe("CLI smart commands", () => {
   it("find --help shows expected flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "find", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "find", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -21,7 +21,7 @@ describe("CLI smart commands", () => {
   });
 
   it("compare --help shows expected flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "compare", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "compare", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -33,7 +33,7 @@ describe("CLI smart commands", () => {
   });
 
   it("provider --help shows expected flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "provider", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "provider", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -45,7 +45,7 @@ describe("CLI smart commands", () => {
   });
 
   it("cost --help shows expected flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "cost", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "cost", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -61,7 +61,7 @@ describe("CLI smart commands", () => {
   });
 
   it("find --help shows new Wave 1-3 flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "find", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "find", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -77,7 +77,7 @@ describe("CLI smart commands", () => {
   });
 
   it("cheapest --help shows expected flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "cheapest", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "cheapest", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -91,7 +91,7 @@ describe("CLI smart commands", () => {
   });
 
   it("info --help shows expected args", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "info", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "info", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -103,7 +103,7 @@ describe("CLI smart commands", () => {
   });
 
   it("recommend --help shows expected flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "recommend", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "recommend", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -117,7 +117,7 @@ describe("CLI smart commands", () => {
   });
 
   it("stats --help shows expected flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "stats", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "stats", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -128,7 +128,7 @@ describe("CLI smart commands", () => {
   });
 
   it("diff --help shows expected flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "diff", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "diff", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -139,7 +139,7 @@ describe("CLI smart commands", () => {
   });
 
   it("latest --help shows expected flags", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "latest", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "latest", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -155,7 +155,7 @@ describe("CLI smart commands", () => {
   });
 
   it("completion --help shows shell argument", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "completion", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "completion", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -167,7 +167,7 @@ describe("CLI smart commands", () => {
   });
 
   it("mcp --help shows description", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "mcp", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "mcp", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -178,7 +178,7 @@ describe("CLI smart commands", () => {
   });
 
   it("main --help shows global options", async () => {
-    const proc = Bun.spawn(["bun", "run", "src/index.ts", "--help"], {
+    const proc = Bun.spawn(["bun", "run", "src/bin.ts", "--help"], {
       cwd,
       stdout: "pipe",
       stderr: "pipe",
