@@ -154,6 +154,13 @@ Conventions:
   it rejects the `workspace:` protocol and the bun-installed tree
 - Tests: `bun test` in the package; React hooks under happy-dom (`react.test.ts`), IndexedDB from `fake-indexeddb`, Cache Storage from `__tests__/fake-cache-storage.ts`
 
+## Release recovery
+If `publish.yml` fails after semantic-release pushed the release commit and tag (for instance GitHub
+rejecting the git notes push with "missing necessary objects"), npm was not published: delete the
+orphan tag (`git push origin :refs/tags/vX.Y.Z`) and run `publish.yml` by hand on `main`.
+semantic-release then tags and publishes that version, and `build-binaries` attaches the binaries to
+any release that has no `checksums.txt` yet.
+
 ## Code conventions
 - Strict TypeScript (`strict: true`)
 - Double quotes, trailing commas (Biome)
