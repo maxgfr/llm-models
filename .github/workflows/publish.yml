@@ -95,6 +95,10 @@ jobs:
             exit 0
           fi
           MAJOR="${TAG%%.*}"
+          if [ "$(git rev-parse -q --verify "refs/tags/$MAJOR^{}")" = "$(git rev-parse "$TAG^{}")" ]; then
+            echo "$MAJOR already points to $TAG"
+            exit 0
+          fi
           git tag -f "$MAJOR" "$TAG^{}"
           git push -f origin "refs/tags/$MAJOR"
           echo "$MAJOR now points to $TAG"
