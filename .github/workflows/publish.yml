@@ -114,6 +114,18 @@ jobs:
             echo "::notice::llm-connect is not on npm yet; publish its first version by hand"
           fi
 
+      # The Marketplace lists the GitHub Action (action.yml, released as v*) from the Latest release:
+      # an llm-connect release made after it in this job would take that place, so hand it back.
+      - name: Keep the llm-models release as Latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version_after.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --latest
+            echo "$TAG is the Latest release"
+          fi
+
   build-binaries:
     needs: release
     if: needs.release.outputs.new_release_published == 'true'
