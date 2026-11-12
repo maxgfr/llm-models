@@ -118,7 +118,7 @@ async function runIn(
   homeDir: string,
   ...args: string[]
 ): Promise<{ stdout: string; stderr: string; code: number }> {
-  const proc = Bun.spawn(["bun", "run", "src/index.ts", ...args], {
+  const proc = Bun.spawn(["bun", "run", "src/bin.ts", ...args], {
     cwd: ROOT,
     env: { ...process.env, HOME: homeDir, NO_COLOR: "1" },
     stdout: "pipe",

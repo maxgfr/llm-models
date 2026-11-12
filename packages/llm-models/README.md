@@ -904,6 +904,12 @@ instructions. `OPENAI_VOICES` and `GEMINI_VOICES` are the voices each maker docu
 `describeFalSpeechModel(endpoint)` reads one fal.ai endpoint's voices, languages and formats from
 its schema.
 
+### Bundling and the CLI
+
+Importing `llm-models` never starts the CLI, so the library can be bundled into another program
+(a GitHub Action, a server) with esbuild, Bun or webpack. The CLI starts from the `llm-models`
+binary; to start it from your own entry point, call `runCommand()` (Node entry only).
+
 ### Raw API Access
 
 ```typescript

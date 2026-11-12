@@ -27,7 +27,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "bun run build:all && test \"$(node build/index.js --version)\" = \"${nextRelease.version}\""
+        "prepareCmd": "bun run build:all && test \"$(node bin/llm-models.js --version)\" = \"${nextRelease.version}\""
       }
     ],
     "@semantic-release/github",

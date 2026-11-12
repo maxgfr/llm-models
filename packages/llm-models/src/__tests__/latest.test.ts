@@ -81,6 +81,19 @@ describe("pickTiers", () => {
     });
   });
 
+  it("never pairs the flagship with another vendor's fast model hosted by the same provider", () => {
+    const pool = [
+      model("mistral/mistral-large-4", "mistral", { date: "2026-09-01" }),
+      model("mistral/deepseek-v4-1-flash-1017", "mistral", { date: "2026-10-17" }),
+      model("mistral/zai-glm-5-3-flash", "mistral", { date: "2026-09-20" }),
+    ];
+    expect(ids(pickTiers(pool))).toEqual({
+      opus: "mistral/mistral-large-4",
+      sonnet: "mistral/mistral-large-4",
+      haiku: "mistral/mistral-large-4",
+    });
+  });
+
   it("prefers a dated entry over an undated snapshot of the same model", () => {
     const pool = [
       model("deepseek/deepseek-v4-pro-0813", "deepseek"),

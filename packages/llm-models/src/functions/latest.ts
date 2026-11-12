@@ -95,6 +95,11 @@ function major(id: string): number {
   return version(id)[0] ?? 0;
 }
 
+/** The model line an id belongs to: its first name token ("gpt", "glm", "mistral", "deepseek"). */
+function lineage(id: string): string {
+  return tokens(id)[0] ?? "";
+}
+
 export function isFast(model: UnifiedModel): boolean {
   return tokens(model.id).some((token) => FAST_TOKENS.has(token));
 }
@@ -169,8 +174,9 @@ function pickClaudeTiers(sorted: UnifiedModel[]): LatestPick[] {
 
 /**
  * Pick the newest flagship (opus) and its fast sibling (sonnet and haiku) out
- * of `pool`. The fast pick has to share the flagship's major version, so a
- * "glm-4.7-flash" never pairs with "glm-5.3"; when the generation ships no fast
+ * of `pool`. The fast pick has to share the flagship's line and major version, so a
+ * "glm-4.7-flash" never pairs with "glm-5.3", nor a "deepseek-v4-flash" hosted by
+ * Mistral with "mistral-large-4"; when the generation ships no fast
  * variant, every tier is the flagship. Pools that hold only fast models make
  * the newest of them the flagship. Returns null when nothing is eligible.
  */
@@ -189,7 +195,11 @@ export function pickTiers(pool: UnifiedModel[], filter?: string): LatestPick[] |
 
   const opus = sorted.find((model) => !isFast(model)) ?? sorted[0];
   const generation = major(opus.id);
-  const sonnet = sorted.find((model) => isFast(model) && major(model.id) === generation) ?? opus;
+  const line = lineage(opus.id);
+  const sonnet =
+    sorted.find(
+      (model) => isFast(model) && major(model.id) === generation && lineage(model.id) === line,
+    ) ?? opus;
 
   return [
     { tier: "opus", model: opus },
