@@ -52,11 +52,6 @@ jobs:
 
       # One semantic-release run per package, from the package folder:
       # semantic-release-monorepo only counts the commits touching that folder.
-      - name: Get llm-models version before release
-        id: version_before
-        working-directory: packages/llm-models
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
       - name: Release llm-models
         working-directory: packages/llm-models
         run: bun run release
@@ -66,15 +61,26 @@ jobs:
         working-directory: packages/llm-models
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
-      - name: Check if a new llm-models version was released
+      # Binaries are owed to any llm-models release that has none yet, not only to one made by
+      # this run: a run that fails after semantic-release pushed the release commit (as when
+      # GitHub rejects the git notes push) leaves package.json already bumped, and comparing
+      # versions would then skip the binaries for good.
+      - name: Check if the llm-models release needs binaries
         id: check_release
+        working-directory: packages/llm-models
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ steps.version_before.outputs.version }}" != "${{ steps.version_after.outputs.version }}" ]; then
-            echo "new_release=true" >> $GITHUB_OUTPUT
-            echo "✅ New version released: ${{ steps.version_after.outputs.version }}"
-          else
+          tag="v${{ steps.version_after.outputs.version }}"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
             echo "new_release=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No new version released"
+            echo "ℹ️ No GitHub release $tag"
+          elif gh release view "$tag" --json assets --jq '.assets[].name' | grep -qx checksums.txt; then
+            echo "new_release=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ $tag already has its binaries"
+          else
+            echo "new_release=true" >> $GITHUB_OUTPUT
+            echo "✅ $tag needs its binaries"
           fi
 
       # The first llm-connect version was published by hand: npm's trusted
