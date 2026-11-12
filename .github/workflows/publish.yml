@@ -83,6 +83,22 @@ jobs:
             echo "✅ $tag needs its binaries"
           fi
 
+      # The GitHub Action (action.yml at the root) is used as maxgfr/llm-models@v1: move that tag to
+      # the latest llm-models release on every run, so it never lags behind (llm-connect tags are
+      # llm-connect-v*, never touched here).
+      - name: Move the llm-models major tag
+        run: |
+          git fetch --tags --force
+          TAG="v${{ steps.version_after.outputs.version }}"
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "No tag $TAG"
+            exit 0
+          fi
+          MAJOR="${TAG%%.*}"
+          git tag -f "$MAJOR" "$TAG^{}"
+          git push -f origin "refs/tags/$MAJOR"
+          echo "$MAJOR now points to $TAG"
+
       # The first llm-connect version was published by hand: npm's trusted
       # publishing only attaches to a package that already exists.
       - name: Release llm-connect
