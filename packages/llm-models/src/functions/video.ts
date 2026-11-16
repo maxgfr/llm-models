@@ -1,5 +1,5 @@
-import type { FetchOptions } from "../clients/http";
-import { fetchModelsDevModels } from "../clients/models-dev";
+import type { FetchOptions } from "../clients/http.js";
+import { fetchModelsDevModels } from "../clients/models-dev.js";
 import {
   type FalModel,
   fetchFalModelSchema,
@@ -12,9 +12,9 @@ import {
   type GoogleModel,
   type OpenRouterVideoModel,
   type ReplicateModel,
-} from "../clients/video";
-import { debug } from "../log";
-import type { ModelsDevResponse } from "../types";
+} from "../clients/video.js";
+import { debug } from "../log.js";
+import type { ModelsDevResponse } from "../types.js";
 import {
   shortSide,
   VIDEO_OPERATIONS,
@@ -23,7 +23,7 @@ import {
   type VideoOperation,
   type VideoPrice,
   type VideoProviderId,
-} from "../video";
+} from "../video.js";
 
 const RATIO = /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/;
 const DAY = (seconds: number) => new Date(seconds * 1000).toISOString().slice(0, 10);

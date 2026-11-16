@@ -1,5 +1,5 @@
-import type { Capabilities, ModelFilter, ModelSortField, UnifiedModel } from "../types";
-import { findModels } from "./search";
+import type { Capabilities, ModelFilter, ModelSortField, UnifiedModel } from "../types.js";
+import { findModels } from "./search.js";
 
 export class QueryBuilder {
   private filter: ModelFilter = {};

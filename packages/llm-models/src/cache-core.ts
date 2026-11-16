@@ -1,4 +1,4 @@
-import { debug, formatAge } from "./log";
+import { debug, formatAge } from "./log.js";
 
 // The cache logic, free of any Node.js API so it also runs in a browser. Where
 // entries live is a CacheStore: in memory by default, on disk once `./cache`

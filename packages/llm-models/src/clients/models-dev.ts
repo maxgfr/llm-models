@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { readCache, writeCache } from "../cache-core";
-import { debug } from "../log";
-import { ModelsDevModelSchema, ModelsDevProviderSchema } from "../schemas/models-dev";
-import type { ModelsDevModel, ModelsDevResponse } from "../types";
-import { type FetchOptions, fetchJson } from "./http";
+import { readCache, writeCache } from "../cache-core.js";
+import { debug } from "../log.js";
+import { ModelsDevModelSchema, ModelsDevProviderSchema } from "../schemas/models-dev.js";
+import type { ModelsDevModel, ModelsDevResponse } from "../types.js";
+import { type FetchOptions, fetchJson } from "./http.js";
 
 const MODELS_DEV_URL = "https://models.dev/api.json";
 

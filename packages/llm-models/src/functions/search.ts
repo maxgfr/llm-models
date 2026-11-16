@@ -1,6 +1,6 @@
-import { normalizeModality } from "../catalog";
-import type { ModelFilter, ModelSortField, UnifiedModel } from "../types";
-import { fetchUnifiedModels } from "./normalize";
+import { normalizeModality } from "../catalog.js";
+import type { ModelFilter, ModelSortField, UnifiedModel } from "../types.js";
+import { fetchUnifiedModels } from "./normalize.js";
 
 export function filterModels(models: UnifiedModel[], filter: ModelFilter): UnifiedModel[] {
   let result = models;

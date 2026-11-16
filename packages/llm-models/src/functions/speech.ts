@@ -1,5 +1,5 @@
-import type { FetchOptions } from "../clients/http";
-import { fetchModelsDevModels } from "../clients/models-dev";
+import type { FetchOptions } from "../clients/http.js";
+import { fetchModelsDevModels } from "../clients/models-dev.js";
 import {
   type ElevenLabsModel,
   type ElevenLabsVoice,
@@ -8,8 +8,8 @@ import {
   fetchFalSpeechModels,
   fetchGatewaySpeechModels,
   type GatewaySpeechModel,
-} from "../clients/speech";
-import { type FalModel, fetchFalModelSchema } from "../clients/video";
+} from "../clients/speech.js";
+import { type FalModel, fetchFalModelSchema } from "../clients/video.js";
 import {
   GEMINI_VOICES,
   OPENAI_VOICES,
@@ -18,9 +18,9 @@ import {
   type SpeechPrice,
   type SpeechProviderId,
   type SpeechVoice,
-} from "../speech";
-import type { ModelsDevResponse } from "../types";
-import { inputProperties, isObject, type Json, settle } from "./video";
+} from "../speech.js";
+import type { ModelsDevResponse } from "../types.js";
+import { inputProperties, isObject, type Json, settle } from "./video.js";
 
 const DAY = (seconds: number) => new Date(seconds * 1000).toISOString().slice(0, 10);
 /** Rounded so a per-character price read as a float comes back as written (0.00002 → 20). */

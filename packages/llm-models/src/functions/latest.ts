@@ -1,6 +1,6 @@
-import type { UnifiedModel } from "../types";
-import { fetchUnifiedData } from "./normalize";
-import { providersForEndpoint } from "./resolve";
+import type { UnifiedModel } from "../types.js";
+import { fetchUnifiedData } from "./normalize.js";
+import { providersForEndpoint } from "./resolve.js";
 
 export type Tier = "opus" | "sonnet" | "haiku";
 

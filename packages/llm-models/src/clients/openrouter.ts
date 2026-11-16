@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { readCache, writeCache } from "../cache-core";
-import { debug } from "../log";
-import { OpenRouterModelSchema } from "../schemas/openrouter";
-import type { OpenRouterModel, OpenRouterResponse } from "../types";
-import { type FetchOptions, fetchJson } from "./http";
+import { readCache, writeCache } from "../cache-core.js";
+import { debug } from "../log.js";
+import { OpenRouterModelSchema } from "../schemas/openrouter.js";
+import type { OpenRouterModel, OpenRouterResponse } from "../types.js";
+import { type FetchOptions, fetchJson } from "./http.js";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/models";
 

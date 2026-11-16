@@ -1,4 +1,4 @@
-import type { LlmModelsConfig, WorkloadProfile } from "./types";
+import type { LlmModelsConfig, WorkloadProfile } from "./types.js";
 
 // Config lookups, free of any Node.js API. Where the config comes from is a
 // loader: none by default (a browser has no config file), the config files once

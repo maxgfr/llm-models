@@ -1,6 +1,6 @@
-import type { ModelComparison, UnifiedModel } from "../types";
-import { fetchUnifiedModels } from "./normalize";
-import { findModel } from "./resolve";
+import type { ModelComparison, UnifiedModel } from "../types.js";
+import { fetchUnifiedModels } from "./normalize.js";
+import { findModel } from "./resolve.js";
 
 function findBest(
   values: Record<string, number | null>,

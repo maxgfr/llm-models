@@ -168,6 +168,9 @@ any release that has no `checksums.txt` yet.
 - Tests use `describe`/`it` blocks with `bun:test`
 - Tests that mock `fetch` must call `setCacheEnabled(false)` in `beforeAll`
 - Tests that need a real cache use `setCacheDir()` on a temp dir; never touch the real ~/.cache
+- Relative imports in `llm-models/src` carry their `.js` extension (`./lib.js`, `./functions/index.js`) and
+  JSON imports use `with { type: "json" }`: `tsconfig` is `NodeNext`, so the emitted `.d.ts` resolve for
+  consumers on `node16`/`nodenext` as well as `bundler` (issue #48); `typecheck` rejects a bare specifier
 - Library modules import `cache-core`/`config-core`, never `cache`/`config` (those pull in node:fs)
 - Browser-callable claims are evidence-based: probe live, or cite the provider's doc next to the table entry
 - Browser-model facts (release, languages, scores) cite a model card, vendor post or report next to

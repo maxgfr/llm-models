@@ -1,4 +1,4 @@
-import type { BrowserSupport } from "../types";
+import type { BrowserSupport } from "../types.js";
 
 /**
  * Base URLs of the providers whose models.dev entry documents no `api`, so the

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { Argument, Command, InvalidArgumentError, Option } from "commander";
-import pkg from "../package.json";
+import pkg from "../package.json" with { type: "json" };
 import {
   clearCache,
   getCacheDir,
@@ -10,17 +10,17 @@ import {
   isCacheEnabled,
   setCacheEnabled,
   setCacheTtl,
-} from "./cache";
-import { CALLABLE_NPM } from "./catalog";
-import { fetchModelsDevModels } from "./clients/models-dev";
-import { fetchOpenRouterModels } from "./clients/openrouter";
-import { bold, cyan, dim, green, red, yellow } from "./colors";
+} from "./cache.js";
+import { CALLABLE_NPM } from "./catalog.js";
+import { fetchModelsDevModels } from "./clients/models-dev.js";
+import { fetchOpenRouterModels } from "./clients/openrouter.js";
+import { bold, cyan, dim, green, red, yellow } from "./colors.js";
 import {
   generateBashCompletion,
   generateFishCompletion,
   generateZshCompletion,
-} from "./completions";
-import { getConfigPath, getProfile, initConfig, listProfiles, loadConfig } from "./config";
+} from "./completions.js";
+import { getConfigPath, getProfile, initConfig, listProfiles, loadConfig } from "./config.js";
 import {
   formatCapabilities,
   formatContext,
@@ -29,28 +29,28 @@ import {
   type OutputFormat,
   outputFormatted,
   parseTokenCount,
-} from "./format";
-import { DEFAULT_PROBE_ORIGIN } from "./functions/browser";
+} from "./format.js";
+import { DEFAULT_PROBE_ORIGIN } from "./functions/browser.js";
 import {
   browserModelCatalog,
   listBrowserModels,
   recommendBrowserModel,
-} from "./functions/browser-models";
-import { buildSlimCatalog } from "./functions/catalog";
-import { compareModels } from "./functions/compare";
-import { cheapestModels, estimateCost, projectCost } from "./functions/cost";
-import { diffModels } from "./functions/diff";
-import { formatFields, parseFieldList } from "./functions/fields";
-import { listImageModels } from "./functions/image";
-import { latestModels, TIERS, type Tier } from "./functions/latest";
-import { fetchUnifiedModels } from "./functions/normalize";
-import { getProvider, listProviders } from "./functions/provider";
-import { listUseCases, recommendModels } from "./functions/recommend";
-import { findModel, resolveModel } from "./functions/resolve";
-import { filterModels, sortModels } from "./functions/search";
-import { listSpeechModels } from "./functions/speech";
-import { getStats } from "./functions/stats";
-import { listVideoModels } from "./functions/video";
+} from "./functions/browser-models.js";
+import { buildSlimCatalog } from "./functions/catalog.js";
+import { compareModels } from "./functions/compare.js";
+import { cheapestModels, estimateCost, projectCost } from "./functions/cost.js";
+import { diffModels } from "./functions/diff.js";
+import { formatFields, parseFieldList } from "./functions/fields.js";
+import { listImageModels } from "./functions/image.js";
+import { latestModels, TIERS, type Tier } from "./functions/latest.js";
+import { fetchUnifiedModels } from "./functions/normalize.js";
+import { getProvider, listProviders } from "./functions/provider.js";
+import { listUseCases, recommendModels } from "./functions/recommend.js";
+import { findModel, resolveModel } from "./functions/resolve.js";
+import { filterModels, sortModels } from "./functions/search.js";
+import { listSpeechModels } from "./functions/speech.js";
+import { getStats } from "./functions/stats.js";
+import { listVideoModels } from "./functions/video.js";
 import {
   filterImageModels,
   IMAGE_OPERATIONS,
@@ -59,22 +59,22 @@ import {
   type ImageOperation,
   type ImageProviderId,
   imagePrice,
-} from "./image";
-import { setVerbose } from "./log";
+} from "./image.js";
+import { setVerbose } from "./log.js";
 import {
   BrowserModelNeedSchema,
   CapabilityEnum,
   ModelFilterSchema,
   ModelSortFieldSchema,
   OutputFormatSchema,
-} from "./schemas/functions";
+} from "./schemas/functions.js";
 import {
   filterSpeechModels,
   SPEECH_PROVIDERS,
   type SpeechModel,
   type SpeechProviderId,
   speechPrice,
-} from "./speech";
+} from "./speech.js";
 import type {
   BrowserModel,
   BrowserModelNeed,
@@ -83,7 +83,7 @@ import type {
   ModelFilter,
   ModelSortField,
   UnifiedModel,
-} from "./types";
+} from "./types.js";
 import {
   filterVideoModels,
   VIDEO_OPERATIONS,
@@ -92,7 +92,7 @@ import {
   type VideoOperation,
   type VideoProviderId,
   videoPricePerSecond,
-} from "./video";
+} from "./video.js";
 
 const CAPABILITIES = CapabilityEnum.options;
 const STATUSES = ModelFilterSchema.shape.status.unwrap().options;
@@ -1654,7 +1654,7 @@ export function createProgram(): Command {
     .command("mcp")
     .description("Start MCP (Model Context Protocol) server for AI agent integration")
     .action(async () => {
-      const { startMcpServer } = await import("./mcp");
+      const { startMcpServer } = await import("./mcp.js");
       await startMcpServer();
     });
 

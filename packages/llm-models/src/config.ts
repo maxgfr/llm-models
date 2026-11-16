@@ -1,15 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { setConfigLoader } from "./config-core";
-import { LlmModelsConfigSchema } from "./schemas/functions";
-import type { LlmModelsConfig } from "./types";
+import { setConfigLoader } from "./config-core.js";
+import { LlmModelsConfigSchema } from "./schemas/functions.js";
+import type { LlmModelsConfig } from "./types.js";
 
 // Node only: reads `.llm-modelsrc` and ~/.config/llm-models/config.json.
 // Importing this module installs that reader; the browser entry never imports it.
 
-export type { LlmModelsConfig, WorkloadProfile } from "./config-core";
-export { getProfile, listProfiles, loadConfig } from "./config-core";
+export type { LlmModelsConfig, WorkloadProfile } from "./config-core.js";
+export { getProfile, listProfiles, loadConfig } from "./config-core.js";
 
 const CONFIG_DIR = join(homedir(), ".config", "llm-models");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
