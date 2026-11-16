@@ -1,5 +1,5 @@
-import { bold, colorizeCost, stripAnsi } from "./colors";
-import type { OutputFormat } from "./types";
+import { bold, colorizeCost, stripAnsi } from "./colors.js";
+import type { OutputFormat } from "./types.js";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape codes require control characters
 const ANSI_RE = /\x1b\[\d+m/g;

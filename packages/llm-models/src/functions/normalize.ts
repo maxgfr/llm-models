@@ -1,15 +1,15 @@
-import { readFallbackCache } from "../cache-core";
-import { normalizeModality } from "../catalog";
-import type { FetchOptions } from "../clients/http";
-import { fetchModelsDevModels } from "../clients/models-dev";
-import { fetchOpenRouterModels } from "../clients/openrouter";
+import { readFallbackCache } from "../cache-core.js";
+import { normalizeModality } from "../catalog.js";
+import type { FetchOptions } from "../clients/http.js";
+import { fetchModelsDevModels } from "../clients/models-dev.js";
+import { fetchOpenRouterModels } from "../clients/openrouter.js";
 import type {
   ModelsDevModel,
   ModelsDevResponse,
   OpenRouterModel,
   OpenRouterResponse,
   UnifiedModel,
-} from "../types";
+} from "../types.js";
 
 /**
  * Drop binary floating-point noise from a price: "0.00000005" * 1e6 is

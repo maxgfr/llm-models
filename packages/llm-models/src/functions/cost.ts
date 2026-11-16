@@ -1,7 +1,7 @@
-import type { Capabilities, CostEstimate, UnifiedModel } from "../types";
-import { fetchUnifiedModels } from "./normalize";
-import { findModel } from "./resolve";
-import { filterModels, sortModels } from "./search";
+import type { Capabilities, CostEstimate, UnifiedModel } from "../types.js";
+import { fetchUnifiedModels } from "./normalize.js";
+import { findModel } from "./resolve.js";
+import { filterModels, sortModels } from "./search.js";
 
 export interface CostProjection {
   daily_cost_usd: number;

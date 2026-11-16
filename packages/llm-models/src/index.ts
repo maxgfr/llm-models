@@ -4,8 +4,8 @@
 // would run the CLI inside it. The CLI starts from bin/llm-models.js (npm) or
 // src/bin.ts (dev, compiled binaries).
 
-import "./cache";
-import "./config";
+import "./cache.js";
+import "./config.js";
 
-export { runCommand } from "./cli";
-export * from "./lib";
+export { runCommand } from "./cli.js";
+export * from "./lib.js";

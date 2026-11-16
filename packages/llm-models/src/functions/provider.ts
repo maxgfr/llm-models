@@ -1,7 +1,7 @@
-import { getCacheTtl, readCache, writeCache } from "../cache-core";
-import type { BrowserSupport, ProviderInfo, UnifiedModel } from "../types";
-import { DEFAULT_PROBE_ORIGIN, type ProbeManyOptions, probeBrowserSupportAll } from "./browser";
-import { fetchUnifiedData } from "./normalize";
+import { getCacheTtl, readCache, writeCache } from "../cache-core.js";
+import type { BrowserSupport, ProviderInfo, UnifiedModel } from "../types.js";
+import { DEFAULT_PROBE_ORIGIN, type ProbeManyOptions, probeBrowserSupportAll } from "./browser.js";
+import { fetchUnifiedData } from "./normalize.js";
 
 export interface ProviderOptions {
   /**

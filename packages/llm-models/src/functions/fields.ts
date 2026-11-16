@@ -1,4 +1,4 @@
-import type { UnifiedModel } from "../types";
+import type { UnifiedModel } from "../types.js";
 
 /**
  * Read a dotted path out of a model object: "context_length", "cost.input",

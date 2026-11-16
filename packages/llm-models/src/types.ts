@@ -19,13 +19,13 @@ import type {
   ProviderInfoSchema,
   UnifiedModelSchema,
   WorkloadProfileSchema,
-} from "./schemas/functions";
+} from "./schemas/functions.js";
 import type {
   ModelsDevModelSchema,
   ModelsDevProviderSchema,
   ModelsDevResponseSchema,
-} from "./schemas/models-dev";
-import type { OpenRouterModelSchema, OpenRouterResponseSchema } from "./schemas/openrouter";
+} from "./schemas/models-dev.js";
+import type { OpenRouterModelSchema, OpenRouterResponseSchema } from "./schemas/openrouter.js";
 
 export type OpenRouterModel = z.infer<typeof OpenRouterModelSchema>;
 export type OpenRouterResponse = z.infer<typeof OpenRouterResponseSchema>;

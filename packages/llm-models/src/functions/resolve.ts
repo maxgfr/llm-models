@@ -1,6 +1,6 @@
-import type { ModelsDevResponse, UnifiedModel } from "../types";
-import { providerBaseUrl } from "./browser";
-import { fetchUnifiedData } from "./normalize";
+import type { ModelsDevResponse, UnifiedModel } from "../types.js";
+import { providerBaseUrl } from "./browser.js";
+import { fetchUnifiedData } from "./normalize.js";
 
 export type ResolveMatchedBy = "endpoint" | "provider" | "global";
 

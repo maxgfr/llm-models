@@ -5,43 +5,43 @@ export {
   probeBrowserSupport,
   probeBrowserSupportAll,
   providerBaseUrl,
-} from "./browser";
+} from "./browser.js";
 export {
   baseId,
   browserModelCatalog,
   describeBrowserModel,
   listBrowserModels,
   recommendBrowserModel,
-} from "./browser-models";
-export type { SlimCatalogOptions } from "./catalog";
-export { buildSlimCatalog, slimCatalog } from "./catalog";
-export { compareModels } from "./compare";
-export { cheapestModels, estimateCost } from "./cost";
-export { diffModels } from "./diff";
-export { formatFields, parseFieldList, readField } from "./fields";
-export type { ListImageModelsOptions } from "./image";
+} from "./browser-models.js";
+export type { SlimCatalogOptions } from "./catalog.js";
+export { buildSlimCatalog, slimCatalog } from "./catalog.js";
+export { compareModels } from "./compare.js";
+export { cheapestModels, estimateCost } from "./cost.js";
+export { diffModels } from "./diff.js";
+export { formatFields, parseFieldList, readField } from "./fields.js";
+export type { ListImageModelsOptions } from "./image.js";
 export {
   describeFalImageModel,
   describeOpenApiImageInput,
   enrichImageModel,
   gatewayImagePrices,
   listImageModels,
-} from "./image";
-export { latestModels, pickTiers } from "./latest";
-export { fetchUnifiedData, fetchUnifiedModels, mergeModels } from "./normalize";
-export { getProvider, listProviders } from "./provider";
-export { QueryBuilder, query } from "./query";
-export { listUseCases, recommendModels } from "./recommend";
-export { findModel, pickBestModel, providersForEndpoint, resolveModel } from "./resolve";
-export { filterModels, findModels, sortModels } from "./search";
-export type { ListSpeechModelsOptions } from "./speech";
+} from "./image.js";
+export { latestModels, pickTiers } from "./latest.js";
+export { fetchUnifiedData, fetchUnifiedModels, mergeModels } from "./normalize.js";
+export { getProvider, listProviders } from "./provider.js";
+export { QueryBuilder, query } from "./query.js";
+export { listUseCases, recommendModels } from "./recommend.js";
+export { findModel, pickBestModel, providersForEndpoint, resolveModel } from "./resolve.js";
+export { filterModels, findModels, sortModels } from "./search.js";
+export type { ListSpeechModelsOptions } from "./speech.js";
 export {
   describeFalSpeechModel,
   describeOpenApiSpeechInput,
   listSpeechModels,
-} from "./speech";
-export { getStats } from "./stats";
-export type { ListVideoModelsOptions } from "./video";
+} from "./speech.js";
+export { getStats } from "./stats.js";
+export type { ListVideoModelsOptions } from "./video.js";
 export {
   describeFalVideoModel,
   describeOpenApiVideoInput,
@@ -49,4 +49,4 @@ export {
   listVideoModels,
   openRouterPrices,
   videoMatchKey,
-} from "./video";
+} from "./video.js";

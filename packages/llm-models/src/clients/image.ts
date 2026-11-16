@@ -1,11 +1,11 @@
 import type { z } from "zod";
-import { readCache, writeCache } from "../cache-core";
+import { readCache, writeCache } from "../cache-core.js";
 import {
   GatewayImageModelSchema,
   OpenAIModelSchema,
   OpenRouterImageModelSchema,
-} from "../schemas/image";
-import { type FetchOptions, fetchJson } from "./http";
+} from "../schemas/image.js";
+import { type FetchOptions, fetchJson } from "./http.js";
 import {
   each,
   type FalModel,
@@ -16,7 +16,7 @@ import {
   type GoogleModel,
   listOf,
   type ReplicateModel,
-} from "./video";
+} from "./video.js";
 
 export type OpenRouterImageModel = z.infer<typeof OpenRouterImageModelSchema>;
 export type GatewayImageModel = z.infer<typeof GatewayImageModelSchema>;

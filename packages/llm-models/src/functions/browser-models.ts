@@ -8,11 +8,11 @@
 // table of published benchmark scores. Every hand-kept fact cites its source.
 // The library never imports @mlc-ai/web-llm.
 
-import catalogJson from "../data/browser-models.json";
+import catalogJson from "../data/browser-models.json" with { type: "json" };
 import {
   BrowserModelCatalogSchema,
   BrowserModelRecommendationOptionsSchema,
-} from "../schemas/functions";
+} from "../schemas/functions.js";
 import type {
   BrowserModel,
   BrowserModelCatalog,
@@ -21,7 +21,7 @@ import type {
   BrowserModelRecommendation,
   BrowserModelRecommendationOptions,
   BrowserModelRecord,
-} from "../types";
+} from "../types.js";
 
 // --- Families and generations -------------------------------------------
 //

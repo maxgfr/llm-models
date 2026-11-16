@@ -1,13 +1,19 @@
 import type { z } from "zod";
-import { readCache, writeCache } from "../cache-core";
+import { readCache, writeCache } from "../cache-core.js";
 import {
   ElevenLabsModelSchema,
   ElevenLabsVoiceSchema,
   ElevenLabsVoicesPageSchema,
   GatewaySpeechModelSchema,
-} from "../schemas/speech";
-import { type FetchOptions, fetchJson } from "./http";
-import { each, type FalModel, fetchFalCategoryModels, GATEWAY_MODELS_URL, listOf } from "./video";
+} from "../schemas/speech.js";
+import { type FetchOptions, fetchJson } from "./http.js";
+import {
+  each,
+  type FalModel,
+  fetchFalCategoryModels,
+  GATEWAY_MODELS_URL,
+  listOf,
+} from "./video.js";
 
 export type GatewaySpeechModel = z.infer<typeof GatewaySpeechModelSchema>;
 export type ElevenLabsModel = z.infer<typeof ElevenLabsModelSchema>;

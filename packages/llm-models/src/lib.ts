@@ -2,8 +2,8 @@
 // (`browser.ts`). Nothing reachable from here may import a Node.js builtin or
 // touch the file system at load: browser-bundle.test.ts enforces it.
 
-export { clearCache, setCacheEnabled } from "./cache-core";
-export type { InputModality, SlimCatalog, SlimModel, SlimProvider, WithInputs } from "./catalog";
+export { clearCache, setCacheEnabled } from "./cache-core.js";
+export type { InputModality, SlimCatalog, SlimModel, SlimProvider, WithInputs } from "./catalog.js";
 export {
   acceptsInput,
   CALLABLE_NPM,
@@ -12,8 +12,8 @@ export {
   INPUT_MODALITIES,
   inputsOf,
   normalizeModality,
-} from "./catalog";
-export type { FetchOptions } from "./clients/http";
+} from "./catalog.js";
+export type { FetchOptions } from "./clients/http.js";
 export {
   fetchFalImageModels,
   fetchGatewayImageModels,
@@ -21,30 +21,30 @@ export {
   fetchOpenAIImageModels,
   fetchOpenRouterImageModels,
   fetchReplicateImageModels,
-} from "./clients/image";
-export { fetchModelsDevModels } from "./clients/models-dev";
-export { fetchOpenRouterModels } from "./clients/openrouter";
+} from "./clients/image.js";
+export { fetchModelsDevModels } from "./clients/models-dev.js";
+export { fetchOpenRouterModels } from "./clients/openrouter.js";
 export {
   fetchElevenLabsModels,
   fetchElevenLabsVoices,
   fetchFalSpeechModels,
   fetchGatewaySpeechModels,
-} from "./clients/speech";
+} from "./clients/speech.js";
 export {
   fetchFalVideoModels,
   fetchGatewayVideoModels,
   fetchGoogleVideoModels,
   fetchOpenRouterVideoModels,
   fetchReplicateVideoModels,
-} from "./clients/video";
-export { getProfile, listProfiles, loadConfig } from "./config-core";
+} from "./clients/video.js";
+export { getProfile, listProfiles, loadConfig } from "./config-core.js";
 export type {
   BrowserProbeOptions,
   BrowserProbeTarget,
   ProbeManyOptions,
-} from "./functions/browser";
-export type { BuildSlimCatalogOptions, SlimCatalogOptions } from "./functions/catalog";
-export type { ListImageModelsOptions } from "./functions/image";
+} from "./functions/browser.js";
+export type { BuildSlimCatalogOptions, SlimCatalogOptions } from "./functions/catalog.js";
+export type { ListImageModelsOptions } from "./functions/image.js";
 export {
   BROWSER_REQUIRED_HEADERS,
   browserModelCatalog,
@@ -98,18 +98,18 @@ export {
   slimCatalog,
   sortModels,
   videoMatchKey,
-} from "./functions/index";
-export type { ProviderOptions } from "./functions/provider";
-export type { ListSpeechModelsOptions } from "./functions/speech";
-export type { ListVideoModelsOptions } from "./functions/video";
-export type { ImageModel, ImageOperation, ImagePrice, ImageProviderId } from "./image";
+} from "./functions/index.js";
+export type { ProviderOptions } from "./functions/provider.js";
+export type { ListSpeechModelsOptions } from "./functions/speech.js";
+export type { ListVideoModelsOptions } from "./functions/video.js";
+export type { ImageModel, ImageOperation, ImagePrice, ImageProviderId } from "./image.js";
 export {
   filterImageModels,
   IMAGE_OPERATIONS,
   IMAGE_PROVIDERS,
   imagePrice,
   rendersImageFromText,
-} from "./image";
+} from "./image.js";
 export {
   BrowserModelCatalogSchema,
   BrowserModelNeedSchema,
@@ -128,7 +128,7 @@ export {
   NormalizedCostSchema,
   ProviderInfoSchema,
   UnifiedModelSchema,
-} from "./schemas/functions";
+} from "./schemas/functions.js";
 export {
   ModelsDevCostSchema,
   ModelsDevLimitSchema,
@@ -136,7 +136,7 @@ export {
   ModelsDevModelSchema,
   ModelsDevProviderSchema,
   ModelsDevResponseSchema,
-} from "./schemas/models-dev";
+} from "./schemas/models-dev.js";
 export {
   OpenRouterArchitectureSchema,
   OpenRouterDefaultParametersSchema,
@@ -145,15 +145,15 @@ export {
   OpenRouterPricingSchema,
   OpenRouterResponseSchema,
   OpenRouterTopProviderSchema,
-} from "./schemas/openrouter";
-export type { SpeechModel, SpeechPrice, SpeechProviderId, SpeechVoice } from "./speech";
+} from "./schemas/openrouter.js";
+export type { SpeechModel, SpeechPrice, SpeechProviderId, SpeechVoice } from "./speech.js";
 export {
   filterSpeechModels,
   GEMINI_VOICES,
   OPENAI_VOICES,
   SPEECH_PROVIDERS,
   speechPrice,
-} from "./speech";
+} from "./speech.js";
 export type {
   BrowserModel,
   BrowserModelCatalog,
@@ -177,13 +177,13 @@ export type {
   OpenRouterResponse,
   ProviderInfo,
   UnifiedModel,
-} from "./types";
+} from "./types.js";
 export type {
   VideoModel,
   VideoOperation,
   VideoPrice,
   VideoProviderId,
-} from "./video";
+} from "./video.js";
 export {
   filterVideoModels,
   rendersFromText,
@@ -192,4 +192,4 @@ export {
   VIDEO_PROVIDERS,
   videoPricePerSecond,
   videoSize,
-} from "./video";
+} from "./video.js";

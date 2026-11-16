@@ -1,5 +1,5 @@
-import type { UnifiedModel } from "../types";
-import { fetchUnifiedModels } from "./normalize";
+import type { UnifiedModel } from "../types.js";
+import { fetchUnifiedModels } from "./normalize.js";
 
 export interface ModelStats {
   total_models: number;

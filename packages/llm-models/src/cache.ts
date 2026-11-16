@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { type CacheEntry, type CacheStore, setCacheStore } from "./cache-core";
+import { type CacheEntry, type CacheStore, setCacheStore } from "./cache-core.js";
 
 // Node only: the on-disk cache under ~/.cache/llm-models. Importing this module
 // installs it as the cache store; the browser entry point never imports it.
@@ -26,7 +26,7 @@ export {
   setCacheEnabled,
   setCacheTtl,
   writeCache,
-} from "./cache-core";
+} from "./cache-core.js";
 
 let cacheDir = join(homedir(), ".cache", "llm-models");
 

@@ -1,6 +1,6 @@
 import type { z } from "zod";
-import { readCache, writeCache } from "../cache-core";
-import { debug } from "../log";
+import { readCache, writeCache } from "../cache-core.js";
+import { debug } from "../log.js";
 import {
   FalListingSchema,
   FalModelSchema,
@@ -8,8 +8,8 @@ import {
   GoogleModelSchema,
   OpenRouterVideoModelSchema,
   ReplicateModelSchema,
-} from "../schemas/video";
-import { type FetchOptions, fetchJson } from "./http";
+} from "../schemas/video.js";
+import { type FetchOptions, fetchJson } from "./http.js";
 
 export type OpenRouterVideoModel = z.infer<typeof OpenRouterVideoModelSchema>;
 export type GatewayVideoModel = z.infer<typeof GatewayVideoModelSchema>;

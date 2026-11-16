@@ -1,4 +1,4 @@
-import type { FetchOptions } from "../clients/http";
+import type { FetchOptions } from "../clients/http.js";
 import {
   fetchFalImageModels,
   fetchGatewayImageModels,
@@ -9,23 +9,23 @@ import {
   type GatewayImageModel,
   type OpenAIModel,
   type OpenRouterImageModel,
-} from "../clients/image";
-import { fetchModelsDevModels } from "../clients/models-dev";
+} from "../clients/image.js";
+import { fetchModelsDevModels } from "../clients/models-dev.js";
 import {
   type FalModel,
   fetchFalModelSchema,
   type GoogleModel,
   type ReplicateModel,
-} from "../clients/video";
+} from "../clients/video.js";
 import {
   IMAGE_PROVIDERS,
   type ImageModel,
   type ImageOperation,
   type ImagePrice,
   type ImageProviderId,
-} from "../image";
-import type { ModelsDevResponse } from "../types";
-import { inputProperties, type Json, settle, videoMatchKey } from "./video";
+} from "../image.js";
+import type { ModelsDevResponse } from "../types.js";
+import { inputProperties, type Json, settle, videoMatchKey } from "./video.js";
 
 const RATIO = /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/;
 const DAY = (seconds: number) => new Date(seconds * 1000).toISOString().slice(0, 10);

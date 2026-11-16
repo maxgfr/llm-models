@@ -1,8 +1,8 @@
-import { version } from "../../package.json";
+import pkg from "../../package.json" with { type: "json" };
 
 export const FETCH_TIMEOUT_MS = 15_000;
 
-const USER_AGENT = `llm-models/${version}`;
+const USER_AGENT = `llm-models/${pkg.version}`;
 
 /**
  * Headers for a GET. User-Agent only outside a browser: a page cannot set it

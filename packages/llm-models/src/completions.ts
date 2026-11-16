@@ -1,5 +1,5 @@
 import type { Command, Option } from "commander";
-import { listProfiles } from "./config";
+import { listProfiles } from "./config.js";
 
 // Completions are generated from the Commander program itself, so a new
 // command, option or enum value shows up in every shell without editing a list.

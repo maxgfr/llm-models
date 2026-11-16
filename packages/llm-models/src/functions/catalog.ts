@@ -1,9 +1,9 @@
-import type { SlimCatalog, SlimModel, SlimProvider } from "../catalog";
-import type { FetchOptions } from "../clients/http";
-import type { ModelsDevModel, ModelsDevResponse, UnifiedModel } from "../types";
-import { DEFAULT_BASE_URLS } from "./browser";
-import { pickTiers } from "./latest";
-import { fetchUnifiedData } from "./normalize";
+import type { SlimCatalog, SlimModel, SlimProvider } from "../catalog.js";
+import type { FetchOptions } from "../clients/http.js";
+import type { ModelsDevModel, ModelsDevResponse, UnifiedModel } from "../types.js";
+import { DEFAULT_BASE_URLS } from "./browser.js";
+import { pickTiers } from "./latest.js";
+import { fetchUnifiedData } from "./normalize.js";
 
 export interface SlimCatalogOptions {
   /**

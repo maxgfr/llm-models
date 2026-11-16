@@ -1,5 +1,5 @@
-import type { ModelFilter, ModelSortField, UnifiedModel } from "../types";
-import { findModels } from "./search";
+import type { ModelFilter, ModelSortField, UnifiedModel } from "../types.js";
+import { findModels } from "./search.js";
 
 export interface UseCasePreset {
   description: string;

@@ -1,6 +1,6 @@
-import { readSnapshot, removeCache, writeCache } from "../cache-core";
-import type { UnifiedModel } from "../types";
-import { fetchUnifiedModels } from "./normalize";
+import { readSnapshot, removeCache, writeCache } from "../cache-core.js";
+import type { UnifiedModel } from "../types.js";
+import { fetchUnifiedModels } from "./normalize.js";
 
 /** diff's own baseline, written only by diffModels. */
 const SNAPSHOT_KEY = "snapshot";
